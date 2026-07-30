@@ -18,6 +18,25 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 
 ---
 
+### DEC-004 — Migrations run against the hosted database; no local Supabase stack
+**Date:** 2026-07-30 | **Phase:** 1 | **Status:** Active
+**Decision:** The Supabase CLI is installed as an npm devDependency and linked to project `uorgodndubyznjzotzje`. Migrations apply with `supabase db push`. No Docker, no local stack.
+**Why:** Docker Desktop is not installed and the local stack is the only thing that needs it. Remote-only gets Phase 1 moving today with no extra tooling.
+**Tradeoff:** Every migration test hits the real cloud database, and `supabase db reset --linked` would destroy it rather than a throwaway local copy. Acceptable while the project is empty. Revisit — install Docker and move to a local stack — before the database holds data worth keeping. Tracked as [ISSUE-004](ISSUES.md).
+
+### DEC-003 — Supabase's new API key format (`sb_publishable_` / `sb_secret_`)
+**Date:** 2026-07-30 | **Phase:** 1 | **Status:** Active
+**Decision:** This project uses Supabase's new API keys, **not** the legacy `anon` / `service_role` JWTs. All Supabase client code must be written for that format.
+**Why:** The keys issued for this project are already new-format. Legacy JWT keys are deprecated and scheduled for removal by end of 2026, so building against them would mean a forced migration later.
+**Rules that follow — these bind all future phases:**
+- The keys are **opaque strings, not JWTs**. Never decode, parse, or inspect claims from a key. Anything that expects to read `role` out of the key will fail.
+- They cannot be sent as `Authorization: Bearer`. They belong in the `apikey` header — `supabase-js` and `@supabase/ssr` handle this, so use the SDK rather than hand-rolled `fetch`.
+- `sb_publishable_` is the browser-safe key (replaces `anon`); `sb_secret_` is server-only (replaces `service_role`) and **still bypasses RLS** via the `service_role` Postgres role.
+- Supabase Edge Functions only verify legacy JWTs, so any Edge Function must be deployed with `--no-verify-jwt` and do its own auth check.
+- Env var **names** stay legacy-styled (`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) while holding new-format **values**. Intentional, so it doesn't read as a mistake.
+**Source:** https://supabase.com/docs/guides/api/api-keys
+**Tradeoff:** Some third-party tutorials and older libraries still assume JWT keys and will need adapting.
+
 ### DEC-002 — Wiki lives in the repo, not an external tracker
 **Date:** 2026-07-30 | **Phase:** 0 | **Status:** Active
 **Decision:** Project state is tracked in `docs/wiki/` as Markdown, versioned alongside the code.

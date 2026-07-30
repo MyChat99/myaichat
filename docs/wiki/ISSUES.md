@@ -18,9 +18,14 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ## Open
 
-### ISSUE-002 — External service credentials not yet provisioned
-**Status:** Open | **Severity:** Medium | **Phase:** 1, 6, 8 | **Opened:** 2026-07-30 | **Resolved:** —
-**Problem:** No accounts or keys exist yet for Supabase (Phase 1), Cloudflare R2 and Resend (Phase 6), or Railway (Phase 8). Each will block its phase at the point of integration.
+### ISSUE-004 — No local Supabase stack; migrations run against the hosted database
+**Status:** Open | **Severity:** Low | **Phase:** 1 | **Opened:** 2026-07-30 | **Resolved:** —
+**Problem:** Docker is not installed, so there is no local Supabase stack. Migrations apply to the hosted project via `supabase db push`, and `supabase db reset --linked` would drop and recreate the **remote** database. Harmless while the project is empty; destructive once real data exists.
+**Resolution:** Use `db push` for normal migration work; never `reset --linked` without confirming first. Install Docker and switch to a local stack before the project holds data worth keeping. See [DEC-004](DECISIONS.md).
+
+### ISSUE-003 — R2, Resend, and Railway credentials not yet provisioned
+**Status:** Open | **Severity:** Medium | **Phase:** 6, 8 | **Opened:** 2026-07-30 | **Resolved:** —
+**Problem:** No accounts or keys yet for Cloudflare R2 and Resend (Phase 6) or Railway (Phase 8). Each blocks its phase at the point of integration. Split out of ISSUE-002, which covered Supabase as well.
 **Resolution:** Provision per phase as needed. Track every new variable in `.env.example`; real values go in Railway, never in the repo.
 
 ### ISSUE-001 — Commit author email may not match GitHub account
@@ -32,4 +37,7 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ## Resolved
 
-_None yet._
+### ISSUE-002 — Supabase credentials not yet provisioned
+**Status:** Resolved | **Severity:** Medium | **Phase:** 1 | **Opened:** 2026-07-30 | **Resolved:** 2026-07-30
+**Problem:** No Supabase project or keys existed, blocking all of Phase 1 (auth, schema, RLS).
+**Resolution:** Project `uorgodndubyznjzotzje` provisioned. URL, publishable key, secret key, and DB password stored in `.env.local` at the repo root — gitignored via `.env.*` and verified untracked. Keys use Supabase's new format, see [DEC-003](DECISIONS.md). Originally also covered R2/Resend/Railway; those were split out to ISSUE-003.
