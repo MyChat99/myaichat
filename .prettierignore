@@ -1,0 +1,11 @@
+.next
+node_modules
+package-lock.json
+public
+supabase/.temp
+components/ui
+
+# Markdown is hand-formatted (wiki, spec, phase files) — Prettier's list
+# reflowing mangles the entry structure in docs/wiki.
+*.md
+docs/

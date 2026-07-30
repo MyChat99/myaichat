@@ -24,16 +24,16 @@ Build a **production-ready, world-class SaaS web application**: a ChatGPT/Claude
 
 ## MANDATORY TECH STACK
 
-| Layer | Technology | Purpose |
-|---|---|---|
-| **Version Control / CI-CD** | GitHub + GitHub Actions | Repo, branch protection, automated lint/test/deploy pipeline |
-| **Hosting / Deployment** | Railway | App hosting, environment variables, auto-deploy from GitHub main branch |
-| **Database + Auth** | Supabase | PostgreSQL, Supabase Auth (email + OAuth), Row Level Security, Realtime |
-| **Transactional Email** | Resend | Welcome emails, password resets, magic links, admin alerts |
-| **File / Object Storage** | Cloudflare R2 | User file uploads, avatars, chat attachments, exports (S3-compatible API, zero egress fees) |
-| **Frontend** | Next.js 14+ (App Router), TypeScript, Tailwind CSS | Type-safe, server components, streaming UI |
-| **UI Components** | shadcn/ui + Framer Motion + Lucide icons | Polished components and fluid animations |
-| **AI SDKs** | Official OpenAI SDK + Anthropic SDK (via a provider-abstraction layer) | Streaming chat completions |
+| Layer                       | Technology                                                             | Purpose                                                                                     |
+| --------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **Version Control / CI-CD** | GitHub + GitHub Actions                                                | Repo, branch protection, automated lint/test/deploy pipeline                                |
+| **Hosting / Deployment**    | Railway                                                                | App hosting, environment variables, auto-deploy from GitHub main branch                     |
+| **Database + Auth**         | Supabase                                                               | PostgreSQL, Supabase Auth (email + OAuth), Row Level Security, Realtime                     |
+| **Transactional Email**     | Resend                                                                 | Welcome emails, password resets, magic links, admin alerts                                  |
+| **File / Object Storage**   | Cloudflare R2                                                          | User file uploads, avatars, chat attachments, exports (S3-compatible API, zero egress fees) |
+| **Frontend**                | Next.js 14+ (App Router), TypeScript, Tailwind CSS                     | Type-safe, server components, streaming UI                                                  |
+| **UI Components**           | shadcn/ui + Framer Motion + Lucide icons                               | Polished components and fluid animations                                                    |
+| **AI SDKs**                 | Official OpenAI SDK + Anthropic SDK (via a provider-abstraction layer) | Streaming chat completions                                                                  |
 
 Reference official docs for current model IDs and API usage rather than hardcoding assumptions: https://docs.claude.com/en/api/overview and https://platform.openai.com/docs
 

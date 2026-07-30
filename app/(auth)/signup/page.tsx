@@ -1,0 +1,10 @@
+import type { Metadata } from 'next';
+
+import { signUp } from '../actions';
+import { AuthForm } from '../auth-form';
+
+export const metadata: Metadata = { title: 'Create account · myaichat' };
+
+export default function SignUpPage() {
+  return <AuthForm mode="signup" action={signUp} />;
+}

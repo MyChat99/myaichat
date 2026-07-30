@@ -1,9 +1,11 @@
 # Phase 4 — Admin Panel: Keys, Models, Users
 
 ## Goal
+
 Admins manage everything from /admin: encrypted provider keys, models, users, and system settings — with a full audit trail.
 
 ## Tasks
+
 1. Admin layout with sidebar navigation: Providers, Models, Users, Settings, (Analytics + Audit Log added in Phase 7).
 2. AES-256-GCM encryption utilities in /lib/security using a master key from env. Store `encrypted_api_key` + `key_last4` in the providers table. Decrypt only server-side at call time.
 3. Providers page — one card/container per provider (OpenAI, Anthropic, + "Add provider"):
@@ -17,6 +19,7 @@ Admins manage everything from /admin: encrypted provider keys, models, users, an
 8. Audit logging middleware: every admin mutation writes actor, action, target, metadata, IP to audit_logs. CSRF protection on all admin mutations.
 
 ## Acceptance criteria
+
 - Keys never appear in plaintext in DB, client, or logs; masked in UI
 - Test Connection correctly distinguishes valid vs invalid keys
 - Chat uses DB-stored encrypted keys; disabling a provider hides its models from the selector
