@@ -38,17 +38,38 @@ Tailwind. TypeScript throughout, strict mode, no `any` in the core paths.
 
 ## Screenshots
 
-> Replace the placeholders below with your own captures. Suggested: 1600×1000,
-> taken in the Midnight or Ocean theme with a real conversation on screen.
+> Placeholders. Capture these four, drop them in `docs/screenshots/`, then
+> replace each cell below with `![Chat](docs/screenshots/chat.png)`.
 
-| | |
-|---|---|
-| **Chat** — streaming reply with the model selector<br />`docs/screenshots/chat.png` | **Themes** — the appearance panel<br />`docs/screenshots/themes.png` |
-| **Admin: providers** — masked keys, connection test<br />`docs/screenshots/admin-providers.png` | **Admin: analytics** — spend and volume<br />`docs/screenshots/admin-analytics.png` |
+**Seed the demo data first**, or the analytics charts are three flat lines:
+
+```bash
+npm run seed -- --demo     # 52 conversations, 82 usage rows, spread over 30 days
+npm run dev
+```
+
+| File | Screen | Capture it in this state |
+| --- | --- | --- |
+| `chat.png` | `/` or `/c/<id>` | **Mid-stream.** Send "Explain closures with an example", capture while tokens are still arriving so the cursor is visible. Model selector in shot. Sidebar showing several named conversations, not "New chat" ×3. |
+| `themes.png` | `/settings` | A **non-default** preset selected — Midnight or Ocean. The live preview panel visible. The default looks like every other chat app; the point of this screen is that it does not have to. |
+| `admin-providers.png` | `/admin/providers` | **After pressing Test connection**, so the green result and latency are on screen. Both provider cards visible with masked keys (`••••••••` + last four). |
+| `admin-analytics.png` | `/admin/analytics` | The **30-day** range, so all three charts have shape. With demo data seeded this shows real variation rather than a flat line. |
+
+Practical notes:
+
+- **1600×1000** at 2× — legible on GitHub, not enormous in the repo.
+- Check the header before you shoot: your account email is in it. Fine if you
+  do not mind it public, worth signing in as a demo account if you do.
+- A key's last four **is** rendered by design and is safe to show; the key
+  itself never reaches the browser.
+- Do not capture the composer's paperclip as though it works — file storage is
+  blocked on credentials ([ISSUE-016](docs/wiki/ISSUES.md)), and the button is
+  correctly disabled.
 
 <!--
-  Once the files exist, swap each cell for:
+  Once the files exist:
   ![Chat](docs/screenshots/chat.png)
+  ![Themes](docs/screenshots/themes.png)
 -->
 
 Six alternative interface concepts, as self-contained HTML, live in
