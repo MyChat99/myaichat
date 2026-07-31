@@ -1603,3 +1603,40 @@ Runs in the `quality` job after the build, since it reads build output.
 | Measured per-page JS against a real build | done — table above |
 | `verify:bundle` | pass — 7 checks, in CI |
 | Lazy-loading applied | **no** — no win available without a visual change |
+
+## Away session 4B — Priority 3 · Showcase polish · 2026-07-31
+
+**Figures refreshed everywhere** — they were a session and a half stale.
+SHOWCASE.md and the LinkedIn drafts now say 20,097 lines across 139 files, 23
+suites, ~900 assertions, 16 migrations, 70 commits, 30 pull requests. Each was
+re-counted rather than incremented, and the drafts now carry the two commands
+that re-check them, because the figures will drift again.
+
+SHOWCASE's "found by looking, not by testing" section gained the three newest
+ones: the health endpoint publishing outage details, a wrapper tested for a
+whole session without being called, and a timeout helper that did not time out.
+
+**`docs/wiki/DEMO-SCRIPT.md`** — a three-minute click path with what to click,
+what to say, and in what order. Written for someone who watches 40 seconds and
+decides whether to keep watching, so the multi-provider claim is visible before
+the first minute is out.
+
+The pre-record checklist matters as much as the script: sign in first, pick a
+non-default theme, and **do not open the paperclip** — file storage is not
+configured, the button is correctly disabled, and lingering on it invites the
+one question that cannot be answered well. There is also a "things not to say"
+section, of which the important line is *do not say production-ready without
+saying what is not ready*.
+
+**README** now opens with the honest state — live and working, Phase 6 waiting
+on credentials, two known-open items named — and adds a "where to start reading"
+table, because a first-time visitor was previously dropped straight into
+requirements. Every relative link in the docs was checked to resolve; the only
+misses are the screenshot placeholders, which are placeholders on purpose.
+
+| Criterion | Result |
+| --- | --- |
+| Figures re-counted, not estimated | done |
+| `DEMO-SCRIPT.md` | written — 3 minutes, six beats |
+| Every relative doc link resolves | pass |
+| `lint` / `build` | pass |

@@ -77,14 +77,34 @@ Six alternative interface concepts, as self-contained HTML, live in
 
 ## Status
 
-Phases 1–5 are complete and verified; 6 is blocked on storage credentials and
-7–8 are partially done. The honest, current state — including what is *not*
-finished and why — is in [docs/wiki/PROGRESS.md](docs/wiki/PROGRESS.md), with
-known problems in [docs/wiki/ISSUES.md](docs/wiki/ISSUES.md) and the reasoning
-behind non-obvious choices in [docs/wiki/DECISIONS.md](docs/wiki/DECISIONS.md).
+**Live and working.** Phases 1–5 complete, 8 complete, 7 partial. **Phase 6
+(file uploads and email) is built and tested up to the integration point and
+waiting on credentials** — the paperclip in the composer is correctly disabled
+until they exist.
 
-There is no test framework here. Every check is a script that exercises the real
-database, the real server or the real source — see [Verification](#verification).
+Two things are known and open: refresh-token reuse detection is off, which is a
+Supabase dashboard setting ([ISSUE-028](docs/wiki/ISSUES.md)), and the
+accessibility audit needs a browser that cannot be automated here.
+
+The honest current state is [docs/wiki/PROGRESS.md](docs/wiki/PROGRESS.md);
+known problems are [docs/wiki/ISSUES.md](docs/wiki/ISSUES.md); the reasoning
+behind every non-obvious choice is
+[docs/wiki/DECISIONS.md](docs/wiki/DECISIONS.md), including the arguments
+against.
+
+**There is no test framework.** 23 suites, ~900 assertions, every one against
+the real database, the real running server or the real source — a deliberate
+choice, and the reasoning is in [Verification](#verification).
+
+### Where to start reading
+
+| If you want | Read |
+| --- | --- |
+| What this is and how it holds together | [docs/SHOWCASE.md](docs/SHOWCASE.md) |
+| Diagrams and request paths | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| To add a provider | [lib/providers/README.md](lib/providers/README.md) |
+| To contribute | [CONTRIBUTING.md](CONTRIBUTING.md) — note that `main` rejects direct pushes |
+| The current state in one screen | [docs/wiki/PROGRESS.md](docs/wiki/PROGRESS.md) |
 
 ---
 
@@ -148,7 +168,14 @@ several real defects here produced responses indistinguishable from success.
 
 ```bash
 npm run lint && npm run type-check && npm run build
+
+npm run verify:all              # all 23 suites, in a safe order
+npm run verify:all -- --offline # only the ones needing no server
 ```
+
+`verify:all` refuses to start if a previous run left the database dirty, and
+re-checks after each suite that mutates shared state — so a leak is reported by
+the run that caused it rather than the next one to trip over it.
 
 | Script | Proves | Needs |
 |---|---|---|
