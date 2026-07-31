@@ -92,6 +92,11 @@ jobs:
       - name: Composer attachment rules
         run: npm run verify:attachments
 
+      # The idle-policy and marker-integrity halves are pure functions and run
+      # here; the refresh-token measurement needs credentials and skips itself.
+      - name: Session policy
+        run: npm run verify:session
+
   security:
     name: Security audit (non-blocking)
     runs-on: ubuntu-latest

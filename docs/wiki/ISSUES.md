@@ -16,6 +16,72 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-028 — A stolen refresh token stays valid, and reuse is not detected
+
+**Status:** Open — needs a dashboard change only you can make | **Severity:** **High** | **Phase:** 1 | **Opened:** 2026-07-31
+**Found by:** measuring, rather than assuming, during away session 3.
+
+**Problem:** refresh-token rotation was assumed to be in force because Supabase
+rotates by default. It does rotate — every refresh issues a new token. What it
+does **not** do on this project is invalidate the old one.
+
+Measured directly by simulating a theft:
+
+```
+rotation issues a NEW refresh token   : yes
+replay original token, 20s later      : ACCEPTED
+legitimate token after the replay     : STILL VALID — family not revoked
+```
+
+**What that means concretely.** A refresh token copied out of a browser — an XSS
+foothold, a shared machine, a synced cookie jar, a stolen backup — keeps working
+alongside the real one. The legitimate user notices nothing, because their own
+session is never disturbed. The attacker's access ends only when the token
+expires on its own, and it is refreshed on every use, so in practice it does not
+expire at all.
+
+Signing out **does** invalidate the token, which is verified and passing. So the
+exposure is bounded by the user signing out — which most people never do.
+
+**This is a Supabase project setting, not application code.** Nothing in this
+repository can fix it, which is why it is filed rather than patched.
+
+#### The fix, when you are back
+
+Supabase dashboard → **Authentication** → **Sessions**:
+
+| Setting | Set to | Why |
+| --- | --- | --- |
+| Detect and revoke potentially compromised refresh tokens | **On** | The actual fix. A replayed token revokes the whole family, so a theft ends the session instead of silently sharing it |
+| Refresh token reuse interval | 10s (default) | Keeps concurrent requests and flaky networks from destroying sessions. Do not set it to 0 — you will get spurious logouts on mobile |
+
+Consider also setting a **time-boxed session length** on the same page, so even
+an undetected theft has an end date.
+
+#### Verify it took
+
+```bash
+npm run verify:session
+```
+
+It replays a token 20 seconds after rotation and reports what happens. Once the
+setting is on, pin it so it cannot regress silently:
+
+```bash
+npm run verify:session -- --strict     # turns the warning into a failure
+```
+
+**Why it warns rather than fails today:** the check reports a configuration
+state that no change in this repository can turn green, and a permanently red
+suite is one people stop reading. `--strict` exists so that stops being true the
+moment the setting is fixed.
+
+**Partial mitigation shipped in the same change:** an idle-session timeout
+(`system_settings.session_idle_timeout_minutes`, default 0/off). It is honest
+about its limits — it clears *our* cookie, and does not revoke the Supabase
+refresh token. It shortens the window on an unlocked laptop; it does nothing
+against someone who has already copied the cookie jar.
+
 ### ISSUE-027 — Gate the Railway deploy on CI (prepared, NOT applied)
 
 **Status:** Open — decision waiting on you | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-07-31

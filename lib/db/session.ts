@@ -3,6 +3,13 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { publicEnv } from '@/lib/env';
 import type { Database } from '@/lib/db/types';
+import {
+  IDLE_COOKIE,
+  idleVerdict,
+  readMarker,
+  shouldRestamp,
+  signMarker,
+} from '@/lib/security/session-policy';
 
 /**
  * Routes an unauthenticated visitor may reach.
@@ -28,6 +35,41 @@ function isPublicPath(pathname: string) {
  */
 function isApiPath(pathname: string) {
   return pathname === '/api' || pathname.startsWith('/api/');
+}
+
+/**
+ * The idle timeout, cached in module scope.
+ *
+ * The proxy runs on every request, so reading a system setting from the
+ * database here would put a round trip on the hot path of the whole app. The
+ * value changes approximately never, so a 60-second cache is generous.
+ *
+ * Fails OPEN — any error yields 0, which disables the policy. The alternative
+ * is a database hiccup signing out every user at once, and an idle timeout is
+ * not worth that risk.
+ */
+let idleCache: { minutes: number; readAt: number } = { minutes: 0, readAt: 0 };
+const IDLE_CACHE_MS = 60_000;
+
+async function idleTimeoutMinutes(): Promise<number> {
+  const now = Date.now();
+  if (now - idleCache.readAt < IDLE_CACHE_MS) return idleCache.minutes;
+
+  try {
+    const { createAdminClient } = await import('@/lib/db/admin');
+    const { data } = await createAdminClient()
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'session_idle_timeout_minutes')
+      .maybeSingle();
+
+    const minutes = typeof data?.value === 'number' && data.value > 0 ? data.value : 0;
+    idleCache = { minutes, readAt: now };
+    return minutes;
+  } catch {
+    idleCache = { minutes: 0, readAt: now };
+    return 0;
+  }
 }
 
 /**
@@ -67,6 +109,45 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+
+  /**
+   * Idle expiry. Runs only for a signed-in user on a page request — never for
+   * API routes, which must not be redirected (ISSUE-011), and never for anyone
+   * already signed out.
+   */
+  if (user && !isApiPath(pathname)) {
+    const minutes = await idleTimeoutMinutes();
+
+    if (minutes > 0) {
+      const now = Date.now();
+      const lastSeen = readMarker(request.cookies.get(IDLE_COOKIE)?.value);
+      const verdict = idleVerdict(lastSeen, minutes, now);
+
+      if (verdict === 'expired') {
+        await supabase.auth.signOut();
+        const url = request.nextUrl.clone();
+        url.pathname = '/login';
+        url.search = '';
+        url.searchParams.set('reason', 'idle');
+        const out = NextResponse.redirect(url);
+        out.cookies.delete(IDLE_COOKIE);
+        return out;
+      }
+
+      if (shouldRestamp(lastSeen, now)) {
+        const marker = signMarker(now);
+        if (marker) {
+          response.cookies.set(IDLE_COOKIE, marker, {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: request.nextUrl.protocol === 'https:',
+            path: '/',
+            maxAge: 60 * 60 * 24 * 7,
+          });
+        }
+      }
+    }
+  }
 
   if (isApiPath(pathname)) return response;
 

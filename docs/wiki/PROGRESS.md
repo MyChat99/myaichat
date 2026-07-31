@@ -825,3 +825,50 @@ reshuffled existing conversations.
 | `verify:api` | pass — 65/65, four of them the new collision case |
 | Full DB suite incl. `verify:chat` | pass — nothing regressed |
 | `lint` / `type-check` / `build` | pass |
+
+## Away session 3 — Priority 2a · Session hardening · 2026-07-31
+
+**The finding is the headline.** Refresh-token rotation was assumed to be in
+force because Supabase rotates by default. It does rotate — and it does **not**
+invalidate the old token. Measured by simulating a theft: a token replayed
+twenty seconds after rotation was accepted, and the legitimate session survived
+untouched, so the theft leaves no trace. Filed as **[ISSUE-028](ISSUES.md)**
+(High). It is a Supabase dashboard setting, so no code here can fix it — which
+is exactly why it needed measuring rather than assuming.
+
+Signing out *does* invalidate the token; that is asserted and passing. So the
+exposure is bounded by the user signing out, which most people never do.
+
+**`npm run verify:session`** — 25 checks. Reports the rotation state as a loud
+warning rather than a failure, because it describes a configuration no change in
+this repository can turn green, and a permanently red suite is one people stop
+reading. `-- --strict` promotes it to a failure, so the moment the setting is
+fixed it can be pinned there. The pure half runs credential-free in CI.
+
+**Idle session expiry** — `system_settings.session_idle_timeout_minutes`,
+**default 0 (off)**. Enforced in the proxy, and honest about its limits: it
+clears our own cookie and does not revoke the Supabase refresh token, so it
+shortens the window on an unlocked or shared machine and does nothing against
+someone who has already copied the cookie jar.
+
+Three decisions in it worth keeping:
+
+- **Default off.** This code runs on the auth path, where a mistake signs out
+  every user at once. Shipping it inert means the risky part only ever runs
+  after a deliberate choice.
+- **An absent marker is `unmarked`, never `expired`.** Otherwise enabling the
+  setting would log out everyone on their next request — asserted directly.
+- **The marker is HMAC-signed**, so it can be deleted but not forward-dated.
+  Without that, keeping a stale session alive forever is a one-line cookie edit.
+  A forward-dated marker is tested and rejected.
+
+The setting is read through a 60-second module-scope cache and **fails open** on
+any error — a database hiccup must not sign out the whole application.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:session` | pass — 25 checks, 2 warnings that are the finding |
+| Full suite | pass — 17 suites, nothing regressed |
+| Idle expiry is inert by default | pass — asserted, and the seed writes 0 |
+| Refresh-token reuse detection | **NEEDS YOUR DASHBOARD** — ISSUE-028 |
+| The logout redirect renders correctly | **NEEDS HUMAN VERIFICATION** — the policy is tested; the screen is not |

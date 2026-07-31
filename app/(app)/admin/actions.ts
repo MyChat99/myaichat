@@ -327,6 +327,8 @@ const settingsInput = z.object({
   max_upload_size_mb: z.coerce.number().int().min(1).max(1024),
   // 0 = unlimited. Enforced in the chat route (lib/security/token-budget.ts).
   daily_token_budget_per_user: z.coerce.number().int().min(0).max(100_000_000),
+  // 0 = disabled. Capped at a week — beyond that it is not an idle policy.
+  session_idle_timeout_minutes: z.coerce.number().int().min(0).max(10_080),
   signups_enabled: z.boolean(),
   default_model_id: z.string().uuid().nullable().optional(),
 });

@@ -35,6 +35,9 @@ const DEFAULT_SETTINGS: {
   // reads it on every request, and a setting the app depends on should exist
   // because the seed created it, not because a test happened to leave it behind.
   { key: 'daily_token_budget_per_user', value: 0 },
+  // 0 = no idle expiry. Default off on purpose: this signs users out, and it
+  // should be an administrator's deliberate choice rather than a surprise.
+  { key: 'session_idle_timeout_minutes', value: 0 },
 ];
 
 /**

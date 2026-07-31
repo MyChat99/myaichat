@@ -35,6 +35,7 @@ export default async function SettingsPage() {
           rate_limit_messages_per_hour: readSetting(rows, 'rate_limit_messages_per_hour', 60),
           max_upload_size_mb: readSetting(rows, 'max_upload_size_mb', 20),
           daily_token_budget_per_user: readSetting(rows, 'daily_token_budget_per_user', 0),
+          session_idle_timeout_minutes: readSetting(rows, 'session_idle_timeout_minutes', 0),
           signups_enabled: readSetting(rows, 'signups_enabled', true),
           default_model_id: readSetting<string | null>(rows, 'default_model_id', null),
         }}
