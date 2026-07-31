@@ -23,12 +23,12 @@ tree and fails if a vendor SDK import or a provider name appears outside
 
 | | |
 | --- | --- |
-| TypeScript | 16,460 lines across 126 files, strict mode |
-| Database | 12 tables, all with row-level security, 12 committed migrations |
-| Verification | 17 suites, ~500 assertions |
-| History | 55 commits across 8 phases |
+| TypeScript | 20,097 lines across 139 files, strict mode |
+| Database | 12 tables, all with row-level security, 16 committed migrations |
+| Verification | 23 suites, ~900 assertions, run by one command |
+| History | 70 commits across 8 phases and 30 pull requests |
 | Decisions recorded | 19 |
-| Issues opened and resolved | 18 |
+| Issues opened | 28, of which 8 remain — none of them code |
 
 ## Stack
 
@@ -67,8 +67,9 @@ Each assumes the one before it can be bypassed:
    that silently follows a 307 into an HTML login page reports success.
 2. **`requireUser()` / `requireAdmin()`** — in every page and action. A test
    reads the source and fails if a new one is added without a gate.
-3. **RLS** — on all 12 tables. A bug that reached the database with the wrong
-   user id still cannot read another user's rows.
+3. **RLS** — on all 12 tables, three of them deny-all and reachable only by the
+   service role. A bug that reached the database with the wrong user id still
+   cannot read another user's rows.
 4. **`SECURITY DEFINER` helpers** — because a policy *on* `profiles` that
    queries `profiles` recurses infinitely. That bug blocked every profile edit
    and **passed its first test**, because a blocked update and a crashed update
@@ -118,14 +119,22 @@ asserts the window *ends with the newest message and excludes the oldest*.
 
 | Suite | Asserts | Needs |
 | --- | --- | --- |
+| `verify:degradation` | 194 — every dependency fails clearly and leaks nothing | — |
 | `verify:theme` | 134 — WCAG AA contrast, every theme, both modes | — |
-| `verify:api` | 65 — every route rejects bad input and other users | server |
+| `verify:api` | 84 — every route rejects bad input and other users | server |
+| `verify:logging` | 67 — one log shape, no secrets, proven by capture | — |
+| `verify:resilience` | 50 — retry policy, backoff, outbound timeouts | — |
 | `verify:security` | 42 — throttling, password rules, rate limits, budgets | database |
-| `verify:session` | 41 — idle policy, marker integrity, refresh-token behaviour | database |
-| `verify:authz` | 37 — no action or route shipped without a gate | — |
+| `verify:session` | 41 — idle policy, refresh-token behaviour | database |
+| `verify:authz` | 39 — no action or route shipped without a gate | — |
 | `verify:attachments` | 33 — every upload rejection path | — |
 | `verify:headers` | 25 — header and CSP configuration, both modes | — |
-| plus 10 more | schema, RLS, seed, storage, gates, appearance, providers, admin, email, smoke | |
+| `verify:csv` | 36 — CSV escaping and formula injection | — |
+| `verify:bundle` | 7 — heavy libraries stay confined | build |
+| plus 11 more | schema, rls, seed, storage, gates, appearance, chat, providers, admin, email, smoke | |
+
+`npm run verify:all` runs all 23 in a safe order and proves the database is as
+it started — refusing to begin if a previous run left it dirty.
 
 Two are worth singling out:
 
@@ -163,6 +172,20 @@ device.
 **CI was red on `main` for forty minutes and I did not notice**, because the
 next commit fixed the formatting before I looked. That one is now structurally
 impossible — branch protection requires the checks to pass on the exact commit.
+
+**The health endpoint published outage details.** Unauthenticated by necessity,
+it echoed the database's own error message — fine for the errors you see while
+everything works, and exactly wrong for the ones that appear during an outage,
+which carry a host and a role name. The test could not catch it because it only
+ever ran against a healthy database.
+
+**A wrapper was tested for a whole session without being called anywhere.**
+57 checks reported that request logging worked while four routes logged nothing
+at all. Tested dead code is worse than none.
+
+**A timeout helper did not time out.** `.unref()` on the timer meant it did not
+hold the event loop — and neither does a pending promise — so the process exited
+before the deadline fired. Its own test caught it by ending mid-run.
 
 ---
 

@@ -60,7 +60,7 @@ read. Pair with two or three screenshots.
 > rotating a key asks for the password again — a stolen session alone shouldn't
 > be able to swap the key that bills your account.
 >
-> **There's no test framework.** 17 suites, ~500 assertions, every one against
+> **There's no test framework.** 23 suites, ~900 assertions, every one against
 > the real database, the real server or the real source. That's deliberate: the
 > bugs this project actually hit weren't the kind a mocked unit test catches.
 > One example — an RLS policy that queried its own table recursed infinitely and
@@ -123,7 +123,7 @@ without anyone clicking through. Lead with the chat screenshot.
 > HTML login page**, because the proxy redirected it and `fetch` followed the
 > redirect. Tests now assert status *and* content type.
 >
-> There's no test framework — 17 suites, ~500 assertions, all against the real
+> There's no test framework — 23 suites, ~900 assertions, all against the real
 > database, the real running server, or the real source. Given what actually
 > broke, mocks would have caught approximately none of it.
 >
@@ -136,12 +136,49 @@ without anyone clicking through. Lead with the chat screenshot.
 
 ---
 
+## Optional addition — the measurement angle
+
+Works as a comment reply, or spliced into the long draft. It is the most
+distinctive material and the least common thing to post.
+
+> One habit that paid off more than I expected: measuring before optimising,
+> and being willing to conclude there was nothing to do.
+>
+> I set out to lazy-load the admin charts, expecting an easy win. Measured the
+> real build first: 746KB on the login page, and no trace of the charting
+> library, the animation library, the markdown renderer or the icon set. The
+> framework had already split all of it. There was nothing to move.
+>
+> The one genuine candidate — 450KB of markdown and syntax highlighting on the
+> chat route, which the empty state doesn't need — I deliberately left alone,
+> because deferring it risks a visible flash on a conversation that already has
+> messages.
+>
+> So I shipped a test that locks in the state that measured well instead. The
+> important assertion isn't the size ceiling, it's that the charting library
+> stays confined to one component: route-level splitting only holds while that's
+> true, and the day someone imports a chart into a shared component every page
+> pays 384KB with nothing failing.
+>
+> Elsewhere the same habit did find something: a database index chosen by
+> benchmarking a 200,000-row temp table, because the real table has 178 rows and
+> Postgres correctly sequential-scans it either way. 106ms → 23ms.
+
+---
+
 ## Notes on all three
 
 **What is deliberately absent:** "cutting-edge", "leveraging", "seamless",
 "game-changing", any claim about time taken, and any metric I cannot show. The
-figures used — 12 tables, 17 suites, ~500 assertions — are all checkable in the
+figures used — 12 tables, 23 suites, ~900 assertions — are all checkable in the
 repo, which is the point of quoting them.
+
+**Figures as of away session 4B**, and they drift. Re-check before posting:
+
+```bash
+node -e "console.log(Object.keys(require('./package.json').scripts).filter(k=>k.startsWith('verify:')).length + ' suites')"
+git rev-list --count HEAD    # commits
+```
 
 **Why the bugs are in the post.** Anyone can list features. Describing a bug
 precisely, including the part where the first test passed, is the thing that
