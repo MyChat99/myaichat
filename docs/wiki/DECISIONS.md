@@ -18,6 +18,13 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 
 ---
 
+### DEC-007 — Provider order follows the phase file; OpenAI waits for Phase 3
+
+**Date:** 2026-07-30 | **Phase:** 2 | **Status:** Active
+**Decision:** Phase 2 is built against **Anthropic**, as its phase file specifies, even though an OpenAI key was available first. OpenAI becomes the second provider in Phase 3, with `gpt-5.4-mini` as its default model.
+**Why:** The master spec only says "one provider" for Phase 2, so the order was genuinely arbitrary and swapping would have cost nothing structurally. Keeping the phase file authoritative was chosen over convenience — Phase 3 needs both providers regardless, so nothing is lost, and the phase files stay trustworthy as written.
+**Tradeoff:** Phase 2 is blocked until an Anthropic key exists ([ISSUE-010](ISSUES.md)), despite a working OpenAI key sitting in `.env.local`.
+
 ### DEC-006 — Route protection is layered, not delegated to middleware
 
 **Date:** 2026-07-30 | **Phase:** 1 | **Status:** Active
