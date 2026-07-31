@@ -955,3 +955,37 @@ despite the change landing in the previous one.
 | `verify:storage` | pass — 13 new limit assertions |
 | `security:audit` | pass — 11 tables, `api_usage` deny-all by design |
 | Full suite | pass — nothing regressed |
+
+## Away session 3 — Priority 2e · Dependency audit as its own job · 2026-07-31
+
+Split the dependency check out of the existing `security` job. They answer
+unrelated questions — `security` checks **our** code (committed secrets, RLS
+coverage), this checks a tree we mostly do not control — and merging them meant
+one red badge for two problems with different answers to "is this actionable?".
+
+**`npm run audit:report`** renders `npm audit --json` as Markdown, split into
+**Direct** and **Transitive**. That split is the whole point: a transitive
+advisory four levels under `next` is not something a maintainer here can fix,
+and mixing it with an actionable one is what makes audit output read as noise.
+
+Two details it surfaces that the raw summary line does not:
+
+- **Advisory count is down from 12 to 3**, from this session's dependency bumps.
+  The "12 high advisories" figure quoted in ISSUE-006 and several earlier reports
+  is now stale.
+- **npm's proposed fix for `next` is `next@9.3.3`** — a four-major downgrade,
+  presented as a fix. The report labels any semver-major suggestion
+  "check this is not a downgrade", because the failure mode here is a maintainer
+  running `npm audit fix --force` and quietly reverting the framework.
+
+The report is written to the **job summary**, not only uploaded as an artifact:
+an artifact you have to download and unzip is an artifact nobody opens.
+
+Non-blocking, and the report explains why in its own footer rather than leaving
+that reasoning in a YAML comment nobody reads.
+
+| Criterion | Result |
+| --- | --- |
+| `audit:report` renders | pass |
+| Direct vs transitive split | pass — 1 direct, 2 transitive |
+| Job runs non-blocking with a summary + artifact | **verified on the PR run** |

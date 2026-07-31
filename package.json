@@ -32,6 +32,7 @@
     "verify:storage": "tsx --conditions=react-server scripts/verify-storage.ts",
     "verify:email": "tsx scripts/verify-email.ts",
     "security:audit": "tsx scripts/security-audit.ts",
+    "audit:report": "tsx scripts/audit-report.ts",
     "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {

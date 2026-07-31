@@ -97,6 +97,51 @@ jobs:
       - name: Session policy
         run: npm run verify:session
 
+  # ------------------------------------------------------------ dependencies
+  #
+  # Separate from `security` on purpose. That job checks OUR code — committed
+  # secrets, RLS coverage. This one checks the dependency tree, which we mostly
+  # do not control. Merging them meant one red badge for two unrelated questions,
+  # and the answer to "is this actionable?" differed between them.
+  #
+  # Non-blocking, and the report says why in its own footer: the advisories are
+  # transitive under `next` and cannot clear without downgrading the framework
+  # (ISSUE-006). A check that can never go green is a check people stop reading,
+  # and the day a real one appears nobody would see it in the permanent red.
+  dependencies:
+    name: Dependency audit (report only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build the report
+        run: npm run audit:report -- --out
+
+      # Written to the job summary so it is readable without downloading
+      # anything — an artifact you have to unzip is an artifact nobody opens.
+      - name: Publish to the job summary
+        if: always()
+        run: cat audit-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit
+          path: audit-report.md
+          retention-days: 30
+
   security:
     name: Security audit (non-blocking)
     runs-on: ubuntu-latest
