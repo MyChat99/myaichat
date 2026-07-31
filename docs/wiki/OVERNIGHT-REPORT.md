@@ -454,8 +454,25 @@ setting the chat route reads every request did not exist on a fresh install; and
 `verify:security` **created** that row while "restoring" it, leaving behind
 something it had invented, which then failed a different suite from a distance.
 
-Both fixed. The correction that matters is procedural: a subset run is not a
-suite run, and I should not describe one as the other.
+Both fixed — and the second fix initially **did not apply**. My edit to the
+cleanup block silently missed (the file had been reformatted since I read it),
+and the seed change masked it: with the row now legitimately seeded, the broken
+path was never taken. CI caught it as an unused-variable warning, which is the
+only reason I looked.
+
+Verified properly afterwards by deleting the row, running the suite against a
+genuinely absent setting, and confirming it stayed absent:
+
+```
+1. delete so the row is genuinely absent:   row is ABSENT
+2. verify:security against an absent row:   ok  restored (absent)
+3. leaked back?                             row is ABSENT
+```
+
+Two corrections that matter, both procedural: **a subset run is not a suite
+run**, and **an edit is not a fix until its own failure mode has been
+reproduced**. A green suite after a change that could not have taken effect is
+not evidence of anything.
 
 ### 3. The repository is clean for publication
 

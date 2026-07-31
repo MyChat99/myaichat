@@ -224,22 +224,33 @@ async function verifyTokenBudget() {
       console.log('  skip  no usage logged today, so the over-budget path is untested');
     }
   } finally {
-    await db
-      .from('system_settings')
-      .upsert({ key: KEY, value: originalValue }, { onConflict: 'key' });
+    // Restoring an ABSENT row by upserting a default CREATES it. That is not a
+    // restore, it is a write — and it is how this suite invented a setting the
+    // seed did not know about and failed verify:seed from a distance
+    // (ISSUE-025). Absent has to be restored as absent.
+    if (existedBefore) {
+      await db
+        .from('system_settings')
+        .upsert({ key: KEY, value: originalValue }, { onConflict: 'key' });
+    } else {
+      await db.from('system_settings').delete().eq('key', KEY);
+    }
+
     const { data: restored } = await db
       .from('system_settings')
       .select('value')
       .eq('key', KEY)
       .maybeSingle();
 
-    if ((restored?.value as number) !== originalValue) {
+    const back = existedBefore ? (restored?.value as number) === originalValue : restored === null;
+
+    if (!back) {
       console.error(
         `\n  !!!!  COULD NOT RESTORE ${KEY}. Set it back to ${originalValue} in /admin/settings.`,
       );
       failures++;
     } else {
-      console.log(`  ok    ${KEY} restored to ${originalValue}`);
+      console.log(`  ok    ${KEY} restored (${existedBefore ? String(originalValue) : 'absent'})`);
       checks++;
     }
   }
