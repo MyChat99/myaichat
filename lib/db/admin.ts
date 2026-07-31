@@ -23,7 +23,7 @@ export function createAdminClient() {
   const { SUPABASE_SERVICE_ROLE_KEY } = getServerEnv();
 
   return createSupabaseClient<Database>(
-    publicEnv.NEXT_PUBLIC_SUPABASE_URL,
+    publicEnv().NEXT_PUBLIC_SUPABASE_URL,
     SUPABASE_SERVICE_ROLE_KEY,
     {
       auth: {
