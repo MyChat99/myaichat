@@ -4,8 +4,17 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { publicEnv } from '@/lib/env';
 import type { Database } from '@/lib/db/types';
 
-/** Routes an unauthenticated visitor may reach. */
-const PUBLIC_PATHS = ['/login', '/signup', '/auth'];
+/**
+ * Routes an unauthenticated visitor may reach.
+ *
+ * `/opengraph-image` is here because the link-preview crawlers that fetch it —
+ * Slack, iMessage, every social platform — are by definition anonymous. Without
+ * this it 307s to /login and the card never renders anywhere. Found by
+ * `npm run smoke`, which is exactly the class of bug only a real request can
+ * surface. The sibling icon routes end in .svg/.png and are already excluded by
+ * the matcher in proxy.ts.
+ */
+const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/opengraph-image'];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

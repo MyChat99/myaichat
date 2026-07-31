@@ -29,25 +29,61 @@ export type ProviderCard = {
 
 function ProviderRow({ provider }: { provider: ProviderCard }) {
   const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draft, setDraft] = useState('');
+  // Re-authentication. The server enforces this independently — the field here
+  // is the prompt, not the control.
+  const [password, setPassword] = useState('');
   const [test, setTest] = useState<ConnectionTest | null>(null);
   const [pending, startTransition] = useTransition();
 
+  function reset() {
+    // Clear both secrets immediately — neither a provider key nor the admin's
+    // own password should sit in component state (or a React DevTools tree)
+    // any longer than the request needs them.
+    setDraft('');
+    setPassword('');
+    setEditing(false);
+    setConfirmingDelete(false);
+  }
+
   function save() {
     const key = draft.trim();
-    if (!key) return;
+    if (!key || !password) return;
 
     startTransition(async () => {
       try {
-        await setProviderKey(provider.name, key);
-        // Clear the draft immediately — a provider key should not sit in
-        // component state (or a React DevTools tree) any longer than needed.
-        setDraft('');
-        setEditing(false);
+        const result = await setProviderKey(provider.name, key, password);
+        if (!result.ok) {
+          // Keep the typed key: a mistyped password should not cost the paste.
+          setPassword('');
+          toast.error(result.error);
+          return;
+        }
+        reset();
         setTest(null);
         toast.success('Key saved and encrypted.');
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Could not save the key.');
+      }
+    });
+  }
+
+  function remove() {
+    if (!password) return;
+    startTransition(async () => {
+      try {
+        const result = await deleteProviderKey(provider.name, password);
+        if (!result.ok) {
+          setPassword('');
+          toast.error(result.error);
+          return;
+        }
+        reset();
+        setTest(null);
+        toast.success('Key deleted.');
+      } catch {
+        toast.error('Could not delete the key.');
       }
     });
   }
@@ -103,9 +139,17 @@ function ProviderRow({ provider }: { provider: ProviderCard }) {
             </p>
           </div>
 
-          {!editing ? (
+          {!editing && !confirmingDelete ? (
             <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setConfirmingDelete(false);
+                  setEditing(true);
+                }}
+              >
                 {provider.hasKey ? 'Rotate' : 'Set key'}
               </Button>
               {provider.hasKey ? (
@@ -115,16 +159,8 @@ function ProviderRow({ provider }: { provider: ProviderCard }) {
                   size="sm"
                   disabled={pending}
                   onClick={() => {
-                    if (!confirm(`Delete the ${provider.name} key? This also disables it.`)) return;
-                    startTransition(async () => {
-                      try {
-                        await deleteProviderKey(provider.name);
-                        setTest(null);
-                        toast.success('Key deleted.');
-                      } catch {
-                        toast.error('Could not delete the key.');
-                      }
-                    });
+                    setEditing(false);
+                    setConfirmingDelete(true);
                   }}
                 >
                   Delete
@@ -135,7 +171,7 @@ function ProviderRow({ provider }: { provider: ProviderCard }) {
         </div>
 
         {editing ? (
-          <div className="flex gap-2">
+          <div className="space-y-2">
             <Input
               autoFocus
               type="password"
@@ -145,20 +181,64 @@ function ProviderRow({ provider }: { provider: ProviderCard }) {
               aria-label={`${provider.name} API key`}
               className="font-mono text-sm"
             />
-            <Button type="button" size="sm" disabled={pending || !draft.trim()} onClick={save}>
-              Save
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setDraft('');
-                setEditing(false);
-              }}
-            >
-              Cancel
-            </Button>
+            <div className="flex gap-2">
+              <Input
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Confirm with your password"
+                aria-label="Your account password"
+                className="text-sm"
+              />
+              <Button
+                type="button"
+                size="sm"
+                disabled={pending || !draft.trim() || !password}
+                onClick={save}
+              >
+                Save
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={reset}>
+                Cancel
+              </Button>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Changing a provider key is confirmed with your password, so a session left open on an
+              unlocked screen cannot replace it.
+            </p>
+          </div>
+        ) : null}
+
+        {confirmingDelete ? (
+          <div className="border-destructive/40 space-y-2 rounded-md border p-3">
+            <p className="text-sm">
+              Delete the {provider.name} key? This also disables the provider for every user.
+            </p>
+            <div className="flex gap-2">
+              <Input
+                autoFocus
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Confirm with your password"
+                aria-label="Your account password"
+                className="text-sm"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="destructive"
+                disabled={pending || !password}
+                onClick={remove}
+              >
+                Delete
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={reset}>
+                Cancel
+              </Button>
+            </div>
           </div>
         ) : null}
 

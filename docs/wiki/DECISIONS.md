@@ -18,6 +18,96 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 
 ---
 
+### DEC-016 — Branch protection binds administrators, and requires a PR but no approval
+
+**Date:** 2026-07-31 | **Phase:** 8 | **Status:** Active
+**Decision:** `main` requires a pull request with both blocking CI jobs green.
+Approvals required: **0**. `enforce_admins`: **true**.
+
+**This reverses the recommendation I wrote in ISSUE-018 two hours earlier**,
+which suggested `enforce_admins: false` to avoid a solo maintainer locking
+themselves out of a 2am hotfix. That reasoning was wrong for this repository:
+you are the only person who pushes to it, so exempting administrators exempts
+*everyone*, and the protection becomes a decoration that reports rather than
+enforces. A rule that binds nobody is not a rule.
+
+**Why 0 approvals rather than 1.** Requiring an approving review on a
+single-maintainer project means nothing can ever merge — GitHub does not let you
+approve your own pull request. `0` still forces the pull request, which is where
+the value is: CI must pass, the branch must be up to date, and the change is
+visible as a diff before it lands.
+
+**Argument against, stated plainly.** You can no longer push a one-line fix
+directly, even when you are certain and in a hurry. Every change now costs a
+branch, a push, a PR, and roughly ninety seconds of CI. On a project with one
+maintainer and no reviewer, some of that ceremony buys nothing.
+
+**Why I chose it anyway.** The failure it prevents is not a bad *decision*, it is
+a bad *accident* — a stray `git push` from the wrong branch, a rebase that goes
+sideways, a force push that eats history. Those happen when you are tired and
+certain, which is exactly when the exemption would have been used. And the
+escape hatch is genuinely one command (`gh api --method DELETE …
+branches/main/protection`), so the cost of being wrong about this is a minute,
+while the cost of being wrong the other way is production.
+
+**Configuration, for re-applying after any deliberate bypass:**
+
+```json
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": ["Lint, type-check, build", "Tests (credential-free)"]
+  },
+  "enforce_admins": true,
+  "required_pull_request_reviews": {
+    "required_approving_review_count": 0,
+    "dismiss_stale_reviews": true,
+    "require_code_owner_reviews": false
+  },
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_conversation_resolution": true
+}
+```
+
+**Consequence for how work happens here:** every future change — including
+agent-driven sessions — goes `git checkout -b`, push the branch, open a PR, wait
+for CI, merge. The instruction "commit per feature, push when green" now means
+"one PR per feature".
+
+### DEC-015 — CSP keeps `'unsafe-inline'` for scripts; the trade is accepted and closed
+
+**Date:** 2026-07-31 | **Phase:** 7/8 | **Status:** Active — **owner decision, not revisitable by an agent**
+**Decision:** `script-src` keeps `'unsafe-inline'` in production. The pre-paint theme resolver in `app/layout.tsx` stays an inline script.
+**Why:** The alternative is a nonce, and a nonce cannot be applied to that script without reintroducing the flash of wrong theme that Phase 5 exists to eliminate. The other route — moving theme resolution to a cookie read in `proxy.ts` — is real work on the one part of the stack where a mistake logs everybody out. Weighed against the actual exposure, it is not worth it: every rendered surface is React-escaped, Markdown is sanitised, and there is no path that injects attacker-controlled markup into a page.
+**Argument against, stated plainly:** `'unsafe-inline'` removes CSP's usefulness as a *second* line of defence against XSS. If a sanitiser bug ever shipped, the CSP would not catch it. That is the cost being accepted.
+**Consequences:** `verify:headers` reports the exception as a note rather than a failure, so it stays visible in every run without going red. `'unsafe-eval'` is a separate matter — allowed in development only (ISSUE-021), never in production, and asserted as such.
+
+### DEC-014 — Signup password rules follow NIST, and apply to signup only
+
+**Date:** 2026-07-31 | **Phase:** 8 (Session 2) | **Status:** Active
+**Decision:** Signup requires 10+ characters and rejects a blocklist of common, repetitive and email-derived passwords. It does **not** require mixed case, digits or symbols. The login path keeps the original 8-character minimum.
+**Why:** NIST SP 800-63B dropped composition rules because they reliably produce `Password1!` — a stricter-*feeling* rule that concentrates users into a small, well-known region of the keyspace. Length plus a blocklist of what attackers actually try is the current guidance.
+**The split matters more than the rules.** Raising the minimum on the *login* schema would reject every existing account whose password is 8 or 9 characters, at form validation, before the password is ever checked — the user would be locked out of their own account with no path to fix it. Existing users move to the new rules through a password reset, not a wall.
+**Tradeoff:** Two schemas to keep straight instead of one, and the blocklist is a hand-written ~50 entries rather than a breach corpus. A k-anonymity range query against Have I Been Pwned would be strictly better and is the upgrade path — it was not taken tonight because it puts a third-party HTTP call in the signup path.
+
+### DEC-013 — Login throttling stores attempts in Postgres, not memory
+
+**Date:** 2026-07-31 | **Phase:** 8 (Session 2) | **Status:** Active
+**Decision:** Failed password attempts are counted in a new `auth_attempts` table (deny-all RLS, service-role only), keyed by an HMAC of the email and separately by an HMAC of the client IP. Five failures per account or thirty per IP in fifteen minutes blocks further attempts.
+**Why:** A module-level `Map` is the obvious implementation and is worth almost nothing: it resets on every deploy and is not shared between instances, so the lockout lasts exactly as long as an attacker is unwilling to wait for a restart. Two counters rather than one because they catch different attacks — a per-account counter never trips under password spraying (one attempt per account), and a per-IP counter alone punishes shared networks.
+**Identifiers are hashed** so the table cannot be harvested as a list of registered email addresses if it is ever exposed.
+**Tradeoff:** One indexed query per login attempt, and the IP counter is only as trustworthy as `x-forwarded-for` — spoofable without a trusted proxy in front. That is why the IP limit is the loose one and the per-account limit carries the weight.
+
+### DEC-012 — Provider key changes require the password again, enforced server-side
+
+**Date:** 2026-07-31 | **Phase:** 8 (Session 2) | **Status:** Active
+**Decision:** `setProviderKey` and `deleteProviderKey` call `requireAdminWithPassword()`, which re-verifies the admin's password on a throwaway Supabase client (`persistSession: false`) and is itself throttled under a separate `reauth` counter.
+**Why:** A stolen session cookie or an unlocked laptop gives an attacker everything the session can do, including replacing the provider key with their own and billing the real account. Re-asking for the password is the one control that a session alone cannot satisfy. It runs in the Server Action, not the dialog — a check enforced only in the component that calls the action is not enforced at all, since the action is a POST endpoint.
+**Two details:** the check uses a throwaway client because calling `signInWithPassword` on the request-bound client would silently re-issue the session cookies as a side effect of a confirmation; and it is throttled because an unthrottled "confirm your password" field is a password oracle that already knows which account it is asking about.
+**Tradeoff:** Two extra fields in the admin UI, and re-auth failures must be *returned* rather than thrown — Next replaces thrown Server Action errors with a generic message in production, which would render "that password is not correct" as "an error occurred".
+
 ### DEC-013 — Admin mutations are Server Actions, not route handlers
 
 **Date:** 2026-07-30 | **Phase:** 4 | **Status:** Active

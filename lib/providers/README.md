@@ -3,58 +3,87 @@
 All LLM access goes through the `ChatProvider` interface in [types.ts](types.ts).
 Nothing outside this directory imports a vendor SDK or branches on a provider name.
 
-## Adding a third provider
+## Adding a provider in five steps
 
-Two steps. No changes to routes, UI, or the database schema.
+No changes to routes, UI, or the database schema. If you find yourself editing
+`app/api/chat/route.ts`, stop — that is the abstraction failing, not you.
 
-### 1. Write one adapter file
+### 1. Write the adapter file
 
-Create `lib/providers/<name>.ts` exporting a `ChatProvider`:
+Create `lib/providers/<name>.ts`. Note the shape: a **factory taking the API
+key**, not a singleton. The key is decrypted per request, so an adapter that
+closed over one at module load would be reading a key that may since have been
+rotated in the admin panel.
 
 ```ts
 import 'server-only';
 
-export const mistralProvider: ChatProvider = {
-  name: 'mistral', // must equal the `providers.name` row
-  async *streamChat(params) { /* yield text → done, or error */ },
-  async listModels() { /* ProviderModel[] */ },
-  async validateKey() { /* KeyValidation */ },
-};
+export const MISTRAL_PROVIDER_NAME = 'mistral';
+
+export function createMistralProvider(apiKey: string): ChatProvider {
+  return {
+    name: MISTRAL_PROVIDER_NAME, // must equal the `providers.name` row
+    async *streamChat(params) { /* yield {type:'text'} → {type:'done'} */ },
+    async listModels() { /* ProviderModel[] */ },
+    async validateKey() { /* KeyValidation */ },
+  };
+}
 ```
 
-Three rules:
+### 2. Obey the three adapter rules
 
-- **`import 'server-only'` at the top.** The API key must never reach a client
-  bundle. This makes an accidental client import a build error rather than a leak.
-- **Normalise errors to `ProviderError`.** The UI reacts to `kind`
-  (`auth`, `quota`, `rate_limit`, `context_length`, `network`, `provider`,
-  `unknown`), never to a vendor status code. Messages are shown to users, so
-  they must not carry key material or raw vendor payloads.
-- **`validateKey()` must spend a token.** Do not implement it as a models-list
-  call. An unfunded key lists models happily and fails only on generation —
-  Phase 3 was blocked by exactly that, twice.
+- **`import 'server-only'` on the first line.** The API key must never reach a
+  client bundle; this turns an accidental client import into a build error
+  rather than a leak.
+- **Normalise every failure to `ProviderError`** with a `kind` — `auth`,
+  `quota`, `rate_limit`, `context_length`, `network`, `provider`, `unknown`.
+  The UI reacts to the kind, never to a vendor status code. Messages are shown
+  to users, so they must carry no key material and no raw vendor payload.
+- **`validateKey()` must actually generate.** Do not implement it as a
+  models-list call: an unfunded key lists models perfectly happily and fails
+  only on generation. Phase 3 was blocked by exactly that, twice (ISSUE-012).
 
-Register it in [registry.ts](registry.ts):
+### 3. Register the factory
+
+One line in [registry.ts](registry.ts) — and this is the only place outside the
+adapter where the provider's name appears anywhere in the codebase:
 
 ```ts
-const ADAPTERS: Record<string, ChatProvider> = {
-  [anthropicProvider.name]: anthropicProvider,
-  [openaiProvider.name]: openaiProvider,
-  [mistralProvider.name]: mistralProvider, // ← the only line that changes
+const ADAPTERS: Record<string, (apiKey: string) => ChatProvider> = {
+  [ANTHROPIC_PROVIDER_NAME]: createAnthropicProvider,
+  [OPENAI_PROVIDER_NAME]: createOpenAIProvider,
+  [MISTRAL_PROVIDER_NAME]: createMistralProvider, // ← the only line that changes
 };
 ```
 
-### 2. Add database rows
+### 4. Add the database rows
 
-One `providers` row (`name` must match the adapter's `name`) and one `models`
+One `providers` row whose `name` matches the adapter exactly, and one `models`
 row per model. Add them to `CATALOGUE` in [scripts/seed.ts](../../scripts/seed.ts),
-or via the Phase 4 admin panel once it exists.
+or through `/admin/providers` and `/admin/models` at runtime.
 
-A model is offered to users only when **all** of these hold: the model is
-enabled, its provider is enabled, and an adapter is registered for that provider
-name. A models row naming an unregistered provider is skipped silently by
-`listAvailableModels()` — but `getAdapter()` throws if a request somehow reaches
-it, so misconfiguration surfaces loudly rather than as a broken chat.
+A model is offered to a user only when **all three** hold: the model is enabled,
+its provider is enabled, and an adapter is registered for that provider name. A
+models row naming an unregistered provider is skipped silently by
+`listAvailableModels()` — but `getAdapter()` **throws** if a request somehow
+reaches it, so a misconfiguration surfaces loudly instead of as a chat that
+quietly does nothing.
+
+### 5. Set the key and prove it works
+
+Paste the key in `/admin/providers` (it is encrypted with AES-256-GCM before it
+touches the database), press **Test connection** — which performs a real
+one-token generation, not an auth check — then run:
+
+```bash
+npm run verify:providers
+```
+
+That suite greps the tree to prove no vendor SDK import and no provider name
+escaped this directory, and then streams a real completion through every
+registered adapter. Two providers working is not the same as an abstraction
+working: an `if/else` in the chat route would pass a "both providers stream"
+test and fail this one.
 
 ## What lives where
 

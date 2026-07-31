@@ -1,5 +1,80 @@
 # Progress
 
+> ## ⏸ SESSION PAUSED — 2026-07-31
+>
+> **Read this block first. Delete it when work resumes.**
+>
+> ### State at pause
+>
+> Everything is committed, pushed and merged. Working tree clean, `main` in sync
+> with origin, CI green, **17 verification suites all passing**. Nothing was
+> left half-finished — the last task (branch protection) completed, was proven,
+> and merged through PR #7.
+>
+> ### ⚠️ The one thing that changed how you work
+>
+> **`main` is protected and administrators are bound by it.** Direct pushes are
+> rejected. Every change — yours or an agent's — now goes:
+>
+> ```bash
+> git checkout -b <type>/<short-name>
+> # ... work ...
+> git push -u origin <branch>
+> gh pr create --base main --title "..." --body "..."
+> gh run watch $(gh run list --branch <branch> --limit 1 --json databaseId --jq '.[0].databaseId') --exit-status
+> gh pr merge <n> --squash --delete-branch
+> ```
+>
+> `git push origin main` will fail with `GH006`. That is correct, not broken.
+> See [DEC-016](DECISIONS.md); the deliberate bypass is in [ISSUE-018](ISSUES.md).
+>
+> ### First command when you resume
+>
+> ```bash
+> git pull && npm install && npm run lint && npm run type-check && npm run build
+> ```
+>
+> Then, if you want the full picture before deciding anything:
+>
+> ```bash
+> npm run dev                       # a server is needed by six of the suites
+> npm run verify:api                # 61 checks — the broadest single signal
+> ```
+>
+> ### What was in progress
+>
+> **Nothing.** The away session finished all six of its priorities, and the
+> branch-protection task that followed it is closed. There is no partial work,
+> no stashed change, no branch left open.
+>
+> ### What is next, in the order I would do it
+>
+> | # | Task | Blocked by | Where the instructions are |
+> | --- | --- | --- | --- |
+> | 1 | **R2 + Resend credentials → finish Phase 6** | you having accounts | [PHASE-6-CHECKLIST.md](PHASE-6-CHECKLIST.md) — nothing in it needs a code change |
+> | 2 | **Screenshots for the README** | needs a browser | run `npm run seed -- --demo` first; four placeholders wait in `docs/screenshots/` |
+> | 3 | **Four human checks from the away session** | needs your eyes | attachment UI, analytics charts, export links, mobile — listed in the Away-session report |
+> | 4 | **Decide on Dependabot PRs #1–#4** | your call | #2 and #1 want actions at v7; I set v5 last session |
+> | 5 | **ISSUE-024** — truncation deletes by timestamp | nothing; it is just structural | needs a `seq` column, a migration, and every `created_at`-ordered read path updated |
+> | 6 | **Chain CI to the Railway deploy** | your call | comment inside `.github/workflows/ci.yml` |
+>
+> Phase 7's remaining tasks (performance pass, accessibility audit) still need a
+> browser and Lighthouse, so they stay unmeasurable headlessly — see the Phase 7
+> section below.
+>
+> ### Open issues worth knowing about
+>
+> | Issue | What it is |
+> | --- | --- |
+> | [ISSUE-016](ISSUES.md) / [ISSUE-017](ISSUES.md) / [ISSUE-003](ISSUES.md) | Phase 6 credentials — the only thing blocking a phase |
+> | [ISSUE-022](ISSUES.md) | Three identifiers in a now-public repo; all judged safe, your call to revisit |
+> | [ISSUE-024](ISSUES.md) | Timestamp-collision truncation; logged, not fixed, structural |
+> | [ISSUE-015](ISSUES.md) | `verify:admin` and `verify:security` mutate shared state — do not run them while someone is using the app |
+> | [ISSUE-004](ISSUES.md) / [ISSUE-005](ISSUES.md) / [ISSUE-006](ISSUES.md) | No Docker: hand-maintained types, remote migrations, unfixable transitive advisories |
+>
+> ---
+
+
 Single source of truth for build status. Update immediately after any phase work.
 
 **Status legend:** `Not Started` · `In Progress` · `Done` (built, self-checked) · `Verified` (lint + type-check + build + phase acceptance criteria all pass)
@@ -16,7 +91,7 @@ Single source of truth for build status. Update immediately after any phase work
 | 5   | [Theming & appearance](../phases/PHASE-5-theming.md)                               | Done        | 2026-07-31 | —          |
 | 6   | [R2 uploads + Resend emails](../phases/PHASE-6-storage-email.md)                   | Partial     | 2026-07-31 | —          |
 | 7   | [Analytics, audit UI, polish](../phases/PHASE-7-analytics-polish.md)               | Partial     | 2026-07-31 | —          |
-| 8   | [CI/CD + Railway deployment](../phases/PHASE-8-cicd-deploy.md)                     | Not Started | —          | —          |
+| 8   | [CI/CD + Railway deployment](../phases/PHASE-8-cicd-deploy.md)                     | Done        | 2026-07-31 | —          |
 
 ## Deployed
 
@@ -24,9 +99,11 @@ Live at **https://myaichat-production.up.railway.app** (Railway, US West), auto-
 Verified in production 2026-07-30: health endpoint green, and the gates, chat, providers and admin
 suites all pass against the live URL — not just localhost.
 
-Deployment was pulled forward from Phase 8 at the user's request. Phase 8 still owns CI/CD:
-**pushes to `main` currently deploy with nothing gating them**, so a broken commit reaches
-production unchallenged.
+Deployment was pulled forward from Phase 8 at the user's request. Since 2026-07-31 a GitHub
+Actions pipeline runs lint, type-check, format, build and the credential-free verification
+suites on every push and pull request. Railway still deploys from `main` on its own — CI and
+the deploy are not yet chained, so a red build does not *block* a deploy, it only reports one.
+Closing that gap needs branch protection, which needs a paid plan on a private repo (ISSUE-018).
 
 ## Verification checklist (per phase)
 
@@ -322,3 +399,357 @@ it without reintroducing the flash Phase 5 exists to eliminate. The trade is
 documented at the top of `next.config.ts`. Removing it would require moving theme
 resolution to a cookie read in `proxy.ts` — possible, and worth doing if CSP
 strictness ever matters more than the flash.
+
+---
+
+## Session 2 — Priority 1 & 2 · 2026-07-31
+
+Overnight work, additive only. Nothing in Phases 1–4 was modified.
+
+### Priority 1 — Phase 8 groundwork · Done
+
+- **CI pipeline** (`.github/workflows/ci.yml`): three jobs. `quality` runs lint,
+  type-check, format:check and build **with no secrets present** — which also
+  proves the lazy-env fix from ISSUE-014 holds, since a build that needed runtime
+  credentials would fail here. `tests` runs only the credential-free suites.
+  `security` runs the audit non-blocking.
+- **Railway deploy job is present but DISABLED** (`if: false`), by instruction and
+  because Railway already auto-deploys from GitHub — enabling both would race two
+  deploys against one another. The comment in the file lists the exact three steps
+  to switch over.
+- **`/api/health`**: already existed from the deployment work; now exercised by CI.
+- **`SECURITY.md`**: security model, the four authorisation layers, and incident
+  checklists for a leaked provider key, a leaked master key, a compromised account
+  and an exposed database.
+- **`README.md`**: setup, scripts, architecture summary.
+- **`.github/dependabot.yml`**: weekly npm updates grouped production/development,
+  monthly Actions. Majors for `next`/`react`/`react-dom` arrive individually rather
+  than inside a group, so a framework major is never buried in a batch.
+- **`scripts/security-audit.ts`** (`npm run security:audit`): secret-shape grep over
+  tracked files, `npm audit` parsing, and an RLS check that reads the **pg catalog**
+  through a new `rls_status()` function rather than trusting that migrations ran.
+
+**NEEDS HUMAN VERIFICATION**
+
+- Branch protection could not be enabled — GitHub returns 403 for rulesets on a
+  private repo without a paid plan (ISSUE-018). Three options are written up there;
+  the decision is yours.
+- Two Dependabot PRs (#5 typescript 7, #6 eslint 10) fail CI for a real upstream
+  reason, not a flake — `eslint-config-next` bundles a react plugin incompatible
+  with ESLint 10. Recommendation: close both (ISSUE-019).
+
+### Priority 2 — Interface polish · Done, visually unverified
+
+- **Motion primitives** (`components/motion/motion.tsx`): message entrance, overlay
+  and panel variants, press feedback. Every one consults `useReducedMotion()`, and
+  when it is on the duration collapses to **zero**, not merely shorter — a fast
+  animation is still animation, and that setting exists for people for whom that is
+  the problem.
+- **Command palette** (`Cmd/Ctrl+K`) with new chat, appearance, profile, model
+  switching and conversation search; `?` opens a shortcuts modal. Written without
+  `cmdk` on purpose: the surface is one filtered list, and the focus-trap and
+  focus-restore behaviour is the actual work — worth owning rather than inheriting.
+  `?` is ignored while typing, or a question mark could never be typed anywhere.
+- **Error boundaries**: `app/error.tsx`, `app/global-error.tsx`, `app/not-found.tsx`
+  and a shared `ErrorState`. The boundary never renders `error.message` — in
+  production Next replaces it with a digest anyway, and in development it carries
+  internals no user should read — but it *does* show the digest, which is the string
+  that makes a support report traceable to a server log. `global-error.tsx` uses
+  inline styles and a neutral palette because the layout that defines the theme
+  tokens is precisely what has failed by the time it renders.
+- **Security headers hardened** (`next.config.ts`), **CSP deliberately untouched** —
+  that decision is the owner's. Added: `Cross-Origin-Opener-Policy: same-origin`,
+  `Cross-Origin-Resource-Policy: same-origin`, `X-DNS-Prefetch-Control: off`, a
+  twelve-feature `Permissions-Policy` deny list, and `Cache-Control: no-store` on
+  `/api/*`. `Cross-Origin-Embedder-Policy` was **not** added: `require-corp` would
+  demand CORP headers from every third-party resource, which Supabase-hosted avatars
+  do not send, so it would break images to buy isolation this app does not need.
+- **`npm run verify:headers`** (24 checks) asserts all of the above against
+  `next.config.ts` and runs in CI. It reports the `unsafe-inline` exception as a note
+  rather than a failure, so the known trade stays visible without going red.
+
+| Criterion | Result |
+| --- | --- |
+| `lint` / `type-check` / `build` | pass |
+| `verify:headers` | pass — 24/24 |
+| `verify:theme` / `appearance` / `gates` / `rls` / `providers` / `admin` | pass |
+| Palette opens on ⌘K, arrows and Enter work | **Verified** 2026-07-31 by owner |
+| Animations feel right, and stop under reduced motion | **Verified** 2026-07-31 by owner |
+| Error and 404 pages look correct | **Verified** 2026-07-31 by owner |
+
+### Priority 3 — Security hardening · Done & verified
+
+- **Login throttling** — new `auth_attempts` table (migration `20260731130001`),
+  five failures per account or thirty per IP in fifteen minutes. Two counters,
+  because a per-account limit never trips under password spraying and a per-IP
+  limit alone punishes shared networks. Stored identifiers are HMACed so the
+  table is not an email list. See DEC-013.
+- **Signup hardening** — 10-character minimum, a common/repetitive/email-derived
+  password blocklist, and a disposable-domain blocklist. Composition rules were
+  deliberately not added; see DEC-014, including why the *login* path keeps the
+  old 8-character minimum (raising it there locks existing users out of their
+  own accounts at form validation).
+- **Re-authentication for provider key changes** — `setProviderKey` and
+  `deleteProviderKey` now require the admin's password, verified server-side on
+  a throwaway client and throttled under its own counter. See DEC-012.
+- **Per-user daily token budget** — `system_settings.daily_token_budget_per_user`
+  (0 = unlimited, the default), enforced in `/api/chat` from `usage_logs` since
+  00:00 UTC, and editable in `/admin/settings`. It sits beside the hourly message
+  limit rather than replacing it: one is a pace limit, the other a spend ceiling,
+  and sixty messages an hour of very large context is a bill the message counter
+  never sees.
+- **`npm run verify:security`** — 35 checks across all four. Excluded from CI for
+  the ISSUE-015 reason: it temporarily writes a system setting and restores it in
+  `finally`, and there is one Supabase project behind local and production.
+
+| Criterion | Result |
+| --- | --- |
+| `lint` / `type-check` / `build` | pass |
+| `verify:security` | pass — 35/35 |
+| `security:audit` | pass — all **10** public tables have RLS |
+| Throttle blocks after 5 failures, clears on success | pass — asserted against stored rows |
+| `auth_attempts` unreadable with the publishable key | pass |
+| Over-budget user is refused by the chat route | pass — asserted via `checkDailyTokenBudget` on a real user with real usage |
+| The password prompt appears when rotating a key | **Verified** 2026-07-31 by owner — wrong password rejected, correct password accepted |
+
+### Priority 4 — Frontend polish · Done, visually unverified
+
+- **Message list windowing** — the list mounts the most recent 60 messages with
+  a "Show N earlier messages" control, and rows more than six from the bottom
+  carry `content-visibility: auto` so the browser skips their layout and paint.
+  A real virtualiser was **rejected**: react-window and friends position rows
+  absolutely from measured heights, which fights markdown rows of unknown height
+  and a final row that grows on every streamed token. The failure mode there is
+  a scroll position that jumps mid-response — worse than the problem being
+  solved. Windowing gets the same bounded DOM with none of that risk.
+- **Loading skeletons** — `loading.tsx` for the conversation, admin, settings and
+  profile routes, shaped like the content they replace so nothing jolts when the
+  real markup lands. Each sits in a `role="status"` live region, so a screen
+  reader hears "loading" rather than a wall of empty boxes.
+- **Favicon and OG metadata** — `app/icon.svg`, a generated `favicon.ico` and
+  `apple-icon.png` (replacing the create-next-app defaults), plus a generated
+  `opengraph-image` and full Open Graph / Twitter metadata. `metadataBase` is set,
+  without which Next emits **relative** og:image URLs that no crawler resolves —
+  the card would have silently never appeared. `robots: noindex` because a
+  private chat app has nothing to gain from being indexed.
+- **Title template fixed** — adding `template: '%s · myaichat'` would have turned
+  every existing page title into "Profile · myaichat · myaichat"; all six page
+  titles were shortened in the same change.
+- **Mobile** — the header nav now wraps instead of overflowing (at 360px the four
+  links plus the sign-out button do not fit on one line, and an overflowing
+  header puts a horizontal scrollbar on the whole page). The sidebar drawer,
+  admin tab strip and audit table already had mobile handling from earlier phases.
+- **Profile** — an Account card showing email, role, member-since and status.
+  The date is formatted with a fixed locale and UTC, because a server-rendered
+  date that follows the server's locale is a hydration mismatch waiting to happen.
+
+| Criterion | Result |
+| --- | --- |
+| `lint` / `type-check` / `build` | pass |
+| `verify:theme` / `verify:appearance` | pass |
+| Icons render correctly | pass — generated PNG inspected directly |
+| OG card renders | **NEEDS HUMAN VERIFICATION** — route builds; the image itself is unseen |
+| Skeletons match the real layout | **NEEDS HUMAN VERIFICATION** |
+| Mobile layout at 360px | **Verified** 2026-07-31 by owner — header wraps, no horizontal scroll |
+| Windowing at 60+ messages | **NEEDS HUMAN VERIFICATION** — no conversation here is that long |
+
+### Priority 5 — Test depth · Done
+
+- **`npm run verify:authz`** (36 checks) — a *completeness* check, and that is
+  the point. Every runtime suite proves the endpoints it knows about are gated;
+  none can notice a **new** Server Action shipped without one, because a test
+  only covers what someone remembered to write. This walks the source: every
+  exported action, every route handler, every admin page. Public routes need a
+  written reason to be exempt. Runs credential-free in CI.
+  - Writing it surfaced two ways a naive version lies: a return type of
+    `Promise<{ ok: true }>` makes brace-matching stop at the *type's* brace, so
+    a well-gated action reads as ungated; and a gate reached through a local
+    helper (`createConversation` → `insertConversation` → `requireUser`) is a
+    real gate. Both are handled, and both produced false failures first.
+- **Rate limit and token budget** now covered in `verify:security` (42 checks):
+  exact message counting, assistant replies correctly *not* counted, the cutoff
+  at the configured limit, and the budget refusal for a user with real usage.
+  Both temporarily change a system setting and restore it in `finally`.
+- **`npm run smoke`** — 18 checks against a *running* server, which is a
+  different question from everything else in `scripts/`. It found a real bug on
+  its first run: `/opengraph-image` was being redirected to `/login` by the
+  proxy, so no link-preview crawler — all of which are anonymous — could ever
+  have fetched the card. Fixed in `lib/db/session.ts`.
+- **`verify:providers` exemption** — the password blocklist contains 'anthropic'
+  and 'openai', which the no-vendor-names scan flagged. Exempted as one named
+  file with a reason, not a pattern: a string table is not a branch on vendor.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:authz` | pass — 36/36 |
+| `verify:security` | pass — 42/42 |
+| `smoke` (local production build) | pass — 18/18 |
+| `verify:gates` / `rls` / `appearance` / `providers` / `admin` / `theme` / `headers` | pass |
+| `smoke` against the live Railway URL | **NOT RUN** — the standing instruction was not to touch production tonight. Run `npm run smoke -- --url https://myaichat-production.up.railway.app` when you are ready; it is read-only and sends no chat message. |
+
+### Priority 6 — Documentation · Done
+
+- **`docs/ARCHITECTURE.md`** — system diagram, chat and sign-in sequence
+  diagrams, an ER diagram, the authorisation-layer chain and the secret
+  lifecycle, all in Mermaid so they render on GitHub without an image to keep in
+  step. Written to explain the non-obvious decisions rather than restate the file
+  tree: why NDJSON instead of SSE, why a foreign conversation 404s instead of
+  403s, why the user message is written before the provider call, why adapters
+  are factories rather than singletons.
+- **`lib/providers/README.md`** — rewritten as five concrete steps. The previous
+  version documented a shape the code no longer has (a `ChatProvider` singleton;
+  adapters have been key-taking factories since Phase 3), which is worse than no
+  document — someone following it would have written an adapter that closes over
+  a key that rotation then invalidates.
+
+---
+
+## Away session — Priority 2 · Phase 6 attachment UI · 2026-07-31
+
+Phase 6's one unfinished task (composer attachment UX) is now built. It is
+**fully wired against the real presign route** — the only step that cannot run
+is the PUT to R2, which needs credentials.
+
+- **`components/chat/attachments.tsx`** — file picker, drag-and-drop with a
+  drop overlay, **paste-to-attach** (screenshots arrive on the clipboard far
+  more often than through a picker), image thumbnails from object URLs,
+  per-file progress and per-file errors, remove-before-send.
+- **The paperclip is disabled with a reason** when storage is unconfigured,
+  rather than failing on click. `isStorageConfigured()` is read server-side and
+  passed down — the client cannot determine this for itself.
+- **One accepted-type table** (`lib/upload/types.ts`) imported by both the
+  composer and the server-only storage module. Previously the list lived behind
+  `server-only`, so a client copy would have been the only option — and two
+  copies drift into the worst failure mode there is: the picker accepts a file,
+  the upload starts, and the server rejects it with an error the user cannot act
+  on.
+- **Uploads are concurrent and fail individually.** A failed chip stays on
+  screen in an error state; removing it silently would look like it attached.
+- **Send is blocked while any upload is in flight**, and a message with an
+  attachment but no text is valid — "what is this?" is implied by the picture.
+- **`npm run verify:attachments`** — 33 credential-free checks, wired into CI.
+  Covers every rejection path (executables, SVG, HTML, zips, video, empty files,
+  oversized, missing MIME), the wording of each message, and two contract
+  assertions: that the per-message cap matches the chat route's `.max(5)`, and
+  that SVG and HTML are absent from the allow-list. An SVG is an image to a user
+  and a script host to a browser; serving one from our own origin is stored XSS.
+
+**`docs/wiki/PHASE-6-CHECKLIST.md`** is the sequence for when credentials land:
+exact env var names, the R2 bucket settings that must be verified by a human
+(public access **off**, CORS including `content-type`), the Resend test-mode
+trap that makes your own emails arrive and everyone else's silently not, and the
+verification order. Nothing in it requires a code change.
+
+| Criterion | Result |
+| --- | --- |
+| `lint` / `type-check` / `build` | pass |
+| `verify:attachments` | pass — 33/33 |
+| `verify:storage` | pass — rejection paths hold |
+| Picker, drag-drop, paste, remove all behave | **NEEDS HUMAN VERIFICATION** — no credentials, so no upload completes |
+| The PUT to R2 | **BLOCKED** — ISSUE-016, awaiting credentials |
+
+## Away session — Priority 3 · Adversarial self-review · 2026-07-31
+
+Read Phases 1–7 as a hostile reviewer looking for authorisation gaps,
+unvalidated input, races, missing RLS, leaky errors and dead code.
+
+**One high-severity bug found and fixed — [ISSUE-023](ISSUES.md).** The chat
+route sent the model the **oldest** forty messages rather than the newest, so
+past forty turns it never saw the question just asked. Nothing errored; the only
+symptom was an assistant that appeared to lose the thread on long conversations,
+which reads as a model limitation rather than our bug. The longest conversation
+here is 31 messages, so it had not surfaced yet.
+
+**One structural issue logged, not fixed — [ISSUE-024](ISSUES.md).** Truncation
+deletes by `created_at >=`, and `now()` is transaction time, so colliding
+timestamps would over-delete. The correct fix is a sequence column plus a
+migration and changes to every read path that assumes `created_at` ordering —
+structural, so logged per the standing instruction.
+
+**Checked and found sound:** `keyBelongsToUser` prefix matching (fixed-length
+UUIDs plus a trailing slash, so no prefix confusion); self-demotion and
+self-suspension guards on the admin actions; the 404-not-403 choice on foreign
+resources; every mutation running through the RLS-bound client rather than the
+admin client; error responses carrying no internals.
+
+**`npm run verify:api` — 47 checks, refusals only.** Every route now has tests
+proving it rejects: no session, malformed body, out-of-schema values, another
+user's resource. Two assertions carry more weight than the rest:
+
+- **Status *and* content type.** ISSUE-011 was an unauthenticated POST returning
+  200 with an HTML login page — a test checking only "not 2xx" would have passed
+  it, and one checking only status would have missed JSON callers getting HTML.
+- **A foreign conversation is byte-identical to a missing one.** Otherwise the
+  difference between 403 and 404 is an existence oracle.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:api` | pass — 47/47 |
+| `verify:attachments` | pass — 33/33 |
+| Every API route has a rejection test | done — chat, presign, download, health |
+| Every admin page refuses a non-admin | pass — all 7 |
+| History-window regression is guarded | pass |
+
+## Away session — Priority 4 · Export and demo data · 2026-07-31
+
+- **Conversation export** — `GET /api/conversations/:id/export?format=md|json`,
+  with `.md` / `.json` links in the chat header. Plain anchors rather than
+  fetch-and-Blob: the browser already knows how to save a response carrying a
+  `content-disposition` header, and doing it by hand means holding the whole
+  export in memory first. Markdown writes "You" and the model's display name
+  rather than `user`/`assistant`, because the file is read by a person and
+  usually pasted somewhere else. Attachment **names** are listed but not linked
+  — the bytes sit behind a signed URL that expires, so a link would be dead
+  before anyone opened the file.
+- **`npm run seed -- --demo`** — 52 conversations, 164 messages and 82 usage
+  rows spread across 30 days, so the analytics ranges (7/30/90) actually differ
+  and the charts are not three flat lines. Weekday volume varies, because a
+  chart of uniform bars looks as fake as it is.
+  - **Flag-gated, and refuses to run twice.** It writes fabricated usage rows,
+    and a fabricated row is indistinguishable from a real one the moment it
+    lands — it will be counted in spend and in every future report. Everything
+    is tagged `[demo]` and `--clean-demo` removes exactly what it added.
+  - Timestamps are written explicitly and spaced. A bulk insert otherwise lands
+    every row on one transaction-time `now()`, which would flatten the charts
+    *and* manufacture the collision described in ISSUE-024.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:api` | pass — 61/61, now covering export refusals **and** a real download |
+| Export downloads rather than rendering | pass — asserted on `content-disposition` |
+| `seed --demo` is gated and idempotent | pass — plain `seed` writes none; a second `--demo` run skips |
+| Charts look right with demo data | **NEEDS HUMAN VERIFICATION** — data is in, appearance unchecked |
+
+---
+
+## Session pause — 2026-07-31
+
+Closing state, for the record.
+
+**Branch protection is live and enforcing.** `main` requires a pull request with
+both blocking CI jobs green; force pushes and deletions are blocked; and
+**administrators are bound**, which is what makes it enforcement rather than
+decoration on a single-maintainer repository. Proven in both directions — a
+direct push is rejected with `GH006`, and PR #7 merged cleanly through the
+intended path. See [ISSUE-018](ISSUES.md) and [DEC-016](DECISIONS.md).
+
+Phase 8 moves from **Partial** to **Done**: CI runs on every push and pull
+request, and now *gates* merges rather than only reporting. It is not **Verified**,
+because one acceptance criterion is unmet on purpose — CI and the Railway deploy
+are still unchained, so deploys are always CI-green but are not themselves
+gated. That is a decision waiting on you, not an unfinished task.
+
+**Three stale issues corrected during the pause audit**, all found by reading
+rather than by any check:
+
+- **ISSUE-010** was marked Open for a full day after it was fixed. Phase 2 shipped
+  on 2026-07-30 and the log never caught up. An issue log that lags reality is
+  worse than none, because the next person plans around a blocker that no longer
+  exists.
+- **ISSUE-003** listed Railway alongside R2 and Resend; Railway has been live
+  since 2026-07-30. Rescoped to Phase 6 credentials only.
+- **ISSUE-001** is resolved and now verifiable: with the repo public, the API
+  confirms every commit is linked to the `MyChat99` profile.
+
+**Nothing is in progress.** No partial work, no stash, no open branch. The resume
+point is at the top of this file.

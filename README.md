@@ -1,10 +1,71 @@
 # myaichat
 
-Multi-provider AI chat SaaS — streaming chat, an admin panel for provider keys and models,
-and per-user theming. Built on Next.js 16 (App Router), Supabase, and Tailwind.
+A production-grade, multi-provider AI chat platform. Bring your own OpenAI and
+Anthropic keys, and get streaming chat, an admin panel to manage providers and
+models, per-user theming, usage analytics and an audit trail.
 
-Current status lives in [docs/wiki/PROGRESS.md](docs/wiki/PROGRESS.md).
-Full requirements are in [docs/00-PROJECT-SPEC.md](docs/00-PROJECT-SPEC.md).
+Built with Next.js 16 (App Router), Supabase (Postgres + Auth + RLS), and
+Tailwind. TypeScript throughout, strict mode, no `any` in the core paths.
+
+[![CI](https://github.com/MyChat99/myaichat/actions/workflows/ci.yml/badge.svg)](https://github.com/MyChat99/myaichat/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+---
+
+## What it does
+
+**For the person using it**
+
+- **Streaming chat** with token-by-token rendering, stop-generation, regenerate,
+  and edit-and-resubmit
+- **Switch models mid-conversation** — Anthropic and OpenAI, in the same thread
+- **Markdown with syntax-highlighted code**, sanitised against XSS, one-click copy
+- **Conversation management** — search, rename, pin, delete
+- **Seven themes** in light and dark, plus accent colour, font size and bubble
+  style, persisted per user and applied with **no flash on load**
+- **Command palette** (`⌘K`) and a keyboard-shortcut reference (`?`)
+
+**For whoever runs it**
+
+- **Encrypted provider keys** — AES-256-GCM at rest, never in a client bundle,
+  never in a log, with a "test connection" that performs a real generation
+  rather than an auth check
+- **Model management** per provider, including per-1K token costs
+- **Usage analytics** — messages per day, tokens by model, estimated spend
+- **Rate limiting** (messages/hour) and a **daily token budget** (spend ceiling)
+- **Audit log** of every admin mutation, with actor and timestamp
+- **User management** — roles, suspension, per-user usage
+
+## Screenshots
+
+> Replace the placeholders below with your own captures. Suggested: 1600×1000,
+> taken in the Midnight or Ocean theme with a real conversation on screen.
+
+| | |
+|---|---|
+| **Chat** — streaming reply with the model selector<br />`docs/screenshots/chat.png` | **Themes** — the appearance panel<br />`docs/screenshots/themes.png` |
+| **Admin: providers** — masked keys, connection test<br />`docs/screenshots/admin-providers.png` | **Admin: analytics** — spend and volume<br />`docs/screenshots/admin-analytics.png` |
+
+<!--
+  Once the files exist, swap each cell for:
+  ![Chat](docs/screenshots/chat.png)
+-->
+
+Six alternative interface concepts, as self-contained HTML, live in
+[docs/mockups/](docs/mockups/) — open any of them directly in a browser.
+
+## Status
+
+Phases 1–5 are complete and verified; 6 is blocked on storage credentials and
+7–8 are partially done. The honest, current state — including what is *not*
+finished and why — is in [docs/wiki/PROGRESS.md](docs/wiki/PROGRESS.md), with
+known problems in [docs/wiki/ISSUES.md](docs/wiki/ISSUES.md) and the reasoning
+behind non-obvious choices in [docs/wiki/DECISIONS.md](docs/wiki/DECISIONS.md).
+
+There is no test framework here. Every check is a script that exercises the real
+database, the real server or the real source — see [Verification](#verification).
+
+---
 
 ## Requirements
 
@@ -59,24 +120,49 @@ a migration, update that file in the same commit.**
 
 ## Verification
 
-```bash
-npm run lint
-npm run type-check
-npm run build
+No test framework. Sixteen scripts, ~370 assertions, each exercising something
+real — the bugs this project actually hit were not the kind a mocked unit test
+catches. The pattern throughout is **assert stored state, not response shape**:
+several real defects here produced responses indistinguishable from success.
 
-npm run verify:schema   # every table/view/function exists
-npm run verify:rls      # users cannot reach each other's data
-npm run verify:seed     # exactly one admin, settings intact
-npm run verify:gates    # route gates (needs `npm run dev` running)
-npm run verify:chat     # streaming, persistence, stop, XSS (needs `npm run dev`)
-npm run verify:providers # abstraction holds, both providers stream (needs `npm run dev`)
-npm run verify:admin    # encryption, admin gates, suspension (needs `npm run dev`)
+```bash
+npm run lint && npm run type-check && npm run build
 ```
 
-`verify:gates` defaults to `http://localhost:3000`; override with `BASE_URL=http://localhost:3001`.
-The verify scripts create throwaway users and delete them afterwards.
+| Script | Proves | Needs |
+|---|---|---|
+| `verify:authz` | no action or route was shipped without an auth gate | — |
+| `verify:headers` | the security-header and CSP configuration | — |
+| `verify:theme` | WCAG AA contrast across every theme, both modes | — |
+| `verify:email` | email templates render and meet contrast | — |
+| `verify:schema` | every table, view and function exists | database |
+| `verify:rls` | user A cannot read or write user B's rows | database |
+| `verify:seed` | exactly one admin, settings intact | database |
+| `verify:security` | throttling, password rules, rate limit, token budget | database |
+| `verify:storage` | presign/download rejection paths | database |
+| `verify:gates` | anonymous and non-admin redirects | server |
+| `verify:appearance` | the chosen theme is in the server-rendered HTML | db + server |
+| `verify:chat` | a real streamed completion, persistence, stop, XSS | db + keys |
+| `verify:providers` | no vendor SDK or name escaped `lib/providers` | db + keys |
+| `verify:admin` | breaking **only** the DB key breaks chat — no silent env fallback | database |
+| `security:audit` | secret shapes, advisories, RLS read from the **pg catalog** | database |
+| `smoke` | a *running deployment*: headers as served, gates, assets | server |
 
-## Architecture notes
+```bash
+npm run security:audit -- --history   # adds a full git-history secret scan
+npm run smoke -- --url https://your-app.example.com
+```
+
+Scripts marked "server" need `npm run dev` running; override the target with
+`BASE_URL=http://localhost:3001`. They create throwaway users and delete them
+afterwards.
+
+⚠️ `verify:admin` and `verify:security` **mutate shared state** — they break a
+provider key or change a system setting and restore it in `finally`. Do not run
+them against a database that matters while someone else is using it
+([ISSUE-015](docs/wiki/ISSUES.md)).
+
+## How it is put together
 
 Three Supabase clients, and the distinction matters:
 
@@ -106,7 +192,7 @@ vendor differences the abstraction absorbs: [lib/providers/README.md](lib/provid
 `npm run verify:providers` enforces this with `git grep` — no vendor SDK import and no
 provider name may appear outside `lib/providers`.
 
-## Architecture
+### The key path
 
 ```mermaid
 flowchart TB
@@ -192,10 +278,38 @@ app/(auth)/      login, signup, auth server actions
 app/(app)/       protected shell, chat root, /admin
 lib/db/          Supabase clients, session refresh, generated-ish types
 lib/security/    auth gates, Zod schemas
-lib/providers/   LLM adapters (Phase 3)
-lib/r2/          object storage (Phase 6)
-emails/          Resend templates (Phase 6)
-scripts/         seed + verification scripts
-supabase/        migrations
+lib/providers/   LLM adapters — the only place a vendor SDK is imported
+lib/r2/          object storage (Phase 6, awaiting credentials)
+lib/theme/       theme tokens, CSS generation, contrast maths
+components/      chat, admin, theming, motion, command palette
+emails/          Resend templates (Phase 6, awaiting credentials)
+scripts/         seed + the sixteen verification scripts
+supabase/        migrations, committed and applied in order
 docs/wiki/       progress, issues, decisions, roadmap
+docs/mockups/    six self-contained interface concepts
 ```
+
+## Contributing
+
+Issues and pull requests are welcome. Two things to know first:
+
+1. **`lib/db/types.ts` is hand-maintained** — `supabase gen types` needs Docker,
+   which this project deliberately avoids ([DEC-004](docs/wiki/DECISIONS.md)).
+   Change a migration, update that file in the same commit, or type-check breaks.
+2. **Adding a provider should touch one file plus one registry line.** If your
+   change needs an edit to `app/api/chat/route.ts`, the abstraction is leaking —
+   `npm run verify:providers` will fail the build on it.
+
+Conventional commits (`feat:`, `fix:`, `chore:`). CI runs lint, type-check,
+build and the credential-free suites on every pull request.
+
+## Security
+
+Provider keys are encrypted at rest and never reach the client. Every table has
+row-level security. If you find a vulnerability, please report it privately —
+see [SECURITY.md](SECURITY.md), which also documents the known gaps rather than
+pretending there are none.
+
+## License
+
+[MIT](LICENSE) © 2026 Muhammad Bin Zeeshan

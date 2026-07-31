@@ -13,6 +13,7 @@ type Settings = {
   global_system_prompt: string;
   rate_limit_messages_per_hour: number;
   max_upload_size_mb: number;
+  daily_token_budget_per_user: number;
   signups_enabled: boolean;
   default_model_id: string | null;
 };
@@ -96,6 +97,25 @@ export function SettingsForm({
             onChange={(e) => setForm({ ...form, max_upload_size_mb: Number(e.target.value) })}
           />
           <p className="text-muted-foreground text-xs">Takes effect with uploads in Phase 6.</p>
+        </div>
+
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="tokenBudget">Daily token budget, per user</Label>
+          <Input
+            id="tokenBudget"
+            type="number"
+            min={0}
+            step={1000}
+            value={form.daily_token_budget_per_user}
+            onChange={(e) =>
+              setForm({ ...form, daily_token_budget_per_user: Number(e.target.value) })
+            }
+          />
+          <p className="text-muted-foreground text-xs">
+            Input + output tokens, counted from 00:00 UTC. <strong>0 means unlimited.</strong> This
+            is a spend ceiling and the messages-per-hour limit is a pace limit — they catch
+            different things, so setting one does not cover the other.
+          </p>
         </div>
       </div>
 

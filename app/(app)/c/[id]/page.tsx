@@ -6,8 +6,11 @@ import type { UiMessage } from '@/components/chat/message-list';
 import { createClient } from '@/lib/db/server';
 import { listAvailableModels } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
+import { listConversationTitles } from '@/lib/db/conversations';
+import { isStorageConfigured } from '@/lib/r2/storage';
+import { maxUploadMb } from '@/lib/db/settings';
 
-export const metadata: Metadata = { title: 'Chat · myaichat' };
+export const metadata: Metadata = { title: 'Chat' };
 
 /**
  * A conversation thread. History is read server-side through the user's own
@@ -56,6 +59,9 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         providerName: m.providerName,
       }))}
       selectedModelId={conversation.model_id}
+      conversations={await listConversationTitles()}
+      storageEnabled={isStorageConfigured()}
+      maxUploadMb={await maxUploadMb()}
     />
   );
 }

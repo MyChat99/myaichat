@@ -92,13 +92,17 @@ export function AuthForm({ mode, action, next, notice }: Props) {
               name="password"
               type="password"
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-              minLength={8}
+              // Signup only. The login field keeps the old minimum, because a
+              // stricter rule here would block existing accounts with shorter
+              // passwords from even submitting the form.
+              minLength={mode === 'signup' ? 10 : 8}
               required
               aria-describedby={mode === 'signup' ? 'password-hint' : undefined}
             />
             {mode === 'signup' ? (
               <p id="password-hint" className="text-muted-foreground text-xs">
-                At least 8 characters.
+                At least 10 characters. Length beats symbols — a short phrase you can remember is
+                stronger than <code>P@ssw0rd</code>, and common passwords are rejected.
               </p>
             ) : null}
           </div>

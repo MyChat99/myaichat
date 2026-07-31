@@ -16,6 +16,11 @@
     "verify:rls": "tsx scripts/verify-rls.ts",
     "verify:schema": "tsx scripts/verify-schema.ts",
     "verify:gates": "tsx scripts/verify-auth-gates.ts",
+    "verify:api": "tsx scripts/verify-api-contracts.ts",
+    "verify:headers": "tsx scripts/verify-headers.ts",
+    "verify:authz": "tsx scripts/verify-authz.ts",
+    "verify:attachments": "tsx scripts/verify-attachments.ts",
+    "verify:security": "tsx --conditions=react-server scripts/verify-security.ts",
     "verify:seed": "tsx scripts/verify-seed.ts",
     "verify:chat": "tsx scripts/verify-chat.ts",
     "verify:providers": "tsx --conditions=react-server scripts/verify-providers.ts",
@@ -25,7 +30,8 @@
     "verify:appearance": "tsx scripts/verify-appearance.ts",
     "verify:storage": "tsx --conditions=react-server scripts/verify-storage.ts",
     "verify:email": "tsx scripts/verify-email.ts",
-    "security:audit": "tsx scripts/security-audit.ts"
+    "security:audit": "tsx scripts/security-audit.ts",
+    "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
@@ -72,5 +78,6 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.1",
     "typescript": "^5"
-  }
+  },
+  "license": "MIT"
 }

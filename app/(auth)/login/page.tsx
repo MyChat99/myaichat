@@ -5,7 +5,7 @@ import { redirectPathSchema } from '@/lib/security/validation';
 import { signIn } from '../actions';
 import { AuthForm } from '../auth-form';
 
-export const metadata: Metadata = { title: 'Sign in · myaichat' };
+export const metadata: Metadata = { title: 'Sign in' };
 
 export default async function LoginPage({
   searchParams,

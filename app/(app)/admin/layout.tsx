@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 import { requireAdmin } from '@/lib/security/auth';
 
-export const metadata: Metadata = { title: 'Admin · myaichat' };
+export const metadata: Metadata = { title: 'Admin' };
 
 const NAV = [
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },

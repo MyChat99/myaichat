@@ -202,6 +202,25 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['audit_logs']['Row']>;
         Relationships: [];
       };
+      auth_attempts: {
+        Row: {
+          id: string;
+          /** HMAC of an email or IP — never the raw value. See the migration. */
+          identifier: string;
+          kind: 'login' | 'reauth';
+          succeeded: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          identifier: string;
+          kind: 'login' | 'reauth';
+          succeeded?: boolean;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['auth_attempts']['Row']>;
+        Relationships: [];
+      };
       system_settings: {
         Row: {
           key: string;
@@ -236,6 +255,14 @@ export interface Database {
       is_admin: {
         Args: { uid?: string };
         Returns: boolean;
+      };
+      prune_auth_attempts: {
+        Args: Record<never, never>;
+        Returns: undefined;
+      };
+      rls_status: {
+        Args: Record<never, never>;
+        Returns: { table_name: string; rls_enabled: boolean; policy_count: number }[];
       };
     };
     Enums: {

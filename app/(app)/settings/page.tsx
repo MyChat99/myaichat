@@ -4,7 +4,7 @@ import { AppearancePanel } from '@/components/theme/appearance-panel';
 import { requireUser } from '@/lib/security/auth';
 import { loadAppearance } from '@/lib/theme/preferences';
 
-export const metadata: Metadata = { title: 'Appearance · myaichat' };
+export const metadata: Metadata = { title: 'Appearance' };
 
 /**
  * User-facing appearance settings.
