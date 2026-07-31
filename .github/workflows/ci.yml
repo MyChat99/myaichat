@@ -89,6 +89,9 @@ jobs:
       - name: Authorisation completeness
         run: npm run verify:authz
 
+      - name: Composer attachment rules
+        run: npm run verify:attachments
+
   security:
     name: Security audit (non-blocking)
     runs-on: ubuntu-latest

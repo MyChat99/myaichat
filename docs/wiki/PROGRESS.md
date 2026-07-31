@@ -526,3 +526,49 @@ Overnight work, additive only. Nothing in Phases 1–4 was modified.
   adapters have been key-taking factories since Phase 3), which is worse than no
   document — someone following it would have written an adapter that closes over
   a key that rotation then invalidates.
+
+---
+
+## Away session — Priority 2 · Phase 6 attachment UI · 2026-07-31
+
+Phase 6's one unfinished task (composer attachment UX) is now built. It is
+**fully wired against the real presign route** — the only step that cannot run
+is the PUT to R2, which needs credentials.
+
+- **`components/chat/attachments.tsx`** — file picker, drag-and-drop with a
+  drop overlay, **paste-to-attach** (screenshots arrive on the clipboard far
+  more often than through a picker), image thumbnails from object URLs,
+  per-file progress and per-file errors, remove-before-send.
+- **The paperclip is disabled with a reason** when storage is unconfigured,
+  rather than failing on click. `isStorageConfigured()` is read server-side and
+  passed down — the client cannot determine this for itself.
+- **One accepted-type table** (`lib/upload/types.ts`) imported by both the
+  composer and the server-only storage module. Previously the list lived behind
+  `server-only`, so a client copy would have been the only option — and two
+  copies drift into the worst failure mode there is: the picker accepts a file,
+  the upload starts, and the server rejects it with an error the user cannot act
+  on.
+- **Uploads are concurrent and fail individually.** A failed chip stays on
+  screen in an error state; removing it silently would look like it attached.
+- **Send is blocked while any upload is in flight**, and a message with an
+  attachment but no text is valid — "what is this?" is implied by the picture.
+- **`npm run verify:attachments`** — 33 credential-free checks, wired into CI.
+  Covers every rejection path (executables, SVG, HTML, zips, video, empty files,
+  oversized, missing MIME), the wording of each message, and two contract
+  assertions: that the per-message cap matches the chat route's `.max(5)`, and
+  that SVG and HTML are absent from the allow-list. An SVG is an image to a user
+  and a script host to a browser; serving one from our own origin is stored XSS.
+
+**`docs/wiki/PHASE-6-CHECKLIST.md`** is the sequence for when credentials land:
+exact env var names, the R2 bucket settings that must be verified by a human
+(public access **off**, CORS including `content-type`), the Resend test-mode
+trap that makes your own emails arrive and everyone else's silently not, and the
+verification order. Nothing in it requires a code change.
+
+| Criterion | Result |
+| --- | --- |
+| `lint` / `type-check` / `build` | pass |
+| `verify:attachments` | pass — 33/33 |
+| `verify:storage` | pass — rejection paths hold |
+| Picker, drag-drop, paste, remove all behave | **NEEDS HUMAN VERIFICATION** — no credentials, so no upload completes |
+| The PUT to R2 | **BLOCKED** — ISSUE-016, awaiting credentials |
