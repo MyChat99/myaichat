@@ -33,6 +33,45 @@ const DEFAULT_SETTINGS: {
   { key: 'signups_enabled', value: true },
 ];
 
+/**
+ * Phase 2 provider + model.
+ *
+ * `encrypted_api_key` stays null: the key lives in `.env.local` until Phase 4
+ * adds AES-256-GCM storage and the admin panel that writes it.
+ *
+ * Costs are per 1K tokens (Claude Opus 5 is $5 / $25 per million).
+ */
+const PROVIDER = { name: 'anthropic', enabled: true };
+
+const MODELS = [
+  {
+    model_id: 'claude-opus-5',
+    display_name: 'Claude Opus 5',
+    max_tokens: 8192,
+    default_temperature: 1.0,
+    input_cost_per_1k: 0.005,
+    output_cost_per_1k: 0.025,
+    enabled: true,
+  },
+];
+
+async function seedProviderAndModels() {
+  const { data: provider, error: providerError } = await admin
+    .from('providers')
+    .upsert(PROVIDER, { onConflict: 'name' })
+    .select('id')
+    .single();
+  if (providerError) throw providerError;
+  console.log(`  ok    provider "${PROVIDER.name}" upserted`);
+
+  const { error: modelsError } = await admin.from('models').upsert(
+    MODELS.map((m) => ({ ...m, provider_id: provider.id })),
+    { onConflict: 'provider_id,model_id' },
+  );
+  if (modelsError) throw modelsError;
+  console.log(`  ok    ${MODELS.length} model(s) upserted`);
+}
+
 async function findUserByEmail(email: string) {
   // listUsers is paginated; the admin account is created first so page 1 is enough
   // for seeding, but scan a few pages to stay correct on a populated project.
@@ -96,6 +135,8 @@ async function main() {
     .upsert(DEFAULT_SETTINGS, { onConflict: 'key' });
   if (settingsError) throw settingsError;
   console.log(`  ok    ${DEFAULT_SETTINGS.length} system settings upserted`);
+
+  await seedProviderAndModels();
 
   console.log('\nSeed complete.');
 }

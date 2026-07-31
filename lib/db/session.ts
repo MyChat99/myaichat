@@ -12,6 +12,16 @@ function isPublicPath(pathname: string) {
 }
 
 /**
+ * API routes still get their session cookie refreshed, but must never be
+ * redirected: a caller expecting JSON would otherwise receive a 307 to the
+ * HTML login page, which a default `fetch` follows into a misleading 200.
+ * Route handlers do their own auth check and return a real 401.
+ */
+function isApiPath(pathname: string) {
+  return pathname === '/api' || pathname.startsWith('/api/');
+}
+
+/**
  * Refreshes the Supabase session cookie on every request and performs the
  * first-pass redirect for protected routes.
  *
@@ -48,6 +58,8 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+
+  if (isApiPath(pathname)) return response;
 
   if (!user && !isPublicPath(pathname)) {
     const url = request.nextUrl.clone();

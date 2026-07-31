@@ -18,6 +18,26 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 
 ---
 
+### DEC-009 — Chat streams as newline-delimited JSON, not SSE
+
+**Date:** 2026-07-30 | **Phase:** 2 | **Status:** Active
+**Decision:** `/api/chat` returns `application/x-ndjson` — one JSON event per line (`text`, `done`, `error`) — read with a plain `fetch` reader.
+**Why:** The endpoint is a POST carrying conversation state, and `EventSource` only issues GETs, so SSE would have meant a side-channel to pass the body. NDJSON needs no client library and no framing rules beyond splitting on newlines.
+**Tradeoff:** No automatic reconnect (SSE gives that free). Irrelevant here — a dropped chat stream should surface an error and let the user retry, not silently resume mid-sentence.
+
+### DEC-008 — Extended thinking is off for chat
+
+**Date:** 2026-07-30 | **Phase:** 2 | **Status:** Active
+**Decision:** The Anthropic adapter sends `thinking: {type: 'disabled'}` with `claude-opus-5`. Thinking is **on by default** on that model, so this is an explicit opt-out, not the default.
+**Why:** Interactive chat is judged on time-to-first-token. Thinking delays the first visible character and bills tokens the user never sees. Phase 5/7 can expose it as a per-model toggle once there's UI to display reasoning.
+**Consequences to carry forward:**
+
+- Disabling thinking is only valid at `effort` **high or below** — pairing it with `xhigh`/`max` is a 400. The default effort is `high`, so the current call is valid; raising effort later means re-enabling thinking.
+- With thinking off, Opus 5 can leak internal XML into the visible response. The documented mitigation is a **generic** "do not include internal or system XML tags" instruction — and explicitly **not** an instruction telling the model not to reason, which makes leakage worse. That wording is in `lib/providers/anthropic.ts`; don't "improve" it into a don't-think rule.
+
+**Source:** https://platform.claude.com/docs/en/about-claude/models/migration-guide
+**Tradeoff:** Lower answer quality on hard reasoning prompts than thinking-on would give.
+
 ### DEC-007 — Provider order follows the phase file; OpenAI waits for Phase 3
 
 **Date:** 2026-07-30 | **Phase:** 2 | **Status:** Active

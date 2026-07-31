@@ -4,12 +4,10 @@ Pending action items and what comes after the eight planned phases.
 
 ## Immediate next steps
 
-1. **Get an Anthropic API key** — the only thing blocking Phase 2 ([ISSUE-010](ISSUES.md)). From console.anthropic.com, then add `ANTHROPIC_API_KEY` to `.env.local`.
-2. **Start Phase 2** — read [PHASE-2-chat-streaming.md](../phases/PHASE-2-chat-streaming.md) in full, propose a plan, then implement.
+1. **Close out Phase 2** — one browser pass: stream a message, reload, copy a code block, press Stop mid-answer, check the mobile sidebar. That is all that stands between Phase 2 and Verified.
+2. **Start Phase 3** — read [PHASE-3-provider-abstraction.md](../phases/PHASE-3-provider-abstraction.md) in full, propose a plan, then implement. The OpenAI key is already in `.env.local` with `gpt-5.4-mini` as its default ([DEC-007](DECISIONS.md)), and `lib/providers/` already has the interface Phase 3 formalises.
 
-Phase 1 is Verified as of 2026-07-30. The admin account is seeded and the auth shell works end to end.
-
-An OpenAI key is already in `.env.local`, held for Phase 3 with `gpt-5.4-mini` as its default model ([DEC-007](DECISIONS.md)).
+Phase 1 is Verified; Phase 2 is Done pending that browser pass. Both providers' keys are present and verified working.
 
 Worth doing soon, not blocking: install Docker to get a local Supabase stack, which also restores `supabase gen types` and removes the hand-maintained types file ([ISSUE-004](ISSUES.md), [ISSUE-005](ISSUES.md)).
 

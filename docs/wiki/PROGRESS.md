@@ -10,7 +10,7 @@ Single source of truth for build status. Update immediately after any phase work
 | --- | ---------------------------------------------------------------------------------- | ----------- | ---------- | ---------- |
 | 0   | Repo & docs setup                                                                  | Verified    | 2026-07-30 | 2026-07-30 |
 | 1   | [Foundation — scaffold, auth, schema, RLS](../phases/PHASE-1-foundation.md)        | Verified    | 2026-07-30 | 2026-07-30 |
-| 2   | [Chat interface with streaming](../phases/PHASE-2-chat-streaming.md)               | Not Started | —          | —          |
+| 2   | [Chat interface with streaming](../phases/PHASE-2-chat-streaming.md)               | Done        | 2026-07-30 | —          |
 | 3   | [Provider abstraction + model selector](../phases/PHASE-3-provider-abstraction.md) | Not Started | —          | —          |
 | 4   | [Admin panel — keys, models, users](../phases/PHASE-4-admin-panel.md)              | Not Started | —          | —          |
 | 5   | [Theming & appearance](../phases/PHASE-5-theming.md)                               | Not Started | —          | —          |
@@ -92,3 +92,49 @@ A phase moves to **Verified** only when all four pass:
 **Known cosmetic gaps** (deliberately not addressed in Phase 1)
 
 - The shell is unstyled placeholder UI. Design work belongs to Phases 2, 5 and 7.
+
+---
+
+## Phase 2 — Chat interface with streaming · Done · 2026-07-30
+
+Not yet **Verified** — two acceptance details need a browser, see below.
+
+**Built**
+
+- `/api/chat` route handler: authenticates, validates with Zod, rate-limits per user, streams from Anthropic and relays NDJSON. The provider key is read only inside a `server-only` module and never crosses to the client.
+- `lib/providers/` — a `ChatProvider` interface plus the Anthropic adapter, already shaped so Phase 3 adds an adapter file rather than rewriting the route
+- Persistence: both turns saved, token counts recorded, `usage_logs` written with estimated cost, conversation auto-titled from the first message
+- UI: sidebar (create, rename, delete, pin, search, collapsible on mobile), thread view, auto-growing composer with Enter / Shift+Enter, typing indicator, scroll-to-bottom pill, 4 starter prompts, toast error states
+- Message actions: copy, regenerate, edit-and-resubmit — the last two rewind the thread server-side via `truncateFromMessageId`
+- Stop aborts the upstream request server-side; whatever was generated is kept rather than discarded
+- Markdown rendered with `rehypeSanitize` **before** `rehypeHighlight`, so only markup we generate survives
+
+**Verification** — `npm run verify:chat`, 25 checks
+
+| Criterion | Result |
+| --- | --- |
+| `npm run lint` | pass |
+| `npm run type-check` | pass |
+| `npm run build` | pass — 8 routes |
+| Full streamed conversation | pass |
+| Refresh restores history from the DB | pass — both turns persisted, content matches the stream byte for byte |
+| XSS attempt renders inert | pass — script tags, inline handlers and `javascript:` URLs all stripped from the real component |
+| Code blocks highlight | pass — `hljs` classes survive sanitization |
+| Code blocks **copy** | **outstanding** — clipboard API is browser-only |
+| Stop halts generation immediately | pass — asserts the persisted partial is short, i.e. the server stopped rather than finishing in the background |
+| Regenerate / edit-and-resubmit | pass |
+| Responsive / mobile sidebar | **outstanding** — needs a real viewport |
+
+**Deviations from the phase file**
+
+- Provider is Anthropic as specified, but the model is `claude-opus-5` with thinking explicitly disabled ([DEC-008](DECISIONS.md)).
+- Streaming uses NDJSON rather than SSE ([DEC-009](DECISIONS.md)).
+- History is capped at the last 40 messages per request — dropped, not summarised. Compaction is a later concern.
+
+**Bugs found and fixed during the phase**
+
+- [ISSUE-011](ISSUES.md) — the proxy redirected unauthenticated API calls to the HTML login page, so `POST /api/chat` returned 200 and the handler's own 401 was unreachable.
+
+**To reach Verified**
+
+Walk the browser flow once: send a message and watch it stream, reload and confirm history returns, copy a code block, press Stop mid-answer, and check the sidebar collapses on a narrow viewport.

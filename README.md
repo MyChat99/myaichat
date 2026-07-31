@@ -62,6 +62,7 @@ npm run verify:schema   # every table/view/function exists
 npm run verify:rls      # users cannot reach each other's data
 npm run verify:seed     # exactly one admin, settings intact
 npm run verify:gates    # route gates (needs `npm run dev` running)
+npm run verify:chat     # streaming, persistence, stop, XSS (needs `npm run dev`)
 ```
 
 `verify:gates` defaults to `http://localhost:3000`; override with `BASE_URL=http://localhost:3001`.

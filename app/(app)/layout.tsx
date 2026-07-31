@@ -1,6 +1,8 @@
 import Link from 'next/link';
 
+import { Sidebar, type SidebarConversation } from '@/components/chat/sidebar';
 import { Button } from '@/components/ui/button';
+import { createClient } from '@/lib/db/server';
 import { requireUser } from '@/lib/security/auth';
 
 import { signOut } from '../(auth)/actions';
@@ -11,42 +13,57 @@ import { signOut } from '../(auth)/actions';
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
+  const supabase = await createClient();
+
+  // RLS scopes this to the signed-in user; no explicit user_id filter needed.
+  const { data } = await supabase
+    .from('conversations')
+    .select('id, title, pinned, updated_at')
+    .order('updated_at', { ascending: false })
+    .limit(200);
+
+  const conversations = (data ?? []) as SidebarConversation[];
 
   return (
-    <div className="flex min-h-full flex-1 flex-col">
-      <header className="border-border flex items-center justify-between border-b px-4 py-3">
-        <Link href="/" className="font-semibold">
-          myaichat
-        </Link>
+    <div className="flex min-h-full flex-1 overflow-hidden">
+      <Sidebar conversations={conversations} />
 
-        <nav className="flex items-center gap-3">
-          {user.role === 'admin' ? (
-            <Link
-              href="/admin"
-              className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="border-border flex items-center justify-between border-b py-3 pr-4 pl-14 md:pl-4">
+          <Link href="/" className="font-semibold">
+            myaichat
+          </Link>
+
+          <nav className="flex items-center gap-3">
+            {user.role === 'admin' ? (
+              <Link
+                href="/admin"
+                className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+              >
+                Admin
+              </Link>
+            ) : null}
+
+            {/* Show the email when the display name would duplicate the nav link. */}
+            <span
+              className="text-muted-foreground hidden text-sm sm:inline"
+              title={user.email ?? ''}
             >
-              Admin
-            </Link>
-          ) : null}
+              {user.displayName && user.displayName.toLowerCase() !== 'admin'
+                ? user.displayName
+                : (user.email ?? user.displayName)}
+            </span>
 
-          {/* Show the email rather than the display name when the two would
-              read as duplicates — the seeded account is literally named
-              "Admin", which rendered as "Admin  Admin" next to the nav link. */}
-          <span className="text-muted-foreground hidden text-sm sm:inline" title={user.email ?? ''}>
-            {user.displayName && user.displayName.toLowerCase() !== 'admin'
-              ? user.displayName
-              : (user.email ?? user.displayName)}
-          </span>
+            <form action={signOut}>
+              <Button type="submit" variant="outline" size="sm">
+                Sign out
+              </Button>
+            </form>
+          </nav>
+        </header>
 
-          <form action={signOut}>
-            <Button type="submit" variant="outline" size="sm">
-              Sign out
-            </Button>
-          </form>
-        </nav>
-      </header>
-
-      <main className="flex flex-1 flex-col">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+      </div>
     </div>
   );
 }

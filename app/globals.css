@@ -131,3 +131,97 @@
     @apply font-sans;
   }
 }
+
+/* ---------------------------------------------------------------- chat markdown
+   Written by hand rather than importing highlight.js's stylesheet: the theme
+   tokens below follow our CSS variables, so code blocks track light/dark with
+   the rest of the app instead of shipping a second, fixed palette.
+   CLAUDE.md: all theming through CSS custom properties. */
+
+@layer components {
+  .prose-chat {
+    @apply text-sm leading-relaxed;
+  }
+  .prose-chat > * + * {
+    @apply mt-4;
+  }
+  .prose-chat h1 {
+    @apply mt-6 text-xl font-semibold;
+  }
+  .prose-chat h2 {
+    @apply mt-6 text-lg font-semibold;
+  }
+  .prose-chat h3 {
+    @apply mt-5 text-base font-semibold;
+  }
+  .prose-chat p {
+    @apply whitespace-pre-wrap;
+  }
+  .prose-chat ul {
+    @apply list-disc space-y-1 pl-6;
+  }
+  .prose-chat ol {
+    @apply list-decimal space-y-1 pl-6;
+  }
+  .prose-chat a {
+    @apply underline underline-offset-4;
+  }
+  .prose-chat blockquote {
+    @apply border-border text-muted-foreground border-l-2 pl-4 italic;
+  }
+  .prose-chat table {
+    @apply block w-full overflow-x-auto text-left text-xs;
+  }
+  .prose-chat th,
+  .prose-chat td {
+    @apply border-border border px-2 py-1;
+  }
+
+  /* Inline code — the :not() keeps it away from code inside a fenced block. */
+  .prose-chat :not(pre) > code {
+    @apply bg-muted rounded px-1.5 py-0.5 font-mono text-[0.85em];
+  }
+
+  .prose-chat pre {
+    @apply bg-muted overflow-x-auto rounded-lg p-4 font-mono text-xs leading-relaxed;
+  }
+  .prose-chat pre code {
+    @apply bg-transparent p-0;
+  }
+}
+
+/* highlight.js tokens, mapped onto the theme */
+.hljs-comment,
+.hljs-quote {
+  @apply text-muted-foreground italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-type {
+  color: color-mix(in oklch, var(--primary) 85%, var(--foreground));
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: color-mix(in oklch, green 55%, var(--foreground));
+}
+.hljs-number,
+.hljs-built_in,
+.hljs-attr {
+  color: color-mix(in oklch, orange 60%, var(--foreground));
+}
+.hljs-title,
+.hljs-section,
+.hljs-name {
+  @apply font-semibold;
+}
+.hljs-deletion {
+  color: color-mix(in oklch, red 60%, var(--foreground));
+}
+.hljs-emphasis {
+  @apply italic;
+}
+.hljs-strong {
+  @apply font-bold;
+}
