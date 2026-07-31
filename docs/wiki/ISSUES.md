@@ -16,6 +16,72 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-027 — Gate the Railway deploy on CI (prepared, NOT applied)
+
+**Status:** Open — decision waiting on you | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-07-31
+
+**Read the honest version first.** Since branch protection landed, `main` cannot receive a commit that has not passed CI. Railway deploys from `main`, so **every deploy is already from a CI-green commit.** This issue closes a narrow remaining gap, not a hole. Do not do it because it sounds more correct.
+
+#### What the gap actually is
+
+| | Today (Railway watches GitHub) | Gated (CI runs the deploy) |
+| --- | --- | --- |
+| Deploy source | any commit reaching `main` | only after `quality` + `tests` pass in that run |
+| Is CI causally upstream of the deploy? | **No** — they are parallel. CI passing and the deploy happening are two independent reactions to the same push | **Yes** |
+| If CI is queued/slow | Railway deploys anyway, possibly before CI finishes | deploy waits |
+| If someone deletes branch protection and pushes | deploys immediately | still gated by the job |
+
+So the real-world exposure is: **a window of a minute or two where production is live on a commit whose CI has not finished**, plus the case where protection is deliberately removed. With one maintainer, both are small.
+
+#### The steps, when you decide to do it
+
+**1. Get a Railway token.** Railway → Account Settings → Tokens → *Create token*. Scope it to this project, not the account, if the option is offered.
+
+**2. Add it to GitHub.**
+```bash
+gh secret set RAILWAY_TOKEN --repo MyChat99/myaichat
+# paste the token when prompted — it is not echoed, and not stored in shell history
+```
+
+**3. Turn OFF Railway's own trigger.** Railway → your service → Settings → **Deploys** → disable *Auto Deploy* (or disconnect the GitHub trigger). ⚠️ **Do this before step 4.** If both are active you get two deployments racing per merge, and the loser can overwrite the winner.
+
+**4. Enable the job.** In `.github/workflows/ci.yml`, delete the `if: false` line from the `deploy` job. It already declares `needs: [quality, tests]`, so it cannot start until both gates pass.
+
+**5. Add a deploy permission.** The workflow currently sets `permissions: contents: read` at the top. The deploy job needs no more than that for the Railway CLI, but confirm the run does not fail on a permissions error before you trust it.
+
+**6. Prove it.** Merge a trivial change and watch: `quality` and `tests` must both go green *before* `Deploy to Railway` starts. Then confirm the change is live:
+```bash
+npm run smoke -- --url https://myaichat-production.up.railway.app
+```
+
+#### Tradeoffs, stated plainly
+
+**What you gain:** a deploy that is causally downstream of the gates. Rollback stays in the Railway UI either way.
+
+**What you give up:**
+- **A long-lived deploy token in GitHub secrets.** Today there is no Railway credential in GitHub at all. This adds one, and it can deploy to production. It becomes something to rotate, and something an action with a supply-chain problem could reach.
+- **Railway's own build path.** `railway up` uploads a build context from the runner rather than Railway building from git. That is a *different* build pipeline than the one currently proven in production — a new source of "green in CI, broken in prod".
+- **A dependency on GitHub Actions availability** for deploying at all. Today, if Actions is down you can still ship.
+- **Slower deploys** — the deploy waits for the full CI run rather than starting immediately.
+
+#### Recommendation
+
+**Not yet.** Branch protection already removed the failure this would prevent almost entirely, and the cost is a production-capable token plus a second build path. Revisit when either becomes true: a second person can merge, or a deploy ever goes out on a commit whose CI later failed. Until then this is complexity bought with a credential.
+
+### ISSUE-026 — CI was red on `main` for one commit and I reported it as pushed
+
+**Status:** Resolved | **Severity:** Medium | **Phase:** 8 | **Opened:** 2026-07-31 | **Resolved:** 2026-07-31
+
+**Problem:** Commit `e8d555a` (the Phase 6 attachment UI) landed on `main` with `scripts/verify-attachments.ts` unformatted, and CI failed on `format:check`. I reported that commit as pushed and green. It was pushed; it was not green.
+
+It went unnoticed because the *next* commit ran `npm run format`, so by the time I checked CI at the end of the session the failure had been papered over by a later success. Main was red for roughly forty minutes.
+
+**How it surfaced:** Dependabot cut PR #3 from the red commit, so that PR failed `format:check` — which read as "the react bump breaks the build" and was nothing of the sort. Diagnosing it is what exposed the original failure.
+
+**Resolution:** structural, and already in place. Branch protection (DEC-016) makes this class of error impossible from now on: nothing reaches `main` without a green run **on that exact commit**, because the merge is blocked until the required checks report success on the PR head. The behavioural half — never report a push as green without looking at the run for that SHA — is recorded here rather than trusted to memory.
+
+**Not fixed by:** running the suite locally before committing. I did that; `npm run format` had not been run in that particular sequence, and local `lint` does not check formatting. Only `format:check` does, and only CI ran it.
+
 ### ISSUE-025 — A verification suite invented a system setting and broke another suite
 
 **Status:** Resolved | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-07-31 | **Resolved:** 2026-07-31

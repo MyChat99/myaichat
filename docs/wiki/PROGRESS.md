@@ -753,3 +753,50 @@ rather than by any check:
 
 **Nothing is in progress.** No partial work, no stash, no open branch. The resume
 point is at the top of this file.
+
+---
+
+## Away session 3 — Priority 1 · Queue cleared · 2026-07-31
+
+**All four Dependabot PRs merged**, each through the protected-branch flow with
+CI green on its own head commit. No `--admin` bypass was used at any point; the
+protection applied yesterday was left to do its job, which meant re-updating and
+re-running each branch as the ones ahead of it landed.
+
+| PR | Bump | Outcome |
+| --- | --- | --- |
+| #1 | `actions/setup-node` 5 → 7 | merged — v7.0.0 confirmed current major |
+| #2 | `actions/checkout` 5 → 7 | merged — v7.0.1 confirmed current major |
+| #4 | `@types/node` 20 → 26 | merged |
+| #3 | `react` / `react-dom` → 19.2.8 | merged |
+
+**PR #3 was failing, and not for the reason it appeared to be.** It reported a
+build failure on a react bump; the actual cause was `format:check` on a file that
+had nothing to do with react. Its branch had been cut from `e8d555a`, a commit
+where `main` itself was red — see [ISSUE-026](ISSUES.md). Updating the branch to
+current `main` turned it green with no change to the bump.
+
+That is worth stating plainly: **`main` was red for about forty minutes during
+the last away session and I reported the commit as pushed and green.** It was
+pushed. It was not green. Branch protection now makes that impossible — a merge
+is blocked until the required checks pass *on that exact commit* — so the fix is
+already in place structurally rather than depending on me remembering.
+
+**[ISSUE-027](ISSUES.md) written and deliberately NOT applied**: the exact steps,
+tradeoffs and a recommendation for gating the Railway deploy on CI. The
+recommendation is *not yet* — branch protection already closed almost all of the
+gap, and the remaining cost is a production-capable token in GitHub secrets plus
+a second, unproven build path.
+
+**Open issues reviewed for code-resolvability.** Of those still open: ISSUE-003,
+-016 and -017 are credentials; -004, -005 and -006 need Docker or a Next
+downgrade; -015 needs a separate CI database; -022 is a decision. Only
+[ISSUE-024](ISSUES.md) is genuinely code-resolvable — handled separately so the
+migration lands on its own.
+
+| Criterion | Result |
+| --- | --- |
+| Four PRs merged, CI green on each head SHA | pass |
+| No admin bypass used | pass |
+| Full suite after all bumps | pass — 17 suites, nothing regressed |
+| `lint` / `type-check` / `format:check` / `build` | pass |
