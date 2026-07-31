@@ -222,6 +222,25 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['api_usage']['Row']>;
         Relationships: [];
       };
+      known_logins: {
+        Row: {
+          id: string;
+          user_id: string;
+          /** HMAC of (ip + coarse user-agent) — never the raw values. */
+          fingerprint: string;
+          first_seen: string;
+          last_seen: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          fingerprint: string;
+          first_seen?: string;
+          last_seen?: string;
+        };
+        Update: Partial<Database['public']['Tables']['known_logins']['Row']>;
+        Relationships: [];
+      };
       auth_attempts: {
         Row: {
           id: string;

@@ -989,3 +989,50 @@ that reasoning in a YAML comment nobody reads.
 | `audit:report` renders | pass |
 | Direct vs transitive split | pass — 1 direct, 2 transitive |
 | Job runs non-blocking with a summary + artifact | **verified on the PR run** |
+
+## Away session 3 — Priority 2b · New-login alerts for admins · 2026-07-31
+
+An administrator signing in from a device not seen before now gets an email.
+Uses the existing console transport until Resend credentials land — which is the
+point: the whole flow is exercised and asserted today, and adding credentials
+changes nothing but the transport.
+
+Three deliberate scoping choices:
+
+- **Admins only.** Theirs are the credentials worth stealing — an admin can read
+  every provider key's last four, rotate keys, suspend accounts and promote
+  users. Alerting every user would be noise for them and cost for us without
+  making the admin account safer.
+- **New devices only, not every sign-in.** Alerting on every login trains the
+  recipient to delete it unread, and then the one that matters looks like the
+  ninety before it.
+- **The first-ever login does not alert.** There is nothing to compare against,
+  so the mail would only say "you signed up".
+
+**What is stored is an HMAC**, never the raw IP or user-agent. A table recording
+where an administrator physically signs in from is a worse thing to hold than
+the problem it solves, and a genuinely valuable target. Asserted directly: no
+stored value contains an address or a browser name.
+
+### The bug the test caught
+
+The first fingerprint implementation kept the browser's **major** version —
+which is exactly the digit Chrome changes every four weeks. That would have
+alerted every administrator monthly about their own laptop, and an alert that
+cries wolf monthly is one nobody reads on the day it matters. All version
+numbers are now stripped; what survives is browser family, engine and platform.
+
+### A design forced by a constraint, and better for it
+
+`noteSignIn` decides and records; the **caller** sends. That split was forced —
+`server-only` needs the `react-server` condition, React Email needs
+`react-dom/server` which that condition removes, so a module importing both
+cannot be loaded by a test at all. The result is better regardless: the policy
+is testable without a mail transport, which is the part worth testing.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:session` | pass — 41 checks, 16 of them new |
+| `security:audit` | pass — 12 tables, `known_logins` deny-all by design |
+| Full suite | pass — nothing regressed |
+| The email renders correctly in a client | **NEEDS HUMAN VERIFICATION** — blocked on Resend (ISSUE-017) |
