@@ -511,3 +511,18 @@ Overnight work, additive only. Nothing in Phases 1–4 was modified.
 | `smoke` (local production build) | pass — 18/18 |
 | `verify:gates` / `rls` / `appearance` / `providers` / `admin` / `theme` / `headers` | pass |
 | `smoke` against the live Railway URL | **NOT RUN** — the standing instruction was not to touch production tonight. Run `npm run smoke -- --url https://myaichat-production.up.railway.app` when you are ready; it is read-only and sends no chat message. |
+
+### Priority 6 — Documentation · Done
+
+- **`docs/ARCHITECTURE.md`** — system diagram, chat and sign-in sequence
+  diagrams, an ER diagram, the authorisation-layer chain and the secret
+  lifecycle, all in Mermaid so they render on GitHub without an image to keep in
+  step. Written to explain the non-obvious decisions rather than restate the file
+  tree: why NDJSON instead of SSE, why a foreign conversation 404s instead of
+  403s, why the user message is written before the provider call, why adapters
+  are factories rather than singletons.
+- **`lib/providers/README.md`** — rewritten as five concrete steps. The previous
+  version documented a shape the code no longer has (a `ChatProvider` singleton;
+  adapters have been key-taking factories since Phase 3), which is worse than no
+  document — someone following it would have written an adapter that closes over
+  a key that rotation then invalidates.

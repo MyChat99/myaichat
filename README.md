@@ -4,6 +4,7 @@ Multi-provider AI chat SaaS — streaming chat, an admin panel for provider keys
 and per-user theming. Built on Next.js 16 (App Router), Supabase, and Tailwind.
 
 Current status lives in [docs/wiki/PROGRESS.md](docs/wiki/PROGRESS.md).
+How it fits together — with diagrams — is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 Full requirements are in [docs/00-PROJECT-SPEC.md](docs/00-PROJECT-SPEC.md).
 
 ## Requirements
