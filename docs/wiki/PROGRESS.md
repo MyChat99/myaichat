@@ -1199,3 +1199,57 @@ with another attempt.
 | `verify:resilience` | pass — 37 checks, credential-free, in CI |
 | `verify:chat` / `verify:providers` / `verify:api` | pass — nothing regressed |
 | Retry behaviour under a real provider outage | **NEEDS HUMAN VERIFICATION** — cannot induce one safely |
+
+## Away session 4A — Priority 2c · Structured logging · 2026-07-31
+
+Every route logged in its own voice — `console.error('[api/chat] stream error:',
+err)` beside `console.error('[uploads/presign] failed:', err)`. Fine to read one
+at a time, impossible to search, and Railway's log view has no idea they are the
+same kind of event.
+
+**One shape now**: `requestId`, `route`, `method`, `status`, `outcome`,
+`durationMs`, plus optional `userId`, `dependency`, `kind`, `model`, token
+counts and `attempts`. One JSON line per request. Server errors go to stderr so
+a platform that separates the streams surfaces them without a filter.
+
+### Redaction is structural, not a filter
+
+The obvious design is `log(message, data)` with a scrubber on the way out. That
+fails the first time someone interpolates a token into `message`, and it fails
+silently. Instead **the payload is a fixed set of typed fields** — there is no
+free-form object to hide a secret in, because there is nowhere to put one.
+Widening it is a deliberate edit to `LogFields`, which is where a reviewer will
+see it. The scrubber still runs, as the second line rather than the first.
+
+Deliberately absent, and asserted absent: `message`, `prompt`, `completion`,
+`content`, `email`, `ip`, `body`. A chat app's logs are the one place the entire
+private contents of every conversation could accumulate, and "we only log it on
+errors" is how that happens — errors are where the interesting text is.
+
+### The test captures real output rather than trusting the function
+
+`npm run verify:logging` — 57 checks. It **replaces `console.log` and
+`console.error`**, pushes eleven credential shapes through the real logger
+(Anthropic, OpenAI, Supabase secret and publishable, Resend, AWS, a JWT, a
+Postgres DSN with a password, an email address, a home path, an encrypted key
+blob) and greps what actually came out. A test that checks the redaction
+function in isolation proves the function works; this proves the *logger* does.
+
+It also asserts redaction does not eat everything — `connect ETIMEDOUT after
+90000ms` survives intact. A log with no information is not safer, just useless.
+
+### A mistake worth recording
+
+My first version of that test asserted **inside** the capture block, so
+`check()`'s own output was counted as the logger's and "one line per request"
+read as three. The test was wrong, not the logger. Assertions now live outside
+the capture.
+
+`verify:all` now covers 20 suites.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:logging` | pass — 57 checks, in CI |
+| No ad-hoc `console.*` left in the chat route | pass |
+| `verify:all` | pass — 20 suites, clean before and after |
+| Log volume in production | **NEEDS HUMAN VERIFICATION** — one line per request is the intent, unmeasured under load |

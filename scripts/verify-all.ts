@@ -55,6 +55,9 @@ type Suite = {
  */
 const SUITES: Suite[] = [
   { script: 'verify:authz', needs: 'nothing' },
+  { script: 'verify:degradation', needs: 'nothing' },
+  { script: 'verify:resilience', needs: 'nothing' },
+  { script: 'verify:logging', needs: 'nothing' },
   { script: 'verify:headers', needs: 'nothing' },
   { script: 'verify:attachments', needs: 'nothing' },
   { script: 'verify:theme', needs: 'nothing' },

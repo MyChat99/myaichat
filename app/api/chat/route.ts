@@ -8,6 +8,7 @@ import { isRetryableKind, withRetry } from '@/lib/providers/resilience';
 import { ProviderError, type ChatMessage } from '@/lib/providers/types';
 import { fetchObject, isStorageConfigured, keyBelongsToUser } from '@/lib/r2/storage';
 import { AppError, fromProviderKind, toAppError } from '@/lib/errors/app-error';
+import { logRequest, newRequestId, outcomeFor } from '@/lib/observability/log';
 import { checkChatRateLimit } from '@/lib/security/rate-limit';
 import { checkDailyTokenBudget } from '@/lib/security/token-budget';
 
@@ -78,6 +79,8 @@ function systemPrompt(displayName: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = newRequestId();
+  const startedAt = Date.now();
   const supabase = await createClient();
   const {
     data: { user },
@@ -338,7 +341,19 @@ export async function POST(request: NextRequest) {
         ? new AppError('provider', fromProviderKind(err.kind), err.message, String(err.message))
         : toAppError(err, 'provider');
 
-    console.error('[api/chat] adapter unavailable:', failure.kind, failure.detail);
+    logRequest({
+      requestId,
+      route: '/api/chat',
+      method: 'POST',
+      status: failure.status,
+      outcome: outcomeFor(failure.status),
+      durationMs: Date.now() - startedAt,
+      userId: user.id,
+      dependency: failure.dependency,
+      kind: failure.kind,
+      model: model.modelId,
+      detail: failure.detail,
+    });
     return NextResponse.json(failure.toBody(), { status: failure.status });
   }
 
@@ -392,12 +407,22 @@ export async function POST(request: NextRequest) {
               if (abort.signal.aborted) return false;
               return err instanceof ProviderError && isRetryableKind(err.kind);
             },
-            onRetry: ({ attempt, delayMs, err }) => {
-              console.warn(
-                `[api/chat] attempt ${attempt} failed (${
-                  err instanceof ProviderError ? err.kind : 'unknown'
-                }), retrying in ${delayMs}ms`,
-              );
+            onRetry: ({ attempt, err }) => {
+              // Logged in the same shape as everything else, so a retry storm
+              // is one query away rather than a string nobody thought to grep.
+              logRequest({
+                requestId,
+                route: '/api/chat',
+                method: 'POST',
+                status: 503,
+                outcome: 'server_error',
+                durationMs: Date.now() - startedAt,
+                userId: user.id,
+                dependency: 'provider',
+                kind: err instanceof ProviderError ? err.kind : 'unknown',
+                model: model.modelId,
+                attempts: attempt,
+              });
             },
           },
         );
@@ -415,7 +440,19 @@ export async function POST(request: NextRequest) {
             ? new AppError('provider', fromProviderKind(err.kind), err.message, String(err.message))
             : toAppError(err, 'provider');
 
-        console.error('[api/chat] stream error:', failure.kind, failure.detail);
+        logRequest({
+          requestId,
+          route: '/api/chat',
+          method: 'POST',
+          status: failure.status,
+          outcome: outcomeFor(failure.status),
+          durationMs: Date.now() - startedAt,
+          userId: user.id,
+          dependency: failure.dependency,
+          kind: failure.kind,
+          model: model.modelId,
+          detail: failure.detail,
+        });
         controller.enqueue(
           ndjson({
             type: 'error',
