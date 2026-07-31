@@ -32,6 +32,7 @@ import {
   recordAttempt,
   THROTTLE_LIMITS,
 } from '@/lib/security/throttle';
+import { checkChatRateLimit } from '@/lib/security/rate-limit';
 import { checkDailyTokenBudget } from '@/lib/security/token-budget';
 
 let failures = 0;
@@ -240,12 +241,117 @@ async function verifyTokenBudget() {
   }
 }
 
+// ------------------------------------------------------------------ rate limit
+
+/**
+ * The hourly message limit, against a real user with real rows.
+ *
+ * Counting is asserted separately from the cutoff, because the two fail
+ * differently: a miscount is silent (a user gets more or fewer messages than
+ * configured), while a broken cutoff is the one that costs money.
+ */
+async function verifyRateLimit() {
+  section('Hourly message rate limit');
+
+  const db = createAdminClient();
+  const KEY = 'rate_limit_messages_per_hour';
+  const email = `ratelimit-probe-${process.pid}@example.invalid`;
+
+  const { data: original } = await db
+    .from('system_settings')
+    .select('value')
+    .eq('key', KEY)
+    .maybeSingle();
+  const originalValue = (original?.value as number | undefined) ?? 60;
+
+  const { data: created, error: createError } = await db.auth.admin.createUser({
+    email,
+    password: 'probe-passphrase-9f3a',
+    email_confirm: true,
+  });
+
+  if (createError || !created?.user) {
+    check('could create a probe user', false, createError?.message);
+    return;
+  }
+
+  const userId = created.user.id;
+
+  try {
+    const fresh = await checkChatRateLimit(userId);
+    check('a user with no messages is allowed', fresh.allowed && fresh.used === 0);
+
+    const { data: conversation } = await db
+      .from('conversations')
+      .insert({ user_id: userId, title: 'probe', model_id: null })
+      .select('id')
+      .single();
+
+    if (!conversation) {
+      check('could create a probe conversation', false);
+      return;
+    }
+
+    const MESSAGES = 3;
+    await db.from('messages').insert(
+      Array.from({ length: MESSAGES }, (_, i) => ({
+        conversation_id: conversation.id,
+        role: 'user' as const,
+        content: `probe ${i}`,
+      })),
+    );
+
+    const counted = await checkChatRateLimit(userId);
+    check(`counts exactly ${MESSAGES} messages`, counted.used === MESSAGES, `got ${counted.used}`);
+    check('still allowed below the limit', counted.allowed);
+
+    // Assistant replies must NOT count against a *message* limit.
+    await db.from('messages').insert({
+      conversation_id: conversation.id,
+      role: 'assistant' as const,
+      content: 'probe reply',
+    });
+    const afterReply = await checkChatRateLimit(userId);
+    check(
+      'assistant replies are not counted',
+      afterReply.used === MESSAGES,
+      `got ${afterReply.used}`,
+    );
+
+    await db.from('system_settings').upsert({ key: KEY, value: MESSAGES }, { onConflict: 'key' });
+    const atLimit = await checkChatRateLimit(userId);
+    check('refused once the configured limit is reached', !atLimit.allowed);
+    check('reports a retry-after', atLimit.retryAfterSeconds > 0);
+  } finally {
+    await db
+      .from('system_settings')
+      .upsert({ key: KEY, value: originalValue }, { onConflict: 'key' });
+    const { data: restored } = await db
+      .from('system_settings')
+      .select('value')
+      .eq('key', KEY)
+      .maybeSingle();
+
+    if ((restored?.value as number) !== originalValue) {
+      console.error(`\n  !!!!  COULD NOT RESTORE ${KEY}. Set it back to ${originalValue}.`);
+      failures++;
+    } else {
+      console.log(`  ok    ${KEY} restored to ${originalValue}`);
+      checks++;
+    }
+
+    // Cascades to the conversation and its messages.
+    await db.auth.admin.deleteUser(userId).catch(() => {});
+  }
+}
+
 async function main() {
-  console.log('Security hardening — throttling, password rules, token budget');
+  console.log('Security hardening — throttling, password rules, rate limits, token budget');
 
   verifyPasswordRules();
   verifyDisposableEmails();
   await verifyThrottle();
+  await verifyRateLimit();
   await verifyTokenBudget();
 
   console.log(

@@ -83,6 +83,12 @@ jobs:
       - name: Security headers
         run: npm run verify:headers
 
+      # Source-level completeness check: catches a Server Action or route
+      # handler shipped without an auth gate, which no runtime suite can see
+      # because a runtime test only covers endpoints someone remembered to add.
+      - name: Authorisation completeness
+        run: npm run verify:authz
+
   security:
     name: Security audit (non-blocking)
     runs-on: ubuntu-latest

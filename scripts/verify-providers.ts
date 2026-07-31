@@ -128,8 +128,14 @@ async function main() {
 
   // Provider names may appear in the seed catalogue and the registry map, but
   // must not appear in routes or UI — that would mean branching on vendor.
+  //
+  // `lib/security/password.ts` is exempt: it lists 'anthropic', 'openai' and
+  // 'claude' in a blocklist of guessable passwords, which is a string table,
+  // not a branch on vendor. The exemption is one named file rather than a
+  // pattern, so it cannot quietly grow to cover real coupling.
+  const NAME_EXEMPT = ['scripts/', 'lib/security/password.ts'];
   const nameLeaks = grepOutsideProviders("'(anthropic|openai)'").filter(
-    (p) => !p.startsWith('scripts/'),
+    (p) => !NAME_EXEMPT.some((prefix) => p.startsWith(prefix)),
   );
   check(
     'no provider name hardcoded in routes or components',

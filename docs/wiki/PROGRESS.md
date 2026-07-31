@@ -477,3 +477,37 @@ Overnight work, additive only. Nothing in Phases 1–4 was modified.
 | Skeletons match the real layout | **NEEDS HUMAN VERIFICATION** |
 | Mobile layout at 360px | **NEEDS HUMAN VERIFICATION** — reasoned from the CSS, not measured in a browser |
 | Windowing at 60+ messages | **NEEDS HUMAN VERIFICATION** — no conversation here is that long |
+
+### Priority 5 — Test depth · Done
+
+- **`npm run verify:authz`** (36 checks) — a *completeness* check, and that is
+  the point. Every runtime suite proves the endpoints it knows about are gated;
+  none can notice a **new** Server Action shipped without one, because a test
+  only covers what someone remembered to write. This walks the source: every
+  exported action, every route handler, every admin page. Public routes need a
+  written reason to be exempt. Runs credential-free in CI.
+  - Writing it surfaced two ways a naive version lies: a return type of
+    `Promise<{ ok: true }>` makes brace-matching stop at the *type's* brace, so
+    a well-gated action reads as ungated; and a gate reached through a local
+    helper (`createConversation` → `insertConversation` → `requireUser`) is a
+    real gate. Both are handled, and both produced false failures first.
+- **Rate limit and token budget** now covered in `verify:security` (42 checks):
+  exact message counting, assistant replies correctly *not* counted, the cutoff
+  at the configured limit, and the budget refusal for a user with real usage.
+  Both temporarily change a system setting and restore it in `finally`.
+- **`npm run smoke`** — 18 checks against a *running* server, which is a
+  different question from everything else in `scripts/`. It found a real bug on
+  its first run: `/opengraph-image` was being redirected to `/login` by the
+  proxy, so no link-preview crawler — all of which are anonymous — could ever
+  have fetched the card. Fixed in `lib/db/session.ts`.
+- **`verify:providers` exemption** — the password blocklist contains 'anthropic'
+  and 'openai', which the no-vendor-names scan flagged. Exempted as one named
+  file with a reason, not a pattern: a string table is not a branch on vendor.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:authz` | pass — 36/36 |
+| `verify:security` | pass — 42/42 |
+| `smoke` (local production build) | pass — 18/18 |
+| `verify:gates` / `rls` / `appearance` / `providers` / `admin` / `theme` / `headers` | pass |
+| `smoke` against the live Railway URL | **NOT RUN** — the standing instruction was not to touch production tonight. Run `npm run smoke -- --url https://myaichat-production.up.railway.app` when you are ready; it is read-only and sends no chat message. |
