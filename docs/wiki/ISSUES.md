@@ -97,7 +97,32 @@ Two mistakes compounding:
 **Resolution:** the setting is seeded explicitly (`0` = unlimited, the documented default), the expected set in `verify:seed` follows, and `verify:security` now records whether the row existed and **deletes** it on cleanup if it did not. A test that cannot restore the exact prior state should not run against shared data.
 ### ISSUE-024 — Truncation deletes by timestamp, so a collision over-deletes
 
-**Status:** Open (logged, not fixed) | **Severity:** Low | **Phase:** 2 | **Opened:** 2026-07-31
+**Status:** Resolved | **Severity:** Low | **Phase:** 2 | **Opened:** 2026-07-31 | **Resolved:** 2026-07-31
+
+**Resolution:** migration `20260731140001` adds `messages.seq`, a monotonic
+per-row sequence, and truncation now deletes by `seq >= pivot.seq`.
+
+Two details in the migration matter more than the column itself:
+
+- The backfill orders by `(created_at, id)` rather than letting `bigserial`
+  number rows in physical order. A `bigserial` added to an existing table
+  numbers rows however they sit on disk, which after any update is **not**
+  insertion order — that would have silently reordered existing threads.
+- The `id` tiebreak makes the backfill deterministic precisely where timestamps
+  already collide, which is the condition this issue is about.
+
+The history window, title derivation, thread rendering and export were switched
+to `seq` in the same change. `created_at` remains the display timestamp; it is
+no longer used to establish order.
+
+**Guarded by** `verify:api`, which writes four messages sharing one timestamp,
+truncates from the third, and asserts exactly the first two survive. Under the
+old predicate that test leaves nothing — the assertion message says so, so a
+future regression reads as the specific bug rather than a mystery.
+
+**Original report below.**
+
+**Status (original):** Open (logged, not fixed) | **Severity:** Low | **Phase:** 2 | **Opened:** 2026-07-31
 **Problem:** Regenerate and edit-and-resubmit drop the pivot message and everything after it:
 
 ```ts

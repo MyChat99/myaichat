@@ -111,6 +111,8 @@ export interface Database {
       };
       messages: {
         Row: {
+          /** Monotonic per-row order. See migration 20260731140001. */
+          seq: number;
           id: string;
           conversation_id: string;
           role: MessageRole;
@@ -122,6 +124,8 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          /** Assigned by a sequence — never set this from application code. */
+          seq?: number;
           conversation_id: string;
           role: MessageRole;
           content?: string;

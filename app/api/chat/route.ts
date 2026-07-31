@@ -193,11 +193,20 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  // Regenerate / edit: drop the target message and everything after it.
+  /**
+   * Regenerate / edit: drop the target message and everything after it.
+   *
+   * Boundary is `seq`, not `created_at`. `created_at` defaults to `now()`,
+   * which is TRANSACTION time — every row written by one statement shares a
+   * value, so `>= pivot.created_at` could sweep up a message that came *before*
+   * the pivot and merely landed in the same transaction. Regenerating an
+   * assistant reply would then delete the question that prompted it
+   * (ISSUE-024). `seq` is monotonic, so the boundary is exact.
+   */
   if (truncateFromMessageId) {
     const { data: pivot } = await supabase
       .from('messages')
-      .select('created_at')
+      .select('seq')
       .eq('id', truncateFromMessageId)
       .eq('conversation_id', conversationId)
       .single();
@@ -207,7 +216,7 @@ export async function POST(request: NextRequest) {
         .from('messages')
         .delete()
         .eq('conversation_id', conversationId)
-        .gte('created_at', pivot.created_at);
+        .gte('seq', pivot.seq);
     }
   }
 
@@ -237,12 +246,16 @@ export async function POST(request: NextRequest) {
    *
    * Newest-first with a limit, then reversed, is what "keep the last N" has to
    * be in SQL.
+   *
+   * Ordered by `seq` rather than `created_at` for the same reason the deletion
+   * above is: a tie at the window edge would make which message falls inside
+   * the window arbitrary.
    */
   const { data: recent } = await supabase
     .from('messages')
     .select('role, content, attachments')
     .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: false })
+    .order('seq', { ascending: false })
     .limit(MAX_HISTORY_MESSAGES);
 
   const history = (recent ?? []).reverse();
@@ -297,7 +310,7 @@ export async function POST(request: NextRequest) {
       .select('content')
       .eq('conversation_id', conversationId)
       .eq('role', 'user')
-      .order('created_at', { ascending: true })
+      .order('seq', { ascending: true })
       .limit(1)
       .maybeSingle();
 

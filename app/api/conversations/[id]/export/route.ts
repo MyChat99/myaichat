@@ -101,7 +101,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .select('role, content, created_at, attachments')
     .eq('conversation_id', id)
     .neq('role', 'system')
-    .order('created_at', { ascending: true });
+    // Same ordering the thread renders with, so an export cannot disagree with
+    // what the user saw on screen.
+    .order('seq', { ascending: true });
 
   // The model name is cosmetic here, so a missing row degrades to null rather
   // than failing the export.

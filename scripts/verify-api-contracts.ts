@@ -473,6 +473,76 @@ async function main() {
       'the oldest message is still in the window',
     );
     check('the window is chronological', ordered[0]!.localeCompare(ordered[1]!) !== 0);
+
+    // ───────────────────────────────────────────────── regression
+    section('Regression — truncation boundary (ISSUE-024, fixed 2026-07-31)');
+
+    /**
+     * The case `created_at` could not express.
+     *
+     * Four messages written with an IDENTICAL timestamp — which is what one
+     * multi-row insert produces, since `now()` is transaction time. Truncating
+     * from the third must remove exactly the third and fourth. The old
+     * `created_at >= pivot` predicate matched all four, so regenerating an
+     * assistant reply deleted the question that prompted it.
+     */
+    const { data: collide } = await admin
+      .from('conversations')
+      .insert({ user_id: ownerId, title: 'collision probe', model_id: null })
+      .select('id')
+      .single();
+
+    const sameInstant = new Date().toISOString();
+    await admin.from('messages').insert([
+      { conversation_id: collide!.id, role: 'user', content: 'A', created_at: sameInstant },
+      { conversation_id: collide!.id, role: 'assistant', content: 'B', created_at: sameInstant },
+      { conversation_id: collide!.id, role: 'user', content: 'C', created_at: sameInstant },
+      { conversation_id: collide!.id, role: 'assistant', content: 'D', created_at: sameInstant },
+    ]);
+
+    const { data: all } = await admin
+      .from('messages')
+      .select('id, content, seq, created_at')
+      .eq('conversation_id', collide!.id)
+      .order('seq', { ascending: true });
+
+    // Annotated because this client is created without the Database generic,
+    // so supabase-js cannot resolve the select string against a schema.
+    const collided = (all ?? []) as unknown as {
+      id: string;
+      content: string;
+      seq: number;
+      created_at: string;
+    }[];
+    check(
+      'four messages share one timestamp',
+      new Set(collided.map((r) => r.created_at)).size === 1,
+    );
+    check('but every seq is distinct', new Set(collided.map((r) => r.seq)).size === 4);
+    check(
+      'seq preserves insertion order under a tie',
+      collided.map((r) => r.content).join('') === 'ABCD',
+      collided.map((r) => r.content).join(''),
+    );
+
+    // Truncate from the third, exactly as the chat route does.
+    const pivot = collided[2]!;
+    await admin.from('messages').delete().eq('conversation_id', collide!.id).gte('seq', pivot.seq);
+
+    const { data: left } = await admin
+      .from('messages')
+      .select('content')
+      .eq('conversation_id', collide!.id)
+      .order('seq', { ascending: true });
+
+    const remaining = (left ?? []).map((m) => m.content).join('');
+    check(
+      'truncating from the third leaves exactly the first two',
+      remaining === 'AB',
+      `left "${remaining}" — the created_at predicate would have left ""`,
+    );
+
+    await admin.from('conversations').delete().eq('id', collide!.id);
   } finally {
     await admin.auth.admin.deleteUser(ownerId).catch(() => {});
     await admin.auth.admin.deleteUser(otherId).catch(() => {});
