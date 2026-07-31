@@ -147,6 +147,20 @@ export function logRequest(fields: LogFields): void {
 }
 
 /**
+ * What a handler can report back about itself while it runs.
+ *
+ * The user id is not known until the handler has authenticated, which is inside
+ * the wrapper — so it cannot be a parameter. A mutable context is the least
+ * ceremony that still gets it into the log line.
+ */
+export type RequestContext = {
+  requestId: string;
+  userId?: string;
+  dependency?: string;
+  kind?: string;
+};
+
+/**
  * Times a request and logs exactly one line for it.
  *
  * Returns the handler's response untouched. The `requestId` is attached as a
@@ -155,13 +169,14 @@ export function logRequest(fields: LogFields): void {
  */
 export async function withRequestLog(
   context: { route: string; method: string; userId?: string },
-  handler: (requestId: string) => Promise<Response>,
+  handler: (ctx: RequestContext) => Promise<Response>,
 ): Promise<Response> {
   const requestId = newRequestId();
   const started = Date.now();
+  const reported: RequestContext = { requestId, userId: context.userId };
 
   try {
-    const response = await handler(requestId);
+    const response = await handler(reported);
     logRequest({
       requestId,
       route: context.route,
@@ -169,7 +184,9 @@ export async function withRequestLog(
       status: response.status,
       outcome: outcomeFor(response.status),
       durationMs: Date.now() - started,
-      userId: context.userId,
+      userId: reported.userId ?? context.userId,
+      dependency: reported.dependency,
+      kind: reported.kind,
     });
 
     response.headers.set('x-request-id', requestId);
@@ -185,7 +202,9 @@ export async function withRequestLog(
       status: 500,
       outcome: 'server_error',
       durationMs: Date.now() - started,
-      userId: context.userId,
+      userId: reported.userId ?? context.userId,
+      dependency: reported.dependency,
+      kind: reported.kind,
       detail: err instanceof Error ? err.message : String(err),
     });
     throw err;

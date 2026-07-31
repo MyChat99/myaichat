@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { createAdminClient } from '@/lib/db/admin';
 import { createClient } from '@/lib/db/server';
+import { withRequestLog, type RequestContext } from '@/lib/observability/log';
 import { ALLOWED_MIME, buildObjectKey, isStorageConfigured, presignUpload } from '@/lib/r2/storage';
 import { checkEndpointLimit, limitMessage } from '@/lib/security/endpoint-limit';
 
@@ -38,7 +39,7 @@ async function maxUploadBytes(): Promise<number> {
   return mb * 1024 * 1024;
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest, ctx: RequestContext) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -47,6 +48,10 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
   }
+
+  // Reported back so the log line carries it — it is not knowable before the
+  // handler authenticates, which is why the context is mutable.
+  ctx.userId = user.id;
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -138,4 +143,17 @@ export async function POST(request: NextRequest) {
     console.error('[uploads/presign] failed:', err);
     return NextResponse.json({ error: 'Could not prepare the upload.' }, { status: 500 });
   }
+}
+
+/**
+ * One structured log line per request, with the id echoed as `x-request-id`.
+ *
+ * The wrapper existed and was tested for a whole session without being called
+ * anywhere — tested dead code, which is worse than none: the suite reported
+ * that request logging worked while four routes logged nothing at all.
+ */
+export async function POST(request: NextRequest) {
+  return withRequestLog({ route: '/api/uploads/presign', method: 'POST' }, (ctx) =>
+    handlePOST(request, ctx),
+  );
 }

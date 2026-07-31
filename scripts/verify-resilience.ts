@@ -14,8 +14,10 @@
 import { readFileSync } from 'node:fs';
 
 import {
+  HEALTH_TIMEOUT_MS,
   MAX_ATTEMPTS,
   REQUEST_TIMEOUT_MS,
+  withDeadline,
   backoffMs,
   isRetryableKind,
   withRetry,
@@ -325,6 +327,33 @@ function verifyTimeouts() {
     );
   }
 
+  console.log('');
+
+  /**
+   * A health check is awaited during a PAGE RENDER. Inheriting the streaming
+   * timeout meant a provider that hangs blocked the admin overview for ninety
+   * seconds — the very page you would open to find out a provider was down.
+   */
+  check('health checks have their own, shorter ceiling', HEALTH_TIMEOUT_MS < REQUEST_TIMEOUT_MS);
+  check(
+    '  and it is short enough to sit inside a page render',
+    HEALTH_TIMEOUT_MS <= 15_000,
+    `${HEALTH_TIMEOUT_MS}ms — a dashboard that takes this long reads as broken`,
+  );
+  check(
+    '  but long enough for a healthy one-token round trip',
+    HEALTH_TIMEOUT_MS >= 3_000,
+    `${HEALTH_TIMEOUT_MS}ms`,
+  );
+
+  const dashboard = readFileSync('lib/admin/dashboard.ts', 'utf8');
+  check('the dashboard applies the health deadline', dashboard.includes('withDeadline('));
+  check(
+    '  rather than the streaming timeout',
+    !dashboard.includes('REQUEST_TIMEOUT_MS'),
+    'the overview would hang for 90s on a provider that hangs',
+  );
+
   const route = readFileSync('app/api/chat/route.ts', 'utf8');
   check('the chat route uses withRetry', route.includes('withRetry('));
   check(
@@ -334,12 +363,49 @@ function verifyTimeouts() {
   );
 }
 
+async function verifyDeadline() {
+  section('withDeadline');
+
+  const fast = await withDeadline(Promise.resolve('done'), 1_000, 'fast');
+  check('a promise that resolves in time passes through', fast === 'done');
+
+  let timedOut = false;
+  let message = '';
+  try {
+    await withDeadline(new Promise(() => {}), 40, 'hung-provider');
+  } catch (err) {
+    timedOut = true;
+    message = err instanceof Error ? err.message : String(err);
+  }
+  check('a promise that never settles rejects', timedOut);
+  check('  and the message names the label', message.includes('hung-provider'), message);
+
+  // The reason it rejects with a plain Error: `toAppError` already classifies
+  // "timed out" as unreachable, so a deadline is reported exactly like any
+  // other failure to reach a dependency rather than as a special case.
+  const { toAppError } = await import('../lib/errors/app-error');
+  check(
+    'a timeout classifies as unreachable',
+    toAppError(new Error(message), 'provider').kind === 'unreachable',
+  );
+
+  // A rejection must propagate, not be swallowed into a timeout.
+  let sawOriginal = false;
+  try {
+    await withDeadline(Promise.reject(new Error('the real failure')), 1_000, 'x');
+  } catch (err) {
+    sawOriginal = err instanceof Error && err.message === 'the real failure';
+  }
+  check('an underlying rejection is not masked by the deadline', sawOriginal);
+}
+
 async function main() {
   console.log('Resilience — retries and timeouts');
 
   verifyPredicate();
   verifyBackoff();
   await verifyRetryLoop();
+  await verifyDeadline();
   verifyTimeouts();
 
   console.log(

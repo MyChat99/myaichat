@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 
 import { createClient } from '@/lib/db/server';
+import { withRequestLog, type RequestContext } from '@/lib/observability/log';
 import { isStorageConfigured, keyBelongsToUser, presignDownload } from '@/lib/r2/storage';
 import { checkEndpointLimit, limitMessage } from '@/lib/security/endpoint-limit';
 
@@ -18,7 +19,7 @@ export const runtime = 'nodejs';
 
 const querySchema = z.object({ key: z.string().trim().min(1).max(512) });
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest, ctx: RequestContext) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -27,6 +28,10 @@ export async function GET(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
   }
+
+  // Reported back so the log line carries it — it is not knowable before the
+  // handler authenticates, which is why the context is mutable.
+  ctx.userId = user.id;
 
   const parsed = querySchema.safeParse({ key: request.nextUrl.searchParams.get('key') });
   if (!parsed.success) {
@@ -68,4 +73,17 @@ export async function GET(request: NextRequest) {
     console.error('[uploads/download] failed:', err);
     return NextResponse.json({ error: 'Could not prepare the download.' }, { status: 500 });
   }
+}
+
+/**
+ * One structured log line per request, with the id echoed as `x-request-id`.
+ *
+ * The wrapper existed and was tested for a whole session without being called
+ * anywhere — tested dead code, which is worse than none: the suite reported
+ * that request logging worked while four routes logged nothing at all.
+ */
+export async function GET(request: NextRequest) {
+  return withRequestLog({ route: '/api/uploads/download', method: 'GET' }, (ctx) =>
+    handleGET(request, ctx),
+  );
 }

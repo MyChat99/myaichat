@@ -12,6 +12,8 @@
  *
  *   npm run verify:logging
  */
+import { readFileSync } from 'node:fs';
+
 import {
   logRequest,
   newRequestId,
@@ -323,6 +325,43 @@ function verifyRedactIsPure() {
   );
 }
 
+function verifyRoutesAreWrapped() {
+  section('Routes actually use the wrapper');
+
+  /**
+   * `withRequestLog` was written, exported and covered by 57 checks for a whole
+   * session without being called anywhere. That is worse than no wrapper: the
+   * suite reported that request logging worked while four routes logged
+   * nothing at all. This asserts the wiring, not just the helper.
+   */
+  const WRAPPED = [
+    'app/api/uploads/presign/route.ts',
+    'app/api/uploads/download/route.ts',
+    'app/api/conversations/[id]/export/route.ts',
+    'app/api/admin/audit/export/route.ts',
+  ];
+
+  for (const file of WRAPPED) {
+    const source = readFileSync(file, 'utf8');
+    check(
+      `${file.replace('app/api/', '')} uses withRequestLog`,
+      source.includes('withRequestLog('),
+    );
+    check(
+      `  and reports the authenticated user`,
+      source.includes('ctx.userId ='),
+      'a log line without a user id cannot be traced to anyone',
+    );
+  }
+
+  // The chat route logs directly rather than through the wrapper, because it
+  // returns a stream that outlives the handler — asserted so the difference is
+  // deliberate rather than an oversight.
+  const chat = readFileSync('app/api/chat/route.ts', 'utf8');
+  check('the chat route logs structurally too', chat.includes('logRequest('));
+  check('  and has no ad-hoc console calls left', !/console\.(log|error|warn)\(/.test(chat));
+}
+
 async function main() {
   console.log('Structured logging');
 
@@ -332,6 +371,7 @@ async function main() {
   await verifySecretsNeverEscape();
   verifyNoUserContent();
   await verifyWrapper();
+  verifyRoutesAreWrapped();
   verifyRedactIsPure();
 
   console.log(

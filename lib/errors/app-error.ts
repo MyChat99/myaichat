@@ -216,7 +216,16 @@ export function toAppError(err: unknown, dependency: Dependency): AppError {
     return new AppError(dependency, 'unreachable', messageFor(dependency, 'unreachable'), raw);
   }
 
-  if (lower.includes('timeout') || lower.includes('aborted')) {
+  // "timed out" and "timeout" are both common, and the SDKs disagree about
+  // which they use — matching only one classified half of all timeouts as
+  // `unknown`, which is also the half that is not retryable. Found by a test
+  // whose own message happened to use the other phrasing.
+  if (
+    lower.includes('timeout') ||
+    lower.includes('timed out') ||
+    lower.includes('aborted') ||
+    lower.includes('abort')
+  ) {
     return new AppError(dependency, 'unreachable', messageFor(dependency, 'unreachable'), raw);
   }
 

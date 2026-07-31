@@ -1370,3 +1370,74 @@ drift apart silently. `verify:all` now covers 21 suites.
 | `verify:api` | pass — export refuses anonymous and non-admin |
 | `verify:all` | pass — 21 suites |
 | The file opens correctly in Excel/Sheets | **NEEDS HUMAN VERIFICATION** |
+
+## Away session 4B — Priority 1 · Adversarial review, round 2 · 2026-07-31
+
+Hostile pass over everything merged in sessions 3 and 4A. **Three findings, all
+fixed**, plus two bugs my own new tests caught in code written minutes earlier.
+
+### Finding 1 — the health endpoint published outage details
+
+`/api/health` is unauthenticated by necessity (Railway probes it before any
+session exists) and echoed Supabase's `error.message` verbatim. The original
+comment argued that message describes the failure rather than the credential —
+true of the errors you see while everything works, and exactly the wrong thing
+to rely on. The messages that appear during a real outage are the ones carrying
+a host, a port or a role name, and by then they are already public.
+
+**`verify:degradation` could not catch it**, because the live half only ever ran
+against a healthy database — the failure branch was never exercised. It now
+reports the classified kind, and the test asserts the classifier over four real
+outage shapes plus a source-level check that the raw echo cannot come back.
+
+### Finding 2 — the admin overview could hang for 90 seconds
+
+`validateKey()` inherited the 90-second streaming timeout, and the dashboard
+awaits it during a page render. A provider that *hangs* rather than refusing
+would block the very page you open to find out a provider is down. Health checks
+now have their own 8-second ceiling, and the test asserts it is both shorter
+than the streaming timeout and short enough to sit inside a render.
+
+### Finding 3 — tested dead code, which is worse than none
+
+`withRequestLog` was written, exported and covered by 57 checks last session
+**without being called anywhere**. The suite reported that request logging
+worked while four routes logged nothing at all. Now wired into presign,
+download, conversation export and audit export — each reporting its
+authenticated user through a mutable context, because the user id is not known
+until the handler has authenticated. `x-request-id` is echoed on every response.
+
+The chat route deliberately still logs directly rather than through the wrapper:
+it returns a stream that outlives the handler. Asserted, so the difference is a
+decision rather than an oversight.
+
+### Two bugs the new tests caught immediately
+
+- **`withDeadline` did not work.** I used `.unref()` on the timer, so it did not
+  hold the event loop — and neither does a pending promise — meaning a process
+  whose only remaining work was "wait for a deadline on a hung call" exited
+  before the timer fired. The test found it by ending mid-run with no summary.
+  Fixed by clearing the timer on settle, which gets both properties.
+- **`toAppError` matched `timeout` but not `timed out`.** Both SDKs use both
+  phrasings, so half of all timeouts classified as `unknown` — which is also the
+  half that is *not* retryable. Found because the deadline's own message
+  happened to use the other wording.
+
+### Checked and found sound
+
+Rate limits on every route except `/api/health` (deliberate — a liveness probe
+gated behind a limit fails its purpose). RLS on all 12 tables, with the three
+service-role-only tables deny-all by design. Every new endpoint gated, detected
+automatically by `verify:authz`. No drift from the CLAUDE.md security rules.
+
+**Logged, not fixed:** the audit export resolves actor emails via
+`listUsers({ perPage: 1000 })`. Beyond 1,000 users some rows would export with a
+blank email rather than a wrong one. Correct behaviour, incomplete data — noted
+rather than paged over, since this deployment has single digits of users.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:degradation` | pass — 194, up from 185 |
+| `verify:resilience` | pass — 47, up from 37 |
+| `verify:logging` | pass — 69, up from 57 |
+| `verify:all` | pass — 21 suites, clean before and after |

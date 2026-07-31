@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 
 import { createAdminClient } from '@/lib/db/admin';
+import { withRequestLog, type RequestContext } from '@/lib/observability/log';
 import { auditLog } from '@/lib/security/audit';
 import { requireAdmin } from '@/lib/security/auth';
 import { checkEndpointLimit, limitMessage } from '@/lib/security/endpoint-limit';
@@ -56,8 +57,9 @@ function csvRow(cells: unknown[]): string {
   return cells.map(csvCell).join(',');
 }
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest, ctx: RequestContext) {
   const admin = await requireAdmin();
+  ctx.userId = admin.id;
 
   const limited = await checkEndpointLimit(admin.id, 'admin.audit_export');
   if (!limited.allowed) {
@@ -144,4 +146,17 @@ export async function GET(request: NextRequest) {
       'cache-control': 'no-store',
     },
   });
+}
+
+/**
+ * One structured log line per request, with the id echoed as `x-request-id`.
+ *
+ * The wrapper existed and was tested for a whole session without being called
+ * anywhere — tested dead code, which is worse than none: the suite reported
+ * that request logging worked while four routes logged nothing at all.
+ */
+export async function GET(request: NextRequest) {
+  return withRequestLog({ route: '/api/admin/audit/export', method: 'GET' }, (ctx) =>
+    handleGET(request, ctx),
+  );
 }

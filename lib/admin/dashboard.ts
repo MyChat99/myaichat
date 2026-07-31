@@ -2,6 +2,7 @@ import 'server-only';
 
 import { createAdminClient } from '@/lib/db/admin';
 import { getAdapter, registeredProviderNames } from '@/lib/providers/registry';
+import { HEALTH_TIMEOUT_MS, withDeadline } from '@/lib/providers/resilience';
 import { ProviderError } from '@/lib/providers/types';
 
 /**
@@ -75,7 +76,11 @@ export async function getProviderHealth(force = false): Promise<ProviderHealth[]
       try {
         const adapter = await getAdapter(name);
         const started = Date.now();
-        const result = await adapter.validateKey();
+
+        // Bounded separately from the streaming timeout. This is awaited during
+        // a page render, and 90 seconds of "loading" on the page that reports
+        // provider health is worse than reporting the provider as down.
+        const result = await withDeadline(adapter.validateKey(), HEALTH_TIMEOUT_MS, name);
 
         const health: ProviderHealth = {
           name,
@@ -92,7 +97,12 @@ export async function getProviderHealth(force = false): Promise<ProviderHealth[]
           ok: false,
           // A ProviderError message is already written for a human and carries
           // no key material. Anything else is replaced rather than surfaced.
-          message: err instanceof ProviderError ? err.message : 'Not configured',
+          message:
+            err instanceof ProviderError
+              ? err.message
+              : err instanceof Error && err.message.includes('timed out')
+                ? `No response in ${HEALTH_TIMEOUT_MS / 1000}s`
+                : 'Not configured',
           latencyMs: null,
           checkedAt: new Date().toISOString(),
         };
