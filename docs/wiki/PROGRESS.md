@@ -10,7 +10,7 @@ Single source of truth for build status. Update immediately after any phase work
 | --- | ---------------------------------------------------------------------------------- | ----------- | ---------- | ---------- |
 | 0   | Repo & docs setup                                                                  | Verified    | 2026-07-30 | 2026-07-30 |
 | 1   | [Foundation — scaffold, auth, schema, RLS](../phases/PHASE-1-foundation.md)        | Verified    | 2026-07-30 | 2026-07-30 |
-| 2   | [Chat interface with streaming](../phases/PHASE-2-chat-streaming.md)               | Done        | 2026-07-30 | —          |
+| 2   | [Chat interface with streaming](../phases/PHASE-2-chat-streaming.md)               | Verified    | 2026-07-30 | 2026-07-30 |
 | 3   | [Provider abstraction + model selector](../phases/PHASE-3-provider-abstraction.md) | Not Started | —          | —          |
 | 4   | [Admin panel — keys, models, users](../phases/PHASE-4-admin-panel.md)              | Not Started | —          | —          |
 | 5   | [Theming & appearance](../phases/PHASE-5-theming.md)                               | Not Started | —          | —          |
@@ -95,9 +95,7 @@ A phase moves to **Verified** only when all four pass:
 
 ---
 
-## Phase 2 — Chat interface with streaming · Done · 2026-07-30
-
-Not yet **Verified** — two acceptance details need a browser, see below.
+## Phase 2 — Chat interface with streaming · Verified · 2026-07-30
 
 **Built**
 
@@ -120,10 +118,10 @@ Not yet **Verified** — two acceptance details need a browser, see below.
 | Refresh restores history from the DB | pass — both turns persisted, content matches the stream byte for byte |
 | XSS attempt renders inert | pass — script tags, inline handlers and `javascript:` URLs all stripped from the real component |
 | Code blocks highlight | pass — `hljs` classes survive sanitization |
-| Code blocks **copy** | **outstanding** — clipboard API is browser-only |
-| Stop halts generation immediately | pass — asserts the persisted partial is short, i.e. the server stopped rather than finishing in the background |
+| Code blocks **copy** | pass — browser walkthrough 2026-07-30 |
+| Stop halts generation immediately | pass — automated check asserts the persisted partial is short, i.e. the server stopped rather than finishing in the background; confirmed by hand too |
 | Regenerate / edit-and-resubmit | pass |
-| Responsive / mobile sidebar | **outstanding** — needs a real viewport |
+| Responsive / mobile sidebar | pass — browser walkthrough 2026-07-30 |
 
 **Deviations from the phase file**
 
@@ -135,6 +133,6 @@ Not yet **Verified** — two acceptance details need a browser, see below.
 
 - [ISSUE-011](ISSUES.md) — the proxy redirected unauthenticated API calls to the HTML login page, so `POST /api/chat` returned 200 and the handler's own 401 was unreachable.
 
-**To reach Verified**
+**Carried into Phase 3**
 
-Walk the browser flow once: send a message and watch it stream, reload and confirm history returns, copy a code block, press Stop mid-answer, and check the sidebar collapses on a narrow viewport.
+- The assistant cannot reliably name its own model — expected for any LLM, not a misconfiguration. Once Phase 3 adds the model selector, pass the selected model's display name into the system prompt so the answer is accurate.

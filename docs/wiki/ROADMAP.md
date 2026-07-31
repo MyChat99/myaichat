@@ -4,10 +4,11 @@ Pending action items and what comes after the eight planned phases.
 
 ## Immediate next steps
 
-1. **Close out Phase 2** — one browser pass: stream a message, reload, copy a code block, press Stop mid-answer, check the mobile sidebar. That is all that stands between Phase 2 and Verified.
-2. **Start Phase 3** — read [PHASE-3-provider-abstraction.md](../phases/PHASE-3-provider-abstraction.md) in full, propose a plan, then implement. The OpenAI key is already in `.env.local` with `gpt-5.4-mini` as its default ([DEC-007](DECISIONS.md)), and `lib/providers/` already has the interface Phase 3 formalises.
+1. **Start Phase 3** — read [PHASE-3-provider-abstraction.md](../phases/PHASE-3-provider-abstraction.md) in full, propose a plan, then implement. Nothing is blocking it: the OpenAI key is already in `.env.local` with `gpt-5.4-mini` as its default ([DEC-007](DECISIONS.md)), and `lib/providers/` already carries the `ChatProvider` interface Phase 3 formalises.
 
-Phase 1 is Verified; Phase 2 is Done pending that browser pass. Both providers' keys are present and verified working.
+While in Phase 3, also pass the selected model's display name into the system prompt — without it the assistant cannot name its own model.
+
+Phases 1 and 2 are Verified. Both providers' keys are present and confirmed working against their live APIs.
 
 Worth doing soon, not blocking: install Docker to get a local Supabase stack, which also restores `supabase gen types` and removes the hand-maintained types file ([ISSUE-004](ISSUES.md), [ISSUE-005](ISSUES.md)).
 
