@@ -4,10 +4,10 @@ Pending action items and what comes after the eight planned phases.
 
 ## Immediate next steps
 
-1. **Close out Phase 4** — a browser pass over `/admin`: rotate a key and Test Connection, toggle a provider off and watch its models leave the chat selector, suspend a user, then confirm the actions landed in `audit_logs`.
-2. **Start Phase 5** — [PHASE-5-theming.md](../phases/PHASE-5-theming.md). Needs nothing external; `user_preferences` has existed since Phase 1 and all colours already run through CSS custom properties.
+1. **Eyeball Phase 5** — `/settings`: switch themes and modes, confirm no flash on reload (set the OS to dark with mode on System) and that the cross-fade is smooth. Those two are the only unautomatable criteria.
+2. **Phases 6 and 7** — see the overnight report.
 
-Phases 1–3 are Verified; Phase 4 is Done pending its browser pass.
+Phases 1–4 are Verified and deployed. Phase 5 is Done pending the visual check.
 
 **Operational note:** `ENCRYPTION_MASTER_KEY` is now load-bearing. Every provider key in the database is encrypted with it — lose it and they must all be re-entered. The same value has to be set in Railway at Phase 8, and rotating it means re-encrypting every stored key.
 

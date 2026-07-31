@@ -13,7 +13,7 @@ Single source of truth for build status. Update immediately after any phase work
 | 2   | [Chat interface with streaming](../phases/PHASE-2-chat-streaming.md)               | Verified    | 2026-07-30 | 2026-07-30 |
 | 3   | [Provider abstraction + model selector](../phases/PHASE-3-provider-abstraction.md) | Verified    | 2026-07-30 | 2026-07-30 |
 | 4   | [Admin panel — keys, models, users](../phases/PHASE-4-admin-panel.md)              | Verified    | 2026-07-30 | 2026-07-30 |
-| 5   | [Theming & appearance](../phases/PHASE-5-theming.md)                               | Not Started | —          | —          |
+| 5   | [Theming & appearance](../phases/PHASE-5-theming.md)                               | Done        | 2026-07-31 | —          |
 | 6   | [R2 uploads + Resend emails](../phases/PHASE-6-storage-email.md)                   | Not Started | —          | —          |
 | 7   | [Analytics, audit UI, polish](../phases/PHASE-7-analytics-polish.md)               | Not Started | —          | —          |
 | 8   | [CI/CD + Railway deployment](../phases/PHASE-8-cicd-deploy.md)                     | Not Started | —          | —          |
@@ -218,3 +218,40 @@ A phase moves to **Verified** only when all four pass:
 - `verify:gates` broke when `/admin` became a redirecting index. The assertion now distinguishes an admin being forwarded *deeper into* admin from a non-admin being bounced *out of* it — the sloppy fix (accept any 307) would have made the test useless.
 
 **Browser walkthrough** — 2026-07-30: Test Connection green on both providers, toggling a provider removed its models from the chat selector, and a settings change persisted across a reload.
+
+---
+
+## Phase 5 — Theming & appearance · Done · 2026-07-31
+
+**NEEDS HUMAN VERIFICATION** — two criteria cannot be asserted without eyes on a
+browser. Everything else is automated and passing.
+
+**Built**
+
+- Seven preset themes (Default, Midnight, Ocean, Forest, Sunset, Rose, Mono) as typed data in `lib/theme/presets.ts`, each with light and dark token sets. Adding a theme is one object — the CSS is generated, the contrast test picks it up, and the picker lists it with no other edits.
+- Zero-flash application: both modes are emitted server-side and the resolved class is in the initial HTML. Only `system` needs the pre-paint inline script, which also follows OS changes mid-session.
+- Appearance panel at `/settings` — mode, theme, eight accent swatches plus custom hex, three text sizes, Bubbles/Document message style, and a live preview that writes the *same generated CSS the server emits*.
+- Custom accents derive a readable foreground automatically, with a live contrast ratio shown; a colour below AA says so rather than silently shipping unreadable buttons.
+- No hardcoded colours left in components. Provider brand colours moved to `lib/theme/brand.ts` as data (deliberately not themeable); success states became a token; syntax highlighting derives from theme variables.
+- `prefers-reduced-motion` honoured globally; the cross-fade transitions only colour properties.
+
+**Verification**
+
+| Criterion | Result |
+| --- | --- |
+| `npm run lint` / `type-check` / `build` | pass |
+| All themes pass AA contrast | pass — `verify:theme`, **134 pairings** across 7 themes × 2 modes, including muted text and both semantic colours |
+| Preferences persist across refresh and devices | pass — `verify:appearance`, 15 checks; a second request is a different device to the server |
+| No flash of wrong theme | pass **for explicit light/dark** — asserted by finding the theme in the server-rendered HTML. `system` mode resolves in a pre-paint script; **NEEDS HUMAN VERIFICATION** that no flash is perceptible. |
+| Smooth animated cross-fade | **NEEDS HUMAN VERIFICATION** — motion cannot be asserted headlessly |
+| Six preset themes minimum | pass — seven |
+| No hardcoded colours remain | pass — grep finds none outside the brand data file |
+
+**Deviations from the phase file**
+
+- The phase file's token names (`background`, `surface`, `accent`, …) are the authoring vocabulary in `presets.ts`, but they are *emitted* as the shadcn variable names the app already used. This was the smallest possible change to working Phase 1–4 code — no component had to be edited to become themeable. ⚠️ Note the collision: shadcn's `--accent` is a hover surface, so the brand accent maps to `--primary`.
+- Semantic colours (`destructive`, `success`) are intentionally consistent across themes. A green that turns orange in one theme stops reading as "success".
+
+**To reach Verified**
+
+Open `/settings`, switch themes and modes, and confirm: no flash on reload (especially with the OS set to dark and mode set to System), and that the cross-fade looks smooth rather than janky.
