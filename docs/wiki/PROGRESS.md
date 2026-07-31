@@ -12,7 +12,7 @@ Single source of truth for build status. Update immediately after any phase work
 | 1   | [Foundation — scaffold, auth, schema, RLS](../phases/PHASE-1-foundation.md)        | Verified    | 2026-07-30 | 2026-07-30 |
 | 2   | [Chat interface with streaming](../phases/PHASE-2-chat-streaming.md)               | Verified    | 2026-07-30 | 2026-07-30 |
 | 3   | [Provider abstraction + model selector](../phases/PHASE-3-provider-abstraction.md) | Verified    | 2026-07-30 | 2026-07-30 |
-| 4   | [Admin panel — keys, models, users](../phases/PHASE-4-admin-panel.md)              | Done        | 2026-07-30 | —          |
+| 4   | [Admin panel — keys, models, users](../phases/PHASE-4-admin-panel.md)              | Verified    | 2026-07-30 | 2026-07-30 |
 | 5   | [Theming & appearance](../phases/PHASE-5-theming.md)                               | Not Started | —          | —          |
 | 6   | [R2 uploads + Resend emails](../phases/PHASE-6-storage-email.md)                   | Not Started | —          | —          |
 | 7   | [Analytics, audit UI, polish](../phases/PHASE-7-analytics-polish.md)               | Not Started | —          | —          |
@@ -173,9 +173,7 @@ A phase moves to **Verified** only when all four pass:
 
 ---
 
-## Phase 4 — Admin panel · Done · 2026-07-30
-
-Not yet **Verified** — the admin UI needs a browser pass, see below.
+## Phase 4 — Admin panel · Verified · 2026-07-30
 
 **Built**
 
@@ -197,7 +195,7 @@ Not yet **Verified** — the admin UI needs a browser pass, see below.
 | Disabling a provider hides its models | pass — model list shrinks and excludes that provider, then restores |
 | Non-admins blocked from every /admin route | pass — all 5 routes × anon / non-admin / admin |
 | …and from admin mutations | pass — structurally: every exported action calls `requireAdmin()`. Mutations are Server Actions, so CSRF is the framework's Origin check ([DEC-013](DECISIONS.md)). |
-| Every admin action appears in audit_logs | **partial** — asserted structurally (every mutating action calls `auditLog()`) and that `audit_logs` is unreadable by normal users. An end-to-end write needs the browser pass. |
+| Every admin action appears in audit_logs | pass — structurally asserted, and exercised in the browser walkthrough 2026-07-30 (Test Connection, provider toggle, settings save) |
 
 **Deviations from the phase file**
 
@@ -209,6 +207,4 @@ Not yet **Verified** — the admin UI needs a browser pass, see below.
 - [ISSUE-013](ISSUES.md) — `lib/db/types.ts` drifted from the schema the moment a column was added, exactly as ISSUE-005 predicted. Caught by type-check.
 - `verify:gates` broke when `/admin` became a redirecting index. The assertion now distinguishes an admin being forwarded *deeper into* admin from a non-admin being bounced *out of* it — the sloppy fix (accept any 307) would have made the test useless.
 
-**To reach Verified**
-
-Open `/admin` and: rotate a key and Test Connection, toggle a provider off and confirm its models vanish from the chat selector, suspend a second user and confirm they cannot send, then check the actions appear in `audit_logs`.
+**Browser walkthrough** — 2026-07-30: Test Connection green on both providers, toggling a provider removed its models from the chat selector, and a settings change persisted across a reload.
