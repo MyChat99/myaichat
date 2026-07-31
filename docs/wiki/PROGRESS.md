@@ -1157,3 +1157,45 @@ a password, an `sk-ant-` key) and assert the raw text survives only in `detail`.
 | `verify:degradation` | pass — 185/185, in CI |
 | `verify:chat` / `verify:api` | pass — nothing regressed |
 | `lint` / `type-check` / `build` | pass |
+
+## Away session 4A — Priority 2b · Retries and timeouts · 2026-07-31
+
+**The rule this is built around:** a stream may only be retried **before its
+first token**. Once any text has reached the client, re-running the request
+appends a second answer to a partial first one — the model appears to stammer
+and the exchange is billed twice. `withRetry` therefore takes an explicit
+`hasEmittedOutput` guard rather than trusting a caller to remember, and the test
+asserts both directions: the same transient failure is retried before output and
+refused after it.
+
+**Timeouts.** Both SDK clients had none, so a hung provider held the request for
+the route's full 300s `maxDuration` and the user watched a spinner that never
+resolved. Now 90 seconds — comfortably longer than a slow completion, far
+shorter than forever. Asserted to be shorter than `maxDuration`, because a
+timeout longer than the route is not a timeout.
+
+**The SDKs' own retries are turned off.** Both retry by default with different
+counts, different backoff and different opinions about which statuses qualify.
+Leaving them on means the effective policy depends on which model the user
+picked, and "3 attempts" here would really be 3 × whatever the SDK does.
+
+**Which failures retry is an allow-list**, not "retry unless known-permanent". A
+default of retry-unless turns every unclassified failure into three failures,
+and the ones we cannot classify are exactly the ones not to multiply. `network`,
+`provider` and `rate_limit` retry; `auth`, `quota`, `context_length` and
+`unknown` do not. `quota` is excluded despite arriving on a 429-shaped path — an
+empty balance does not refill in 400ms.
+
+**Backoff uses full jitter.** Not decoration: without it every client that
+failed against one outage retries at the same instant and keeps the provider
+down. Asserted over 200 samples that values land in `[0, ceiling]` and are
+genuinely spread rather than constant.
+
+An aborted request is never retried — a user pressing Stop must not be answered
+with another attempt.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:resilience` | pass — 37 checks, credential-free, in CI |
+| `verify:chat` / `verify:providers` / `verify:api` | pass — nothing regressed |
+| Retry behaviour under a real provider outage | **NEEDS HUMAN VERIFICATION** — cannot induce one safely |

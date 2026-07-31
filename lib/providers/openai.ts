@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { REQUEST_TIMEOUT_MS } from './resilience';
+
 import OpenAI from 'openai';
 
 import {
@@ -32,7 +34,16 @@ const NON_CHAT_PATTERN =
  */
 function makeClient(apiKey: string): OpenAI {
   if (!apiKey) throw new ProviderError('auth', 'OpenAI is not configured.', false);
-  return new OpenAI({ apiKey });
+  return new OpenAI({
+    apiKey,
+    // Without this a hung provider holds the request for the route's full
+    // 300s maxDuration, and the user watches a spinner that never resolves.
+    timeout: REQUEST_TIMEOUT_MS,
+    // Retries are handled once, in the chat route, so the policy does not
+    // depend on which model was picked — and so "3 attempts" means 3 rather
+    // than 3 × whatever this SDK does by default.
+    maxRetries: 0,
+  });
 }
 
 function normalise(err: unknown): ProviderError {

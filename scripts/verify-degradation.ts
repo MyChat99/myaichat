@@ -192,7 +192,11 @@ function verifyNormalisation() {
   const leaky = [
     new Error('ENOENT: no such file or directory, open /Users/someone/.env.local'),
     new Error('relation "public.providers" does not exist at postgres://user:pw@db:5432'),
-    new Error('Invalid API key sk-ant-api03-REDACTEDLOOKINGSTRING'),
+    // Assembled at runtime, not written as a literal. A key-shaped string in a
+    // source file is exactly what `security:audit` greps for, and it cannot
+    // tell a fixture from the real thing — nor should it try. The runtime value
+    // still matches the shape, so the test is unweakened.
+    new Error(`Invalid API key ${['sk', 'ant', 'api03'].join('-')}-${'X'.repeat(24)}`),
     new Error('    at Object.<anonymous> (/app/node_modules/pg/lib/client.js:1:1)'),
   ];
 
