@@ -18,6 +18,16 @@ Single source of truth for build status. Update immediately after any phase work
 | 7   | [Analytics, audit UI, polish](../phases/PHASE-7-analytics-polish.md)               | Not Started | —          | —          |
 | 8   | [CI/CD + Railway deployment](../phases/PHASE-8-cicd-deploy.md)                     | Not Started | —          | —          |
 
+## Deployed
+
+Live at **https://myaichat-production.up.railway.app** (Railway, US West), auto-deploying from `main`.
+Verified in production 2026-07-30: health endpoint green, and the gates, chat, providers and admin
+suites all pass against the live URL — not just localhost.
+
+Deployment was pulled forward from Phase 8 at the user's request. Phase 8 still owns CI/CD:
+**pushes to `main` currently deploy with nothing gating them**, so a broken commit reaches
+production unchallenged.
+
 ## Verification checklist (per phase)
 
 A phase moves to **Verified** only when all four pass:

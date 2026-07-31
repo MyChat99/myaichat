@@ -18,6 +18,13 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ## Open
 
+### ISSUE-015 — Verification suites share database state and interfere when chained
+
+**Status:** Open | **Severity:** Medium | **Phase:** 8 | **Opened:** 2026-07-30 | **Resolved:** —
+**Problem:** `verify:admin` mutates rows every other suite reads — it disables a provider and breaks a stored key, restoring both in `finally`. Run back-to-back with `verify:providers`, assertions in one can observe the other's mid-flight state. Chaining them against production produced four failures that all passed when each suite ran alone.
+**Partly fixed:** the target provider is now chosen from an **ordered** query. It was unordered, so each run disabled a different provider and the same bug looked like a different one each time.
+**Still open:** there is one Supabase project for local and production, so a suite that dies before its `finally` can leave a provider disabled for real users. Two fixes, either sufficient: a separate Supabase project for tests, or a `verify:all` runner that serialises the suites and asserts clean state between them. Phase 8's CI work is the natural place — CI must not be able to disable a provider in production.
+
 ### ISSUE-006 — 12 high-severity advisories in the stock Next.js dependency tree
 
 **Status:** Open | **Severity:** Low | **Phase:** 1 | **Opened:** 2026-07-30 | **Resolved:** —

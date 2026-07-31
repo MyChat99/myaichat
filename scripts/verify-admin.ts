@@ -153,9 +153,13 @@ async function main() {
   check('tampered ciphertext is rejected', tamperRejected);
 
   // --- stored keys ---------------------------------------------------------
+  // Ordered on purpose: the target provider is picked from this list, and an
+  // unordered query made the script disable a different provider on each run —
+  // which turns a shared-database failure into a confusing intermittent one.
   const { data: providers } = await admin
     .from('providers')
-    .select('name, encrypted_api_key, key_last4, enabled');
+    .select('name, encrypted_api_key, key_last4, enabled')
+    .order('name');
 
   const withKeys = (providers ?? []).filter((p) => p.encrypted_api_key);
   check('providers have keys stored', withKeys.length >= 2, `${withKeys.length} with keys`);
