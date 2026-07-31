@@ -14,7 +14,7 @@ Single source of truth for build status. Update immediately after any phase work
 | 3   | [Provider abstraction + model selector](../phases/PHASE-3-provider-abstraction.md) | Verified    | 2026-07-30 | 2026-07-30 |
 | 4   | [Admin panel — keys, models, users](../phases/PHASE-4-admin-panel.md)              | Verified    | 2026-07-30 | 2026-07-30 |
 | 5   | [Theming & appearance](../phases/PHASE-5-theming.md)                               | Done        | 2026-07-31 | —          |
-| 6   | [R2 uploads + Resend emails](../phases/PHASE-6-storage-email.md)                   | Not Started | —          | —          |
+| 6   | [R2 uploads + Resend emails](../phases/PHASE-6-storage-email.md)                   | Partial     | 2026-07-31 | —          |
 | 7   | [Analytics, audit UI, polish](../phases/PHASE-7-analytics-polish.md)               | Not Started | —          | —          |
 | 8   | [CI/CD + Railway deployment](../phases/PHASE-8-cicd-deploy.md)                     | Not Started | —          | —          |
 
@@ -255,3 +255,35 @@ browser. Everything else is automated and passing.
 **To reach Verified**
 
 Open `/settings`, switch themes and modes, and confirm: no flash on reload (especially with the OS set to dark and mode set to System), and that the cross-fade looks smooth rather than janky.
+
+---
+
+## Phase 6 — R2 uploads + Resend emails · Partial · 2026-07-31
+
+**BLOCKED ON CREDENTIALS.** R2 and Resend are unconfigured ([ISSUE-016](ISSUES.md),
+[ISSUE-017](ISSUES.md)), so the happy paths are unverified. Everything up to the
+integration point is built and tested.
+
+**Built and verified**
+
+- `lib/r2/storage.ts` — presigned upload/download against a private bucket. Object keys are namespaced by user id, making ownership a string comparison and preventing a leaked key from being walked to another user's files.
+- `/api/uploads/presign` validates auth → suspension → rate limit → MIME allow-list → size, and only then touches storage. Every rejection is testable without credentials.
+- `/api/uploads/download` returns a 302 to a short-lived presigned GET, after an ownership check that 404s (not 403s) on someone else's key — a 403 confirms the file exists.
+- Attachments through the provider abstraction: `ChatAttachment` is optional on `ChatMessage`, so no existing call site changed. Anthropic gets content blocks, OpenAI gets `image_url` parts.
+- Model capabilities (`supports_vision`, `supports_documents`) live in the database. A model that cannot read an image returns **422 with a clear message** rather than dropping the file and answering as though it had seen it.
+- Four React Email templates with dark-mode support, inline styles, and every action link repeated as copyable text.
+- Profile page: display name and avatar upload, avatars served through our route rather than a bucket URL.
+
+| Criterion | Result |
+| --- | --- |
+| `lint` / `type-check` / `build` | pass |
+| Unauthorised / oversized / wrong-type uploads rejected server-side | pass — `verify:storage`, 16 checks |
+| Direct bucket URLs do not work | pass **by construction** — no code path returns a public URL, and downloads go through an ownership-checked route. **NEEDS HUMAN VERIFICATION** that the bucket itself is created private. |
+| Upload → send → model receives the attachment | **NEEDS CREDENTIALS** — cannot be exercised without R2 |
+| All four emails render well in light and dark clients | pass for *structure* — `verify:email`, 23 checks (dark-mode styles, inline CSS, no stranded white text). **NEEDS HUMAN VERIFICATION** of actual rendering in Gmail/Outlook. |
+| All four emails send | **NEEDS CREDENTIALS** — console transport only |
+
+**Not done**
+
+- **Composer attachment UX** (task 2): the upload helper and API exist, but the attach button, drag-and-drop and chip previews are NOT wired into the chat composer. Deliberate — building an attachment UI that cannot upload anything would be unverifiable, and I would rather leave it clearly missing than half-present. This is the first thing to finish once R2 credentials exist.
+- **Supabase auth emails routed through Resend** (task 7): a dashboard SMTP change, not code. See ISSUE-017.

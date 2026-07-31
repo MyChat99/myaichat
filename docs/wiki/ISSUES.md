@@ -18,6 +18,38 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ## Open
 
+### ISSUE-017 — Resend not configured: email is rendered but never sent
+
+**Status:** Open (blocked on credentials) | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-07-31
+**Problem:** No `RESEND_API_KEY`. `isEmailConfigured()` is false, so `lib/email/send.ts` uses a **console transport** — templates render and the calling code runs, but nothing is delivered.
+**What you must add to `.env.local`** (and to Railway):
+
+```
+RESEND_API_KEY=re_xxxxxxxxxxxx
+RESEND_FROM_EMAIL=noreply@yourdomain.com
+```
+
+Resend requires a **verified sending domain** — an unverified `from` address is rejected. Add and verify the domain at resend.com/domains first.
+**Also outstanding:** task 7 of the phase file (routing Supabase's own auth emails through Resend) is **not done**. Supabase sends confirmation and reset emails from its own default sender; pointing them at Resend is a dashboard change (Authentication → Emails → SMTP) using Resend's SMTP credentials, not a code change.
+**Verified regardless:** all four templates render, declare dark-mode styles, use inline CSS, and repeat every action link as copyable text (`npm run verify:email`, 23 checks).
+
+### ISSUE-016 — Cloudflare R2 not configured: uploads cannot complete
+
+**Status:** Open (blocked on credentials) | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-07-31
+**Problem:** No R2 credentials, so `isStorageConfigured()` is false. Every upload path validates correctly and then returns `503 storage_unconfigured`; the UI disables its upload controls with an explanation rather than failing on click.
+**What you must add to `.env.local`** (and to Railway):
+
+```
+R2_ACCOUNT_ID=...            # Cloudflare dashboard → R2 → account id
+R2_ACCESS_KEY_ID=...         # R2 → Manage API tokens → Create (Object Read & Write)
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET_NAME=myaichat
+```
+
+Keep the bucket **private** — no public access, no custom public domain. The app never issues a public URL; if the bucket is public, the "direct bucket URLs do not work" guarantee is broken from outside the code.
+CORS on the bucket must allow `PUT` from your app origin, or browser uploads fail even with valid credentials.
+**Verified regardless:** every rejection path — unauthenticated, wrong MIME, oversized, non-image avatar, another user's object (`npm run verify:storage`, 16 checks).
+
 ### ISSUE-015 — Verification suites share database state and interfere when chained
 
 **Status:** Open | **Severity:** Medium | **Phase:** 8 | **Opened:** 2026-07-30 | **Resolved:** —
