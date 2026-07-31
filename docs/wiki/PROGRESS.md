@@ -1109,3 +1109,51 @@ disabled. That fix is a separate Supabase project, which is infrastructure.
 | `verify:all` | pass — 17 suites, 81.5s, clean before and after |
 | Dirt detection demonstrated failing | pass — refuses to start, names the fix |
 | Nothing regressed | pass |
+
+## Away session 4A — Priority 2a · Graceful degradation · 2026-07-31
+
+Each external dependency failed in its own dialect: the chat route mapped
+`ProviderError` kinds to sentences, the upload routes returned bespoke strings,
+email failed silently, and a database outage produced whatever Supabase happened
+to say — which is written for the developer who caused it, not the person
+reading it.
+
+**`lib/errors/app-error.ts`** gives all four one shape: a `dependency`, a `kind`,
+a message *already safe to show a user*, and a `detail` that is logged and never
+serialised. Nothing downstream decides whether a given error is safe to render,
+because deciding that per call site is how a stack trace eventually reaches a
+browser.
+
+Two things it fixes in the chat route:
+
+- **`getAdapter` failures now carry `kind` and `retryable`**, not just a
+  sentence. A bare 503 gives the UI nothing to decide a retry button with.
+- **Stream failures were unconditionally `retryable: true`.** A mid-stream
+  rejection of our API key told the user to try again, and each retry burned
+  another request against a key that was never going to work. The flag now comes
+  from the failure.
+
+### The bug the test found before I did
+
+`messageFor` fell back to the dependency's `unknown` sentence for any kind it
+did not name — and those sentences say "try again shortly" while `unknown` is
+deliberately **not** retryable. Eight combinations told a user to retry
+something the code would refuse to retry.
+
+Fixed structurally rather than by filling a 40-cell table: fallbacks are now
+keyed by **kind**, and each one agrees with the retryable flag by construction.
+`unknown` says "This has been logged." because looping on a failure we cannot
+classify is how one bad request becomes ten.
+
+**`npm run verify:degradation`** — 185 checks. Exhaustive over every dependency ×
+kind: each has a message, each is a complete sentence, none contains a
+credential, hostname, path, env var name or stack fragment, and any message
+saying "try again" must have the flag to match. Plus normalisation tests that
+push genuinely leaky errors through (`/Users/…/.env.local`, a Postgres DSN with
+a password, an `sk-ant-` key) and assert the raw text survives only in `detail`.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:degradation` | pass — 185/185, in CI |
+| `verify:chat` / `verify:api` | pass — nothing regressed |
+| `lint` / `type-check` / `build` | pass |

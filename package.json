@@ -20,6 +20,7 @@
     "verify:api": "tsx scripts/verify-api-contracts.ts",
     "verify:headers": "tsx scripts/verify-headers.ts",
     "verify:authz": "tsx scripts/verify-authz.ts",
+    "verify:degradation": "tsx scripts/verify-degradation.ts",
     "verify:attachments": "tsx scripts/verify-attachments.ts",
     "verify:security": "tsx --conditions=react-server scripts/verify-security.ts",
     "verify:session": "tsx --conditions=react-server scripts/verify-session.ts",
