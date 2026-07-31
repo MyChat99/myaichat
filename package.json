@@ -15,7 +15,8 @@
     "seed": "tsx scripts/seed.ts",
     "verify:rls": "tsx scripts/verify-rls.ts",
     "verify:schema": "tsx scripts/verify-schema.ts",
-    "verify:gates": "tsx scripts/verify-auth-gates.ts"
+    "verify:gates": "tsx scripts/verify-auth-gates.ts",
+    "verify:seed": "tsx scripts/verify-seed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

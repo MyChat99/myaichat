@@ -60,6 +60,7 @@ npm run build
 
 npm run verify:schema   # every table/view/function exists
 npm run verify:rls      # users cannot reach each other's data
+npm run verify:seed     # exactly one admin, settings intact
 npm run verify:gates    # route gates (needs `npm run dev` running)
 ```
 
