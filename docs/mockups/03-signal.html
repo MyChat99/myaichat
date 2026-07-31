@@ -1,0 +1,928 @@
+<title>Signal — myaichat concept 03</title>
+
+<!--
+  SIGNAL — concept 03 of 03
+  ────────────────────────────────────────────────────────────────────────
+  An instrumented treatment, for the team that pays the provider bill.
+
+  The idea: this product's real differentiator is that it routes between
+  providers, and nothing in the current interface says so. Here a third
+  pane makes the routing visible — which provider served this turn, how
+  long the first token took, what the exchange cost, how much context is
+  left. Press Send and the reply streams while every meter moves with it,
+  because they are driven by the same loop.
+
+  Typography is inverted from the usual: monospace is the PRIMARY interface
+  face — labels, numbers, navigation — and the proportional face is reserved
+  for the one thing that is actually prose, the message body. Instrument
+  panels read in mono; only humans and models write in sans.
+
+  DELIBERATELY SINGLE-THEME: an operations console is a dark room instrument.
+-->
+
+<style>
+  :root {
+    /* a slate-teal ground — the neutral carries the accent's hue, faintly */
+    --bg: #080f12;
+    --pane: #0c1519;
+    --raised: #111d22;
+    --raised-2: #16252b;
+    --rule: #1b2c33;
+    --rule-lit: #274049;
+
+    --ink: #dde9e7;
+    --ink-2: #a9bcb9;
+    --muted: #74898a;
+    --faint: #4d6167;
+
+    /* semantic, and separate from any single "brand" colour */
+    --amber: #efa63f;
+    --cyan: #40c8d6;
+    --green: #4fcaa1;
+    --rose: #e56680;
+    --violet: #9d8cf0;
+
+    --anthropic: #d9764f;
+    --openai: #17b98f;
+
+    --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+    --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  .signal {
+    height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.5;
+    display: grid;
+    grid-template-columns: 252px 1fr 276px;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* a faint engineering grid, so the panes sit on something */
+  .signal::before {
+    content: '';
+    position: fixed; inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(var(--rule) 1px, transparent 1px),
+      linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+    background-size: 48px 48px;
+    opacity: 0.22;
+    z-index: 0;
+  }
+
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  :focus-visible { outline: 1.5px solid var(--amber); outline-offset: 2px; }
+
+  .k {
+    font-size: 9.5px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  /* ══════════════════════════════════════ left: index */
+  .index {
+    background: var(--pane);
+    border-right: 1px solid var(--rule);
+    display: flex; flex-direction: column;
+    min-height: 0; position: relative; z-index: 1;
+  }
+
+  .head {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--rule);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo { display: flex; align-items: center; gap: 9px; }
+  .logo-m {
+    width: 24px; height: 24px;
+    border: 1.5px solid var(--amber);
+    color: var(--amber);
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 700;
+    position: relative;
+  }
+  /* corner ticks — an instrument bezel, not a rounded app icon */
+  .logo-m::before, .logo-m::after {
+    content: ''; position: absolute;
+    width: 4px; height: 4px;
+    border: 1.5px solid var(--amber);
+  }
+  .logo-m::before { top: -3.5px; left: -3.5px; border-right: 0; border-bottom: 0; }
+  .logo-m::after { bottom: -3.5px; right: -3.5px; border-left: 0; border-top: 0; }
+  .logo-t { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+
+  .newthread {
+    margin: 10px;
+    padding: 8px 11px;
+    border: 1px solid var(--rule-lit);
+    background: var(--raised);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px;
+    transition: background 0.18s, border-color 0.18s, color 0.18s;
+  }
+  .newthread:hover { background: var(--raised-2); border-color: var(--amber); color: var(--amber); }
+  .newthread span:last-child { color: var(--faint); font-size: 10px; }
+
+  .filters { display: flex; gap: 1px; margin: 0 10px 8px; }
+  .filter {
+    flex: 1; padding: 5px 0; text-align: center;
+    font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--faint);
+    background: var(--raised);
+    border: 1px solid var(--rule);
+    transition: color 0.16s, background 0.16s;
+  }
+  .filter:hover { color: var(--ink-2); }
+  .filter[aria-pressed='true'] { color: var(--bg); background: var(--amber); border-color: var(--amber); }
+
+  .rows { flex: 1; overflow-y: auto; }
+  .rows::-webkit-scrollbar { width: 7px; }
+  .rows::-webkit-scrollbar-thumb { background: var(--rule-lit); }
+
+  .grp {
+    padding: 11px 14px 5px;
+    display: flex; justify-content: space-between;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .row {
+    display: block; width: 100%; text-align: left;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--rule);
+    position: relative;
+    transition: background 0.16s;
+  }
+  .row:hover { background: var(--raised); }
+  .row.on { background: var(--raised-2); }
+  .row.on::before {
+    content: ''; position: absolute; left: 0; top: -1px; bottom: -1px;
+    width: 2px; background: var(--amber);
+  }
+
+  .row-top { display: flex; align-items: baseline; gap: 8px; }
+  .row-id { color: var(--faint); font-size: 10px; flex: none; }
+  .row-t {
+    flex: 1; font-size: 12px; color: var(--ink-2);
+    font-family: var(--sans);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .row.on .row-t { color: var(--ink); }
+  .row-bot { display: flex; align-items: center; gap: 8px; margin-top: 5px; font-size: 10px; color: var(--faint); }
+
+  .tag {
+    padding: 0 5px;
+    border: 1px solid;
+    font-size: 9px; letter-spacing: 0.05em;
+    flex: none;
+  }
+  .tag.a { color: var(--anthropic); border-color: color-mix(in oklab, var(--anthropic) 45%, transparent); }
+  .tag.o { color: var(--openai); border-color: color-mix(in oklab, var(--openai) 45%, transparent); }
+
+  .spark { margin-left: auto; opacity: 0.65; flex: none; }
+
+  /* ══════════════════════════════════════ centre: thread */
+  .thread { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; z-index: 1; }
+
+  .topline {
+    height: 44px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--pane);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .path { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted); }
+  .path b { color: var(--ink); font-weight: 500; font-family: var(--sans); font-size: 12.5px; }
+  .path i { color: var(--faint); font-style: normal; }
+
+  .status { display: flex; align-items: center; gap: 14px; }
+  .stat { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+  .led { width: 5px; height: 5px; border-radius: 50%; flex: none; }
+  .led.up { background: var(--green); animation: beat 2.6s ease-in-out infinite; }
+  @keyframes beat {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--green) 60%, transparent); }
+    50% { box-shadow: 0 0 0 5px color-mix(in oklab, var(--green) 0%, transparent); }
+  }
+
+  .transcript { flex: 1; overflow-y: auto; padding: 0 20px; }
+  .transcript::-webkit-scrollbar { width: 8px; }
+  .transcript::-webkit-scrollbar-thumb { background: var(--rule-lit); }
+
+  /* ── briefing (the empty state, as a status board) ── */
+  .brief { max-width: 680px; margin: 0 auto; padding: 34px 0 24px; }
+
+  .brief-h {
+    display: flex; align-items: baseline; gap: 10px;
+    padding-bottom: 9px; margin-bottom: 18px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .brief-h h1 {
+    font-family: var(--sans);
+    font-size: 22px; font-weight: 500; letter-spacing: -0.02em;
+    margin: 0;
+  }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-bottom: 20px; }
+  .cell { background: var(--pane); padding: 12px 13px; }
+  .cell-v { font-size: 21px; font-weight: 500; letter-spacing: -0.02em; margin-top: 3px; }
+  .cell-d { font-size: 10px; color: var(--faint); margin-top: 2px; }
+  .up { color: var(--green); }
+  .warn { color: var(--amber); }
+
+  .provs { border: 1px solid var(--rule); margin-bottom: 20px; }
+  .prov {
+    display: flex; align-items: center; gap: 11px;
+    padding: 10px 13px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .prov:last-child { border-bottom: 0; }
+  .prov-n { width: 84px; font-size: 11.5px; }
+  .prov-bar { flex: 1; height: 4px; background: var(--raised-2); position: relative; overflow: hidden; }
+  .prov-fill {
+    position: absolute; inset: 0 auto 0 0;
+    width: 0;
+    transition: width 1.4s var(--ease);
+  }
+  .prov-pct { width: 46px; text-align: right; font-size: 11px; color: var(--muted); }
+
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+  .act {
+    background: var(--pane);
+    text-align: left;
+    padding: 13px;
+    transition: background 0.18s;
+    position: relative;
+  }
+  .act:hover { background: var(--raised); }
+  .act:hover .act-go { transform: translateX(3px); opacity: 1; }
+  .act-k { font-size: 9.5px; letter-spacing: 0.14em; color: var(--amber); }
+  .act-t { font-family: var(--sans); font-size: 13.5px; margin: 6px 0 3px; }
+  .act-d { font-size: 10.5px; color: var(--faint); }
+  .act-go {
+    position: absolute; right: 12px; top: 13px;
+    color: var(--muted); opacity: 0;
+    transition: transform 0.24s var(--ease), opacity 0.24s;
+  }
+
+  /* ── messages ── */
+  .turns { max-width: 680px; margin: 0 auto; padding: 22px 0 10px; }
+
+  .turn { margin-bottom: 22px; }
+  .turn-h {
+    display: flex; align-items: center; gap: 8px;
+    padding-bottom: 6px; margin-bottom: 8px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .turn-who { font-size: 10px; letter-spacing: 0.13em; text-transform: uppercase; }
+  .turn-who.you { color: var(--cyan); }
+  .turn-who.ai { color: var(--anthropic); }
+  .turn-meta { margin-left: auto; font-size: 10px; color: var(--faint); }
+
+  .prose {
+    font-family: var(--sans);
+    font-size: 14.5px; line-height: 1.65;
+    color: var(--ink-2);
+  }
+  .prose p { margin: 0 0 11px; }
+  .prose strong { color: var(--ink); }
+
+  .cur {
+    display: inline-block; width: 7px; height: 1.05em;
+    background: var(--amber);
+    vertical-align: text-bottom; margin-left: 1px;
+    animation: bl 0.9s steps(2) infinite;
+  }
+  @keyframes bl { 50% { opacity: 0; } }
+
+  /* ── input ── */
+  .input-wrap { padding: 10px 20px 16px; }
+  .input {
+    max-width: 680px; margin: 0 auto;
+    border: 1px solid var(--rule-lit);
+    background: var(--pane);
+    transition: border-color 0.22s, box-shadow 0.22s;
+  }
+  .input:hover, .input:focus-within {
+    border-color: var(--amber);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--amber) 10%, transparent);
+  }
+  .input-f {
+    padding: 12px 14px 8px;
+    font-family: var(--sans); font-size: 14px;
+    color: var(--faint);
+    min-height: 42px;
+  }
+  .input-b {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 8px 8px 12px;
+    border-top: 1px solid var(--rule);
+  }
+  .sel {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 8px;
+    border: 1px solid var(--rule-lit);
+    font-size: 11px;
+    transition: border-color 0.18s, color 0.18s;
+  }
+  .sel:hover { border-color: var(--amber); color: var(--amber); }
+
+  .fire {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 6px 13px;
+    background: var(--amber); color: #14100a;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.09em; text-transform: uppercase;
+    transition: filter 0.18s, transform 0.18s;
+  }
+  .fire:hover { filter: brightness(1.12); }
+  .fire:active { transform: scale(0.97); }
+  .fire:disabled { opacity: 0.45; cursor: default; }
+
+  /* ══════════════════════════════════════ right: inspector */
+  .inspect {
+    background: var(--pane);
+    border-left: 1px solid var(--rule);
+    overflow-y: auto;
+    position: relative; z-index: 1;
+  }
+  .inspect::-webkit-scrollbar { width: 7px; }
+  .inspect::-webkit-scrollbar-thumb { background: var(--rule-lit); }
+
+  .ins-h {
+    height: 44px; padding: 0 14px;
+    border-bottom: 1px solid var(--rule);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .block { padding: 14px; border-bottom: 1px solid var(--rule); }
+  .block-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 11px; }
+
+  /* routing diagram */
+  .route { display: flex; flex-direction: column; gap: 0; }
+  .node {
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 9px;
+    border: 1px solid var(--rule);
+    background: var(--raised);
+    font-size: 11px;
+    position: relative;
+  }
+  .node.hot { border-color: var(--amber); color: var(--amber); }
+  .node-i { width: 6px; height: 6px; flex: none; }
+  .wire {
+    height: 16px; width: 1px;
+    margin-left: 12px;
+    background: var(--rule-lit);
+    position: relative;
+    overflow: hidden;
+  }
+  /* a packet travelling down the wire while a request is in flight */
+  .wire::after {
+    content: '';
+    position: absolute; left: -1.5px; top: -8px;
+    width: 4px; height: 8px;
+    background: var(--amber);
+    opacity: 0;
+  }
+  .wire.flowing::after { animation: travel 0.85s linear infinite; opacity: 1; }
+  @keyframes travel { to { top: 16px; } }
+
+  /* gauge */
+  .gauge-wrap { display: flex; align-items: center; gap: 14px; }
+  .gauge { position: relative; width: 76px; height: 76px; flex: none; }
+  .gauge svg { transform: rotate(-90deg); }
+  .gauge-track { stroke: var(--raised-2); }
+  .gauge-arc { stroke: var(--cyan); transition: stroke-dashoffset 0.7s var(--ease), stroke 0.4s; }
+  .gauge-n {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    font-size: 15px; font-weight: 600;
+  }
+  .gauge-n small { display: block; font-size: 8.5px; color: var(--faint); font-weight: 400; text-align: center; }
+
+  .kv { display: flex; justify-content: space-between; padding: 5px 0; font-size: 11px; }
+  .kv span:first-child { color: var(--faint); }
+
+  .track { height: 5px; background: var(--raised-2); overflow: hidden; margin-top: 7px; }
+  .fill { height: 100%; width: 6%; background: var(--violet); transition: width 0.4s linear, background 0.4s; }
+
+  .cost { font-size: 25px; font-weight: 500; letter-spacing: -0.025em; }
+  .cost small { font-size: 11px; color: var(--faint); font-weight: 400; letter-spacing: 0; }
+
+  .log { font-size: 10px; line-height: 1.75; color: var(--faint); }
+  .log div { display: flex; gap: 8px; }
+  .log time { color: var(--rule-lit); flex: none; }
+  .log b { font-weight: 400; color: var(--muted); }
+  .log .ok { color: var(--green); }
+  .log .em { color: var(--amber); }
+
+  /* ══════════════════════════════════════ entrance */
+  @keyframes up { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+  .index { animation: up 0.5s var(--ease) both; }
+  .thread { animation: up 0.5s 0.05s var(--ease) both; }
+  .inspect { animation: up 0.5s 0.1s var(--ease) both; }
+  .stagger { opacity: 0; animation: up 0.5s var(--ease) forwards; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    .stagger { opacity: 1; }
+  }
+
+  @media (max-width: 1180px) { .signal { grid-template-columns: 252px 1fr; } .inspect { display: none; } }
+  @media (max-width: 820px) { .signal { grid-template-columns: 1fr; } .index { display: none; } }
+</style>
+
+<div class="signal">
+  <!-- ═══════════════════════════ index -->
+  <aside class="index">
+    <div class="head">
+      <div class="logo">
+        <div class="logo-m">m</div>
+        <div class="logo-t">myaichat</div>
+      </div>
+      <span class="k">v0.8</span>
+    </div>
+
+    <button class="newthread">
+      <span>+ New thread</span>
+      <span>⌘K</span>
+    </button>
+
+    <div class="filters">
+      <button class="filter" aria-pressed="true">All</button>
+      <button class="filter" aria-pressed="false">Anthropic</button>
+      <button class="filter" aria-pressed="false">OpenAI</button>
+    </div>
+
+    <div class="rows">
+      <div class="grp"><span class="k">Today</span><span class="k">3</span></div>
+
+      <button class="row on stagger" style="animation-delay: 0.10s">
+        <div class="row-top"><span class="row-id">14</span><span class="row-t">Which model are you?</span></div>
+        <div class="row-bot">
+          <span class="tag a">HAIKU 4.5</span>
+          <span>4 msg</span>
+          <canvas class="spark" width="52" height="14" data-spark="3,7,4,9,6,11,8,12"></canvas>
+        </div>
+      </button>
+
+      <button class="row stagger" style="animation-delay: 0.14s">
+        <div class="row-top"><span class="row-id">13</span><span class="row-t">Rate limiting strategy for the chat endpoint</span></div>
+        <div class="row-bot">
+          <span class="tag o">GPT-5.4</span>
+          <span>22 msg</span>
+          <canvas class="spark" width="52" height="14" data-spark="9,4,11,7,13,6,10,14"></canvas>
+        </div>
+      </button>
+
+      <button class="row stagger" style="animation-delay: 0.18s">
+        <div class="row-top"><span class="row-id">12</span><span class="row-t">Untitled thread</span></div>
+        <div class="row-bot">
+          <span class="tag a">HAIKU 4.5</span>
+          <span>0 msg</span>
+        </div>
+      </button>
+
+      <div class="grp"><span class="k">Yesterday</span><span class="k">2</span></div>
+
+      <button class="row stagger" style="animation-delay: 0.22s">
+        <div class="row-top"><span class="row-id">11</span><span class="row-t">Explain closures with a worked example</span></div>
+        <div class="row-bot">
+          <span class="tag a">HAIKU 4.5</span>
+          <span>8 msg</span>
+          <canvas class="spark" width="52" height="14" data-spark="2,5,3,8,5,9,7,6"></canvas>
+        </div>
+      </button>
+
+      <button class="row stagger" style="animation-delay: 0.26s">
+        <div class="row-top"><span class="row-id">10</span><span class="row-t">Duplicate rows in the usage table</span></div>
+        <div class="row-bot">
+          <span class="tag o">GPT-5.4</span>
+          <span>15 msg</span>
+          <canvas class="spark" width="52" height="14" data-spark="6,9,5,12,8,4,10,7"></canvas>
+        </div>
+      </button>
+
+      <div class="grp"><span class="k">Earlier</span><span class="k">9</span></div>
+
+      <button class="row stagger" style="animation-delay: 0.30s">
+        <div class="row-top"><span class="row-id">09</span><span class="row-t">Row-level security policy review</span></div>
+        <div class="row-bot">
+          <span class="tag o">GPT-5.4</span>
+          <span>31 msg</span>
+          <canvas class="spark" width="52" height="14" data-spark="11,7,13,9,14,10,12,8"></canvas>
+        </div>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════ thread -->
+  <main class="thread">
+    <div class="topline">
+      <div class="path">
+        <i>thread/14</i>
+        <span>·</span>
+        <b>Which model are you?</b>
+      </div>
+      <div class="status">
+        <span class="stat"><span class="led up"></span> anthropic</span>
+        <span class="stat"><span class="led up"></span> openai</span>
+        <span class="stat" id="clock">09:14:22</span>
+      </div>
+    </div>
+
+    <div class="transcript" id="transcript">
+      <!-- briefing -->
+      <section class="brief" id="brief">
+        <div class="brief-h">
+          <h1>Session briefing</h1>
+          <span class="k">31 Jul · 09:14</span>
+        </div>
+
+        <div class="grid2">
+          <div class="cell">
+            <div class="k">Messages · 30d</div>
+            <div class="cell-v" data-count="1247">0</div>
+            <div class="cell-d up">▲ 18% on the previous period</div>
+          </div>
+          <div class="cell">
+            <div class="k">Spend · 30d</div>
+            <div class="cell-v" data-count="18" data-prefix="$" data-suffix=".40">0</div>
+            <div class="cell-d">Budget $50.00 · 37% used</div>
+          </div>
+          <div class="cell">
+            <div class="k">Median first token</div>
+            <div class="cell-v" data-count="412" data-suffix="ms">0</div>
+            <div class="cell-d up">▼ 60ms since the pool change</div>
+          </div>
+          <div class="cell">
+            <div class="k">Refused requests</div>
+            <div class="cell-v warn" data-count="3">0</div>
+            <div class="cell-d">All hourly rate limit · none provider-side</div>
+          </div>
+        </div>
+
+        <div class="block-h">
+          <span class="k">Traffic by provider · 30 days</span>
+          <span class="k">1.2M tokens</span>
+        </div>
+        <div class="provs">
+          <div class="prov">
+            <span class="prov-n">Anthropic</span>
+            <span class="prov-bar"><span class="prov-fill" data-w="68" style="background: var(--anthropic)"></span></span>
+            <span class="prov-pct">68%</span>
+          </div>
+          <div class="prov">
+            <span class="prov-n">OpenAI</span>
+            <span class="prov-bar"><span class="prov-fill" data-w="32" style="background: var(--openai)"></span></span>
+            <span class="prov-pct">32%</span>
+          </div>
+        </div>
+
+        <div class="block-h"><span class="k">Start from here</span></div>
+        <div class="actions">
+          <button class="act">
+            <div class="act-k">RESUME</div>
+            <div class="act-t">Rate limiting strategy</div>
+            <div class="act-d">22 messages · 40 minutes ago</div>
+            <span class="act-go">→</span>
+          </button>
+          <button class="act">
+            <div class="act-k">COMPARE</div>
+            <div class="act-t">Run one prompt on both</div>
+            <div class="act-d">Answers side by side, with cost</div>
+            <span class="act-go">→</span>
+          </button>
+          <button class="act">
+            <div class="act-k">AUDIT</div>
+            <div class="act-t">Where the spend went</div>
+            <div class="act-d">Break 1.2M tokens down by thread</div>
+            <span class="act-go">→</span>
+          </button>
+          <button class="act">
+            <div class="act-k">DRAFT</div>
+            <div class="act-t">Write the migration notes</div>
+            <div class="act-d">From the last four schema changes</div>
+            <span class="act-go">→</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- turns -->
+      <section class="turns" id="turns" hidden>
+        <div class="turn">
+          <div class="turn-h">
+            <span class="turn-who you">You</span>
+            <span class="turn-meta">09:14:22 · 9 tokens</span>
+          </div>
+          <div class="prose"><p>Which model are you, and how do you know?</p></div>
+        </div>
+
+        <div class="turn">
+          <div class="turn-h">
+            <span class="turn-who ai">Claude Haiku 4.5</span>
+            <span class="turn-meta" id="turnmeta">streaming…</span>
+          </div>
+          <div class="prose" id="out"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="input-wrap">
+      <div class="input">
+        <div class="input-f">Ask anything…</div>
+        <div class="input-b">
+          <button class="sel">
+            <span class="tag a">HAIKU 4.5</span>
+            <span>change model</span>
+          </button>
+          <button class="fire" id="fire">Send ⏎</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ═══════════════════════════ inspector -->
+  <aside class="inspect">
+    <div class="ins-h">
+      <span class="k">Inspector</span>
+      <span class="k" id="state">idle</span>
+    </div>
+
+    <!-- routing -->
+    <div class="block">
+      <div class="block-h"><span class="k">Route</span></div>
+      <div class="route">
+        <div class="node"><span class="node-i" style="background: var(--cyan)"></span> Browser · NDJSON</div>
+        <div class="wire" id="w1"></div>
+        <div class="node"><span class="node-i" style="background: var(--violet)"></span> /api/chat · node</div>
+        <div class="wire" id="w2"></div>
+        <div class="node" id="nodeReg"><span class="node-i" style="background: var(--amber)"></span> registry → adapter</div>
+        <div class="wire" id="w3"></div>
+        <div class="node" id="nodeProv"><span class="node-i" style="background: var(--anthropic)"></span> Anthropic · Haiku 4.5</div>
+      </div>
+    </div>
+
+    <!-- latency -->
+    <div class="block">
+      <div class="block-h"><span class="k">Latency</span><span class="k" id="lgrade">—</span></div>
+      <div class="gauge-wrap">
+        <div class="gauge">
+          <svg width="76" height="76">
+            <circle class="gauge-track" cx="38" cy="38" r="32" fill="none" stroke-width="6" />
+            <circle class="gauge-arc" id="arc" cx="38" cy="38" r="32" fill="none" stroke-width="6"
+                    stroke-linecap="butt" stroke-dasharray="201" stroke-dashoffset="201" />
+          </svg>
+          <div class="gauge-n"><span id="gnum">—</span><small>FIRST TOKEN</small></div>
+        </div>
+        <div style="flex: 1">
+          <div class="kv"><span>p50</span><span>412ms</span></div>
+          <div class="kv"><span>p95</span><span>1.24s</span></div>
+          <div class="kv"><span>tok/s</span><span id="tps">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- tokens -->
+    <div class="block">
+      <div class="block-h"><span class="k">Tokens · this turn</span></div>
+      <div class="kv"><span>input</span><span id="tin">0</span></div>
+      <div class="kv"><span>output</span><span id="tout">0</span></div>
+      <div class="kv"><span>context</span><span id="tctx">12,480 / 200,000</span></div>
+      <div class="track"><span class="fill" id="ctxfill"></span></div>
+    </div>
+
+    <!-- cost -->
+    <div class="block">
+      <div class="block-h"><span class="k">Cost · this turn</span></div>
+      <div class="cost">$<span id="cost">0.000000</span></div>
+      <div class="kv" style="margin-top: 8px"><span>rate in</span><span>$1.00 / MTok</span></div>
+      <div class="kv"><span>rate out</span><span>$5.00 / MTok</span></div>
+      <div class="kv"><span>day to date</span><span id="dtd">$0.61</span></div>
+    </div>
+
+    <!-- log -->
+    <div class="block" style="border-bottom: 0">
+      <div class="block-h"><span class="k">Event log</span></div>
+      <div class="log" id="log">
+        <div><time>09:14:02</time><b>session opened</b></div>
+        <div><time>09:14:02</time><b>keys decrypted</b> <span class="ok">2 ok</span></div>
+        <div><time>09:14:03</time><b>rate limit</b> 3/60 this hour</div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+  (function () {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const $ = (id) => document.getElementById(id);
+
+    /* ══ sparklines ══
+       Drawn rather than shipped as SVG paths: eight numbers describe each
+       thread's message volume, and the shape is derived from them. */
+    document.querySelectorAll('[data-spark]').forEach((c) => {
+      const pts = c.dataset.spark.split(',').map(Number);
+      const ctx = c.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const w = c.width, h = c.height;
+      c.width = w * dpr; c.height = h * dpr;
+      c.style.width = w + 'px'; c.style.height = h + 'px';
+      ctx.scale(dpr, dpr);
+
+      const max = Math.max(...pts), min = Math.min(...pts);
+      const x = (i) => (i / (pts.length - 1)) * (w - 1) + 0.5;
+      const y = (v) => h - 1.5 - ((v - min) / (max - min || 1)) * (h - 3);
+
+      // area under the line, then the line, then the final point emphasised
+      ctx.beginPath();
+      ctx.moveTo(x(0), h);
+      pts.forEach((v, i) => ctx.lineTo(x(i), y(v)));
+      ctx.lineTo(x(pts.length - 1), h);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(239,166,63,0.13)';
+      ctx.fill();
+
+      ctx.beginPath();
+      pts.forEach((v, i) => (i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v))));
+      ctx.strokeStyle = '#efa63f';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(x(pts.length - 1), y(pts[pts.length - 1]), 1.6, 0, Math.PI * 2);
+      ctx.fillStyle = '#efa63f';
+      ctx.fill();
+    });
+
+    /* ══ clock ══ */
+    setInterval(() => {
+      const d = new Date();
+      $('clock').textContent = [d.getHours(), d.getMinutes(), d.getSeconds()]
+        .map((n) => String(n).padStart(2, '0'))
+        .join(':');
+    }, 1000);
+
+    /* ══ counters + bars ══ */
+    document.querySelectorAll('[data-count]').forEach((el) => {
+      const target = Number(el.dataset.count);
+      const pre = el.dataset.prefix || '', suf = el.dataset.suffix || '';
+      if (reduced) { el.textContent = pre + target.toLocaleString() + suf; return; }
+      const t0 = performance.now();
+      (function tick(now) {
+        const p = Math.min(1, ((now || t0) - t0) / 1200);
+        el.textContent = pre + Math.round(target * (1 - Math.pow(1 - p, 3))).toLocaleString() + suf;
+        if (p < 1) requestAnimationFrame(tick);
+      })();
+    });
+    setTimeout(() => {
+      document.querySelectorAll('.prov-fill').forEach((f) => (f.style.width = f.dataset.w + '%'));
+    }, 350);
+
+    /* ══ filters and rows ══ */
+    document.querySelectorAll('.filter').forEach((f) => {
+      f.addEventListener('click', () => {
+        document.querySelectorAll('.filter').forEach((x) => x.setAttribute('aria-pressed', 'false'));
+        f.setAttribute('aria-pressed', 'true');
+      });
+    });
+    document.querySelectorAll('.row').forEach((r) => {
+      r.addEventListener('click', () => {
+        document.querySelectorAll('.row').forEach((x) => x.classList.remove('on'));
+        r.classList.add('on');
+      });
+    });
+
+    function logLine(time, text, cls) {
+      const d = document.createElement('div');
+      d.innerHTML = '<time>' + time + '</time><b class="' + (cls || '') + '">' + text + '</b>';
+      $('log').prepend(d);
+    }
+
+    /* ══ the run ══
+       One loop drives the transcript AND every meter, because in the real
+       product they are the same event: a token arrives, and the output count,
+       the cost, the context bar and the throughput all move because of it. */
+    const REPLY =
+      "I'm Claude Haiku 4.5, reached through this app's Anthropic adapter.\n\n" +
+      "The honest part of the answer is that I couldn't tell you on my own. A model ships " +
+      "after its training data was collected, so asking one to name its own version is asking " +
+      "it to recall something it was never told — which is why models elsewhere so often get " +
+      "this wrong, confidently.\n\n" +
+      "What makes it reliable here is that the app puts the selected model's display name into " +
+      "the system prompt on every request. Change the model in the selector and ask again: the " +
+      "answer changes, because the context does.";
+
+    const RATE_IN = 1.0 / 1e6, RATE_OUT = 5.0 / 1e6, IN_TOKENS = 9;
+
+    $('fire').addEventListener('click', function () {
+      this.disabled = true;
+
+      $('brief').hidden = true;
+      $('turns').hidden = false;
+      $('out').innerHTML = '';
+      $('state').textContent = 'in flight';
+      $('state').style.color = 'var(--amber)';
+
+      const now = new Date().toTimeString().slice(0, 8);
+      logLine(now, 'POST /api/chat');
+
+      if (reduced) {
+        $('out').innerHTML = REPLY.split('\n\n').map((p) => '<p>' + p + '</p>').join('');
+        $('tin').textContent = IN_TOKENS;
+        $('tout').textContent = '198';
+        $('cost').textContent = (IN_TOKENS * RATE_IN + 198 * RATE_OUT).toFixed(6);
+        $('state').textContent = 'complete';
+        this.disabled = false;
+        return;
+      }
+
+      // wires light up in sequence, the way the request actually travels
+      ['w1', 'w2', 'w3'].forEach((id, i) => {
+        setTimeout(() => $(id).classList.add('flowing'), i * 140);
+      });
+      setTimeout(() => { $('nodeReg').classList.add('hot'); logLine(now, 'adapter resolved · anthropic', 'em'); }, 180);
+      setTimeout(() => $('nodeProv').classList.add('hot'), 340);
+
+      $('tin').textContent = IN_TOKENS;
+
+      const t0 = performance.now();
+      const ttft = 380 + Math.random() * 180;
+
+      setTimeout(() => {
+        const first = Math.round(performance.now() - t0);
+
+        // gauge: 0–1500ms mapped onto the arc, coloured by how it lands
+        const arc = $('arc'), C = 201;
+        const pct = Math.min(1, first / 1500);
+        arc.style.strokeDashoffset = String(C - C * pct);
+        arc.style.stroke = first < 600 ? 'var(--green)' : first < 1100 ? 'var(--amber)' : 'var(--rose)';
+        $('gnum').textContent = first + 'ms';
+        $('lgrade').textContent = first < 600 ? 'good' : first < 1100 ? 'fair' : 'slow';
+        $('lgrade').style.color = first < 600 ? 'var(--green)' : first < 1100 ? 'var(--amber)' : 'var(--rose)';
+        logLine(new Date().toTimeString().slice(0, 8), 'first token ' + first + 'ms', 'ok');
+
+        ['w1', 'w2', 'w3'].forEach((id) => $(id).classList.remove('flowing'));
+        $('state').textContent = 'streaming';
+
+        const body = document.createElement('div');
+        const cur = document.createElement('span');
+        cur.className = 'cur';
+        $('out').appendChild(body);
+        $('out').appendChild(cur);
+
+        let i = 0;
+        const startStream = performance.now();
+
+        (function step() {
+          if (i >= REPLY.length) {
+            cur.remove();
+            const outTok = Math.round(REPLY.length / 3.9);
+            $('turnmeta').textContent =
+              Math.round(performance.now() - t0) + 'ms · ' + outTok + ' tokens out';
+            $('state').textContent = 'complete';
+            $('state').style.color = 'var(--green)';
+            $('nodeReg').classList.remove('hot');
+            $('nodeProv').classList.remove('hot');
+            logLine(new Date().toTimeString().slice(0, 8), 'usage row written · ' + outTok + ' tok', 'ok');
+            $('fire').disabled = false;
+            return;
+          }
+
+          i += 2 + Math.floor(Math.random() * 4);
+          body.innerHTML = REPLY.slice(0, i).split('\n\n').map((p) => '<p>' + p + '</p>').join('');
+
+          // every meter, from the same tick
+          const outTok = Math.round(i / 3.9);
+          const secs = (performance.now() - startStream) / 1000;
+          $('tout').textContent = outTok.toLocaleString();
+          $('tps').textContent = secs > 0.25 ? Math.round(outTok / secs) + '/s' : '—';
+          $('cost').textContent = (IN_TOKENS * RATE_IN + outTok * RATE_OUT).toFixed(6);
+
+          const ctx = 12480 + IN_TOKENS + outTok;
+          $('tctx').textContent = ctx.toLocaleString() + ' / 200,000';
+          const ctxPct = (ctx / 200000) * 100;
+          $('ctxfill').style.width = Math.max(6, ctxPct) + '%';
+          $('ctxfill').style.background = ctxPct > 80 ? 'var(--rose)' : 'var(--violet)';
+
+          $('transcript').scrollTop = $('transcript').scrollHeight;
+          setTimeout(step, 11 + Math.random() * 22);
+        })();
+      }, ttft);
+    });
+  })();
+</script>
