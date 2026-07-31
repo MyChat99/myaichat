@@ -47,6 +47,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Needs the build output, so it lives here rather than in the tests job.
+      - name: Bundle budget
+        run: npm run verify:bundle
+
   tests:
     name: Tests (credential-free)
     runs-on: ubuntu-latest
