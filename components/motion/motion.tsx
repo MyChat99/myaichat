@@ -25,15 +25,18 @@ export function useMotionSafe() {
 export function MessageEntrance({
   children,
   className,
+  style,
 }: {
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
 }) {
   const animate = useMotionSafe();
 
   return (
     <motion.div
       className={className}
+      style={style}
       initial={animate ? { opacity: 0, y: 8 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={animate ? { duration: 0.22, ease: EASE } : { duration: 0 }}

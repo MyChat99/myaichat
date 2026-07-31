@@ -124,15 +124,57 @@ function UserMessage({
   );
 }
 
+/**
+ * How many messages are mounted before the "show earlier" control appears.
+ *
+ * This is windowing, not virtualisation. A real virtualiser (react-window and
+ * friends) positions rows absolutely from measured heights — which fights two
+ * things this list does: markdown rows whose height is unknown until rendered,
+ * and a last row that grows on every token during streaming. The failure mode
+ * is a jumping scroll position mid-response, which is far worse than the
+ * problem being solved.
+ *
+ * Capping the mounted count gets the same win (bounded DOM nodes, bounded
+ * markdown parsing) with none of that risk, and the older messages are one
+ * click away rather than gone.
+ */
+const WINDOW_SIZE = 60;
+
+/** Rows this far from the bottom get `content-visibility: auto`. */
+const ACTIVE_TAIL = 6;
+
 export function MessageList({ messages, streaming, onRegenerate, onEdit }: Props) {
   const lastAssistantId = [...messages].reverse().find((m) => m.role === 'assistant')?.id;
+  const [expanded, setExpanded] = useState(false);
+
+  const hiddenCount = expanded ? 0 : Math.max(0, messages.length - WINDOW_SIZE);
+  const visible = hiddenCount > 0 ? messages.slice(hiddenCount) : messages;
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6">
-      {messages.map((message) => {
+      {hiddenCount > 0 ? (
+        <div className="flex justify-center">
+          <Button type="button" variant="outline" size="sm" onClick={() => setExpanded(true)}>
+            Show {hiddenCount} earlier message{hiddenCount === 1 ? '' : 's'}
+          </Button>
+        </div>
+      ) : null}
+
+      {visible.map((message, index) => {
+        /**
+         * Lets the browser skip layout and paint for rows scrolled well out of
+         * view. `contain-intrinsic-size: auto` makes it remember each row's
+         * last real height, so the scrollbar does not jump around. The last few
+         * rows are excluded — one of them is being written to.
+         */
+        const offscreenStyle =
+          index < visible.length - ACTIVE_TAIL
+            ? ({ contentVisibility: 'auto', containIntrinsicSize: 'auto 96px' } as const)
+            : undefined;
+
         if (message.role === 'user') {
           return (
-            <MessageEntrance key={message.id}>
+            <MessageEntrance key={message.id} style={offscreenStyle}>
               <UserMessage message={message} disabled={streaming} onEdit={onEdit} />
             </MessageEntrance>
           );
@@ -141,7 +183,7 @@ export function MessageList({ messages, streaming, onRegenerate, onEdit }: Props
         const isStreamingThis = streaming && message.id === 'streaming';
 
         return (
-          <div key={message.id} className="group flex flex-col gap-1">
+          <div key={message.id} style={offscreenStyle} className="group flex flex-col gap-1">
             <Markdown content={message.content} />
 
             {isStreamingThis ? (

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 
 import { Toaster } from '@/components/ui/sonner';
@@ -17,9 +17,51 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://myaichat-production.up.railway.app';
+
+/**
+ * `metadataBase` matters more than it looks: without it, Next emits RELATIVE
+ * og:image URLs, and every crawler that reads them resolves nothing. The
+ * generated card in opengraph-image.tsx would silently never appear.
+ */
 export const metadata: Metadata = {
-  title: 'myaichat',
-  description: 'Multi-provider AI chat platform',
+  metadataBase: new URL(APP_URL),
+  title: {
+    default: 'myaichat',
+    // Page-level titles fill the slot; the suffix is not repeated by hand.
+    template: '%s · myaichat',
+  },
+  description: 'One chat interface for every model — streaming chat across providers.',
+  applicationName: 'myaichat',
+  openGraph: {
+    type: 'website',
+    siteName: 'myaichat',
+    title: 'myaichat',
+    description: 'One chat interface for every model — streaming chat across providers.',
+    url: APP_URL,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'myaichat',
+    description: 'One chat interface for every model — streaming chat across providers.',
+  },
+  // A private chat app has nothing to gain from being indexed, and conversation
+  // URLs are 404-on-RLS rather than secret — keeping crawlers out entirely is
+  // the conservative default.
+  robots: { index: false, follow: false },
+};
+
+export const viewport: Viewport = {
+  // Matches the badge colour, so mobile browser chrome does not clash with it.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b0b0f' },
+  ],
+  width: 'device-width',
+  initialScale: 1,
+  // NOT `maximumScale: 1` — locking zoom is an accessibility failure, and iOS
+  // Safari ignores it anyway.
+  viewportFit: 'cover',
 };
 
 /**

@@ -8,7 +8,7 @@ import { listAvailableModels } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
 import { listConversationTitles } from '@/lib/db/conversations';
 
-export const metadata: Metadata = { title: 'Chat · myaichat' };
+export const metadata: Metadata = { title: 'Chat' };
 
 /**
  * A conversation thread. History is read server-side through the user's own

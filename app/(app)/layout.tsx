@@ -34,7 +34,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             myaichat
           </Link>
 
-          <nav className="flex items-center gap-3">
+          {/* Wraps rather than overflowing: at 360px the four links plus the
+              sign-out button do not fit on one line, and an overflowing header
+              pushes the horizontal scrollbar onto the whole page. */}
+          <nav className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
             <Link
               href="/profile"
               className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"

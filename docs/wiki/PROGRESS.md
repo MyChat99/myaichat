@@ -436,3 +436,44 @@ Overnight work, additive only. Nothing in Phases 1–4 was modified.
 | `auth_attempts` unreadable with the publishable key | pass |
 | Over-budget user is refused by the chat route | pass — asserted via `checkDailyTokenBudget` on a real user with real usage |
 | The password prompt appears when rotating a key | **NEEDS HUMAN VERIFICATION** — the server gate is tested; the dialog is not |
+
+### Priority 4 — Frontend polish · Done, visually unverified
+
+- **Message list windowing** — the list mounts the most recent 60 messages with
+  a "Show N earlier messages" control, and rows more than six from the bottom
+  carry `content-visibility: auto` so the browser skips their layout and paint.
+  A real virtualiser was **rejected**: react-window and friends position rows
+  absolutely from measured heights, which fights markdown rows of unknown height
+  and a final row that grows on every streamed token. The failure mode there is
+  a scroll position that jumps mid-response — worse than the problem being
+  solved. Windowing gets the same bounded DOM with none of that risk.
+- **Loading skeletons** — `loading.tsx` for the conversation, admin, settings and
+  profile routes, shaped like the content they replace so nothing jolts when the
+  real markup lands. Each sits in a `role="status"` live region, so a screen
+  reader hears "loading" rather than a wall of empty boxes.
+- **Favicon and OG metadata** — `app/icon.svg`, a generated `favicon.ico` and
+  `apple-icon.png` (replacing the create-next-app defaults), plus a generated
+  `opengraph-image` and full Open Graph / Twitter metadata. `metadataBase` is set,
+  without which Next emits **relative** og:image URLs that no crawler resolves —
+  the card would have silently never appeared. `robots: noindex` because a
+  private chat app has nothing to gain from being indexed.
+- **Title template fixed** — adding `template: '%s · myaichat'` would have turned
+  every existing page title into "Profile · myaichat · myaichat"; all six page
+  titles were shortened in the same change.
+- **Mobile** — the header nav now wraps instead of overflowing (at 360px the four
+  links plus the sign-out button do not fit on one line, and an overflowing
+  header puts a horizontal scrollbar on the whole page). The sidebar drawer,
+  admin tab strip and audit table already had mobile handling from earlier phases.
+- **Profile** — an Account card showing email, role, member-since and status.
+  The date is formatted with a fixed locale and UTC, because a server-rendered
+  date that follows the server's locale is a hydration mismatch waiting to happen.
+
+| Criterion | Result |
+| --- | --- |
+| `lint` / `type-check` / `build` | pass |
+| `verify:theme` / `verify:appearance` | pass |
+| Icons render correctly | pass — generated PNG inspected directly |
+| OG card renders | **NEEDS HUMAN VERIFICATION** — route builds; the image itself is unseen |
+| Skeletons match the real layout | **NEEDS HUMAN VERIFICATION** |
+| Mobile layout at 360px | **NEEDS HUMAN VERIFICATION** — reasoned from the CSS, not measured in a browser |
+| Windowing at 60+ messages | **NEEDS HUMAN VERIFICATION** — no conversation here is that long |
