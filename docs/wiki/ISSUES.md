@@ -18,6 +18,42 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ## Open
 
+### ISSUE-019 — Two Dependabot PRs break the build (caught by CI on day one)
+
+**Status:** Open | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-07-31
+**Problem:** Dependabot opened six PRs within minutes of its config landing. CI failed two:
+- **#6 eslint 9.39.5 → 10.8.0** — `eslint-config-next@16.2.12` bundles `eslint-plugin-react@7.37.5`, which is incompatible with ESLint 10: `TypeError: contextOrFilename.getFilename is not a function`. Not fixable from our side; it needs an `eslint-config-next` release that supports ESLint 10.
+- **#5 typescript 5.9.3 → 7.0.2** — also fails.
+
+**Action:** **close #6 and #5** rather than merging. Re-open when `eslint-config-next` supports ESLint 10.
+The other four (#1 checkout, #2 setup-node, #3 production group, #4 @types/node) are green and safe to merge.
+**Worth noting:** this is CI justifying itself on its first day. Both would have looked like routine version bumps.
+
+### ISSUE-018 — Branch protection cannot be set: private repo needs GitHub Pro
+
+**Status:** Open | **Severity:** Medium | **Phase:** 8 | **Opened:** 2026-07-31
+**Problem:** `gh api -X PUT repos/MyChat99/myaichat/branches/main/protection` returns **403 "Upgrade to GitHub Pro or make this repository public to enable this feature."** Branch protection on private repositories is a paid feature. This is a plan limit, not an auth problem — `gh` is authenticated as MyChat99 and every other API call works.
+**Consequence:** CI runs on every push and PR, but nothing *enforces* a passing run before merge. A red build can still reach `main`, and `main` auto-deploys to Railway.
+
+**Three ways to fix, pick one:**
+
+1. **Make the repository public** — free, and branch protection turns on immediately. Check first that nothing sensitive is in the history; `npm run security:audit` scans tracked files for credential shapes and currently reports clean.
+2. **Upgrade to GitHub Pro** (~$4/month) and then run:
+   ```bash
+   gh api -X PUT repos/MyChat99/myaichat/branches/main/protection \
+     -H "Accept: application/vnd.github+json" \
+     -f "required_status_checks[strict]=true" \
+     -f "required_status_checks[contexts][]=Lint, type-check, build" \
+     -f "required_status_checks[contexts][]=Tests (credential-free)" \
+     -F "enforce_admins=false" \
+     -F "required_pull_request_reviews[required_approving_review_count]=0" \
+     -F "restrictions=null"
+   ```
+   Or via the UI: **Settings → Branches → Add branch protection rule** → branch name `main` → tick *Require status checks to pass before merging* → select **Lint, type-check, build** and **Tests (credential-free)** → tick *Require branches to be up to date*.
+3. **Accept it for now** and rely on discipline: work on branches, open PRs, read CI before merging. Workable for a single maintainer; it stops working the moment anyone else can push.
+
+**Until one of these is done, treat a green CI badge as advisory rather than as a gate.**
+
 ### ISSUE-017 — Resend not configured: email is rendered but never sent
 
 **Status:** Open (blocked on credentials) | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-07-31
