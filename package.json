@@ -23,6 +23,7 @@
     "verify:degradation": "tsx scripts/verify-degradation.ts",
     "verify:resilience": "tsx --conditions=react-server scripts/verify-resilience.ts",
     "verify:logging": "tsx --conditions=react-server scripts/verify-logging.ts",
+    "verify:csv": "tsx scripts/verify-csv.ts",
     "verify:attachments": "tsx scripts/verify-attachments.ts",
     "verify:security": "tsx --conditions=react-server scripts/verify-security.ts",
     "verify:session": "tsx --conditions=react-server scripts/verify-session.ts",

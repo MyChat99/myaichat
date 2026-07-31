@@ -1324,3 +1324,45 @@ non-admin refusal list.
 | `verify:api` | pass — the drill-in refuses a non-admin |
 | `lint` / `type-check` / `build` | pass |
 | The page renders correctly with real usage | **NEEDS HUMAN VERIFICATION** |
+
+## Away session 4A — Priority 3c · Audit log CSV export · 2026-07-31
+
+`GET /api/admin/audit/export?days=90`, with an **Export CSV** button on the audit
+page. CSV because the tool at the other end is a spreadsheet — the audit trail
+exists to be read by someone who is not looking at this app.
+
+### The part that matters: formula injection
+
+A CSV cell beginning `=`, `+`, `-` or `@` is interpreted by Excel and Google
+Sheets as a **formula**. An audit row whose metadata contains
+`=HYPERLINK("http://evil","click")` becomes a live link in the reviewer's
+spreadsheet.
+
+An audit export is exactly where this bites: the text can be influenced by
+whoever performed the audited action, and the reader trusts the file because it
+came from their own admin panel. Such cells are prefixed with a quote —
+**defused, not destroyed**, so a reviewer still sees what was there. Asserted
+against five payloads including the classic DDE one.
+
+Also RFC 4180 proper: quotes doubled, embedded commas and newlines quoted, CRLF
+line endings, and `charset=utf-8` because metadata carries non-ASCII and Excel
+guesses badly without it.
+
+**The export is itself audited.** That reads as circular and is not: pulling a
+complete record of every administrative action is precisely what a later
+reviewer wants to see, and an export leaving no trace is a gap in the thing it
+is exporting.
+
+Rate limited separately (5/min, 30/hour) — it reads up to 10,000 rows and
+resolves every actor's email.
+
+`npm run verify:csv` — 36 checks, credential-free, in CI. It asserts the rules
+**and** that the route still applies them, so the escaping and the test cannot
+drift apart silently. `verify:all` now covers 21 suites.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:csv` | pass — 36 checks |
+| `verify:api` | pass — export refuses anonymous and non-admin |
+| `verify:all` | pass — 21 suites |
+| The file opens correctly in Excel/Sheets | **NEEDS HUMAN VERIFICATION** |

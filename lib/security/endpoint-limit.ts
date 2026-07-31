@@ -41,6 +41,8 @@ export const ENDPOINT_LIMITS: Record<string, EndpointLimit> = {
   // Reads are cheaper, and a gallery view legitimately fetches many at once.
   'uploads.download': { perMinute: 60, perHour: 600 },
   'conversations.export': { perMinute: 10, perHour: 60 },
+  // Reads up to 10k audit rows and resolves every actor. Rare by nature.
+  'admin.audit_export': { perMinute: 5, perHour: 30 },
 };
 
 export type EndpointVerdict = {

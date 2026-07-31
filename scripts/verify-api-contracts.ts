@@ -480,6 +480,34 @@ async function main() {
     }
     check('the export rate limit engages over HTTP', sawLimit, 'never refused in 14 requests');
 
+    // ───────────────────────────────────────────────── audit CSV export
+    section('Audit CSV export');
+
+    await probe({
+      label: 'audit export without a session refuses',
+      path: '/api/admin/audit/export',
+      expect: [307, 401, 403],
+      json: false,
+    });
+
+    const asUser = await fetch(`${BASE}/api/admin/audit/export`, {
+      redirect: 'manual',
+      headers: { cookie: otherCookie },
+    });
+    check(
+      'audit export refuses a non-admin',
+      asUser.status !== 200,
+      `got ${asUser.status} — a normal user must not read the audit trail`,
+    );
+
+    await probe({
+      label: 'audit export: days out of range is 400',
+      path: '/api/admin/audit/export?days=9999',
+      cookie: otherCookie,
+      expect: [307, 400, 401, 403],
+      json: false,
+    });
+
     // ───────────────────────────────────────────────── admin surfaces
     section('Admin surfaces, as a normal user');
 

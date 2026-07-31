@@ -25,7 +25,13 @@ export type AuditAction =
   | 'model.deleted'
   | 'user.role_changed'
   | 'user.suspension_changed'
-  | 'settings.updated';
+  | 'settings.updated'
+  // Exporting the audit log is itself audited. Not circular: pulling a full
+  // record of every administrative action is exactly what a later reviewer
+  // wants to see, and an export that leaves no trace is a gap in the thing it
+  // is exporting.
+  | 'audit.exported'
+  | 'upload.presigned';
 
 type AuditEntry = {
   actorId: string;
