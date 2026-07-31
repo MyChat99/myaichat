@@ -96,6 +96,9 @@ jobs:
       - name: Graceful degradation
         run: npm run verify:degradation
 
+      - name: Retry policy and timeouts
+        run: npm run verify:resilience
+
       # The idle-policy and marker-integrity halves are pure functions and run
       # here; the refresh-token measurement needs credentials and skips itself.
       - name: Session policy

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createAdminClient } from '@/lib/db/admin';
 import { createClient } from '@/lib/db/server';
 import { defaultModel, getAdapter, resolveModel } from '@/lib/providers/registry';
+import { isRetryableKind, withRetry } from '@/lib/providers/resilience';
 import { ProviderError, type ChatMessage } from '@/lib/providers/types';
 import { fetchObject, isStorageConfigured, keyBelongsToUser } from '@/lib/r2/storage';
 import { AppError, fromProviderKind, toAppError } from '@/lib/errors/app-error';
@@ -353,23 +354,53 @@ export async function POST(request: NextRequest) {
       let outputTokens = 0;
 
       try {
-        for await (const event of adapter.streamChat({
-          model: model.modelId,
-          system: systemPrompt(model.displayName),
-          messages,
-          maxTokens: Math.min(model.maxTokens, MAX_TOKENS),
-          signal: abort.signal,
-        })) {
-          if (event.type === 'text') {
-            assistantText += event.text;
-            controller.enqueue(ndjson({ type: 'text', text: event.text }));
-          } else if (event.type === 'done') {
-            inputTokens = event.inputTokens;
-            outputTokens = event.outputTokens;
-          } else if (event.type === 'error') {
-            controller.enqueue(ndjson(event));
-          }
-        }
+        /**
+         * Retried only until the first token.
+         *
+         * `hasEmittedOutput` is what makes this safe. Once any text has reached
+         * the client, a retry would append a second answer to a partial first
+         * one — the model appears to stammer, and the exchange is billed twice.
+         * A transient failure during connection is worth another attempt; the
+         * same failure after 200 tokens is not.
+         *
+         * The abort signal is honoured throughout: a user pressing Stop must
+         * not be answered with a retry.
+         */
+        await withRetry(
+          async () => {
+            for await (const event of adapter.streamChat({
+              model: model.modelId,
+              system: systemPrompt(model.displayName),
+              messages,
+              maxTokens: Math.min(model.maxTokens, MAX_TOKENS),
+              signal: abort.signal,
+            })) {
+              if (event.type === 'text') {
+                assistantText += event.text;
+                controller.enqueue(ndjson({ type: 'text', text: event.text }));
+              } else if (event.type === 'done') {
+                inputTokens = event.inputTokens;
+                outputTokens = event.outputTokens;
+              } else if (event.type === 'error') {
+                controller.enqueue(ndjson(event));
+              }
+            }
+          },
+          {
+            hasEmittedOutput: () => assistantText.length > 0,
+            isRetryable: (err) => {
+              if (abort.signal.aborted) return false;
+              return err instanceof ProviderError && isRetryableKind(err.kind);
+            },
+            onRetry: ({ attempt, delayMs, err }) => {
+              console.warn(
+                `[api/chat] attempt ${attempt} failed (${
+                  err instanceof ProviderError ? err.kind : 'unknown'
+                }), retrying in ${delayMs}ms`,
+              );
+            },
+          },
+        );
       } catch (err) {
         /**
          * Classified rather than blanket-retryable.

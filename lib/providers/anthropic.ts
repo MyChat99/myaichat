@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { REQUEST_TIMEOUT_MS } from './resilience';
+
 import Anthropic from '@anthropic-ai/sdk';
 
 import {
@@ -27,7 +29,16 @@ import {
  */
 function makeClient(apiKey: string): Anthropic {
   if (!apiKey) throw new ProviderError('auth', 'Anthropic is not configured.', false);
-  return new Anthropic({ apiKey });
+  return new Anthropic({
+    apiKey,
+    // Without this a hung provider holds the request for the route's full
+    // 300s maxDuration, and the user watches a spinner that never resolves.
+    timeout: REQUEST_TIMEOUT_MS,
+    // Retries are handled once, in the chat route, so the policy does not
+    // depend on which model was picked — and so "3 attempts" means 3 rather
+    // than 3 × whatever this SDK does by default.
+    maxRetries: 0,
+  });
 }
 
 /** Maps SDK errors onto the shared kinds, without leaking key material. */
