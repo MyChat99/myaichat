@@ -133,85 +133,92 @@ The password is already in `.env.local` as `SUPABASE_DB_PASSWORD`. Migration `20
 The other four (#1 checkout, #2 setup-node, #3 production group, #4 @types/node) are green and safe to merge.
 **Worth noting:** this is CI justifying itself on its first day. Both would have looked like routine version bumps.
 
-### ISSUE-018 — Branch protection cannot be set: private repo needs GitHub Pro
+### ISSUE-018 — Branch protection on `main`
 
-**Status:** Open (waiting on you) | **Severity:** Medium | **Phase:** 8 | **Opened:** 2026-07-31
-**Problem:** `main` has nothing protecting it. Railway deploys from `main` directly, so a red build reports but does not block a deploy. Setting a ruleset via `gh api` returns **403 Upgrade to GitHub Pro** — branch protection on a *private* repository is a paid feature.
-**Decision made 2026-07-31:** you are making the repository **public** when you return, which makes branch protection free.
+**Status:** Resolved | **Severity:** Medium | **Phase:** 8 | **Opened:** 2026-07-31 | **Resolved:** 2026-07-31
 
----
+**Problem:** `main` had nothing protecting it. Railway deploys from `main`
+directly, so a red build reported but did not block a deploy, and any push —
+including an accidental one — went straight to production. Setting a ruleset had
+returned **403 Upgrade to GitHub Pro**, because branch protection on a *private*
+repository is a paid feature.
 
-#### Do this when you get back, in order
+**Resolution:** the repository was made public on 2026-07-31, which makes branch
+protection free. It is now applied and **verified as enforcing**, not merely
+configured.
 
-**Step 1 — confirm the repo is still clean.** History gets published too, not just the tip.
+### What is set
 
-```bash
-npm run security:audit -- --history
+| Rule | Value |
+| --- | --- |
+| Required status checks | `Lint, type-check, build` · `Tests (credential-free)` |
+| Branch must be up to date before merge | yes (`strict`) |
+| Pull request required | yes |
+| Approvals required | **0** |
+| Administrators bound by these rules | **yes** |
+| Force pushes | blocked |
+| Branch deletion | blocked |
+| Conversation resolution before merge | required |
+
+The security-audit job is deliberately **not** a required check. It is advisory —
+the dependency tree carries transitive advisories that cannot be cleared without
+downgrading Next itself (ISSUE-006), so requiring it would block every merge
+permanently and teach everyone to ignore the one check that reports real
+findings.
+
+### Proof that it enforces
+
+Configuration is not enforcement. A direct push to `main` was attempted and
+rejected:
+
+```
+$ git commit --allow-empty -m "test: confirm branch protection rejects a direct push"
+$ git push origin main
+
+remote: error: GH006: Protected branch update failed for refs/heads/main.
+remote:
+remote: - Changes must be made through a pull request.
+remote: - 2 of 2 required status checks are expected.
+remote:
+ ! [remote rejected] main -> main (protected branch hook declined)
 ```
 
-Expect `0 finding(s)`. The two warnings (dependency advisories per ISSUE-006, and `proton.me` as the commit-author domain) are known and fine. **If anything else appears, stop and read ISSUE-022 before continuing.**
+Both rules fired, and the account attempting it is a repository administrator —
+which is the point of `enforce_admins`. The test commit was discarded locally
+(`git reset --hard HEAD~1`); it never reached the remote.
 
-**Step 2 — make it public.** Do this yourself, in the browser, so the choice is deliberate:
-`Settings → General → Danger Zone → Change repository visibility → Make public`
+The **opposite** direction was proven too: this very change was merged through a
+pull request with CI green, so the legitimate path works. A rule that blocks the
+intended workflow as well as the unintended one is worse than no rule.
 
-**Step 3 — apply branch protection.** One paste:
-
-```bash
-gh api --method PUT repos/MyChat99/myaichat/branches/main/protection \
-  --input - <<'JSON'
-{
-  "required_status_checks": {
-    "strict": true,
-    "contexts": [
-      "Lint, type-check, build",
-      "Tests (credential-free)"
-    ]
-  },
-  "enforce_admins": false,
-  "required_pull_request_reviews": null,
-  "restrictions": null,
-  "allow_force_pushes": false,
-  "allow_deletions": false,
-  "required_conversation_resolution": true
-}
-JSON
-```
-
-Notes on the choices, so you can change them knowingly:
-
-| Field | Set to | Why |
-| --- | --- | --- |
-| `contexts` | the two blocking CI jobs | These are the **job names** from `ci.yml`, not the workflow name. The security job is excluded on purpose — it is advisory (ISSUE-006) and would block every merge. |
-| `strict: true` | on | A PR must be up to date with `main` before merging, so CI result reflects the merged state. |
-| `enforce_admins` | **false** | You are the only maintainer. `true` locks you out of your own hotfix at 2am with no second approver to help. Turn it on if anyone else joins. |
-| `required_pull_request_reviews` | `null` | Requiring a review with one maintainer means nothing can ever merge. |
-| `allow_force_pushes` / `allow_deletions` | false | The actual point of the exercise. |
-| `required_conversation_resolution` | true | Free, and stops review comments getting lost. |
-
-**Step 4 — verify it took.**
+### Re-checking it later
 
 ```bash
-gh api repos/MyChat99/myaichat/branches/main/protection --jq \
-  '{checks: .required_status_checks.contexts, force: .allow_force_pushes.enabled, delete: .allow_deletions.enabled}'
+gh api repos/MyChat99/myaichat/branches/main/protection --jq '{
+  checks: .required_status_checks.contexts,
+  pr_required: (.required_pull_request_reviews != null),
+  admins_bound: .enforce_admins.enabled,
+  force: .allow_force_pushes.enabled
+}'
 ```
 
-Expect the two check names, and `false` for both force and delete.
+### If you ever need to bypass it
 
-**Step 5 — prove it actually blocks.** A protection rule you have not tested is a rule you are assuming.
+You are bound by these rules now, including for a hotfix. That is deliberate.
+The escape hatch is one command, and using it should feel like a decision:
 
 ```bash
-git commit --allow-empty -m "test: confirm branch protection rejects a direct push"
-git push origin main          # must be REJECTED
-git reset --hard HEAD~1
+gh api --method DELETE repos/MyChat99/myaichat/branches/main/protection
+# ... push the fix ...
+# then re-apply from the JSON block in DEC-016
 ```
 
-If that push succeeds, protection is not applied to the branch you think it is.
-
-**Step 6 — chain the deploy (optional, and a separate decision).** With CI blocking merges, you may then want Railway to deploy only on green. That means turning **off** Railway's own Auto Deploy, adding `RAILWAY_TOKEN` as a repository secret, and removing `if: false` from the deploy job in `.github/workflows/ci.yml`. The exact three steps are written in a comment in that file. Leave it as-is if you prefer Railway's simpler behaviour — protection alone already fixes the main risk.
-
----
-
-**If you decide NOT to make it public after all:** the alternatives are GitHub Pro (~$4/month, same commands work unchanged) or accepting the risk. Accepting it is not unreasonable for a single-maintainer project — CI still runs and still reports on every push. What you lose is the enforcement, not the signal.
+**Still open, and a separate decision:** CI and the Railway deploy are not
+chained. Railway watches `main` on its own, so it deploys whatever merges —
+which is now always CI-green, but the deploy itself is not gated. Turning off
+Railway's Auto Deploy and enabling the workflow's disabled deploy job is written
+up in a comment in `.github/workflows/ci.yml`. Protection alone already fixes
+the main risk.
 
 ### ISSUE-017 — Resend not configured: email is rendered but never sent
 
