@@ -33,6 +33,20 @@ import type { ProviderErrorKind } from './types';
  */
 export const REQUEST_TIMEOUT_MS = 90_000;
 
+/**
+ * A much shorter ceiling for health checks.
+ *
+ * `REQUEST_TIMEOUT_MS` is sized for a slow *completion*. A health check is a
+ * one-token generation, and it is awaited during a page render — the admin
+ * overview. Inheriting 90 seconds meant a provider that hangs (rather than
+ * refusing) blocked for a minute and a half the very page you would open to
+ * find out a provider was down.
+ *
+ * Eight seconds is far longer than a healthy one-token round trip and short
+ * enough that a hung provider reads as "down" rather than "loading".
+ */
+export const HEALTH_TIMEOUT_MS = 8_000;
+
 /** Attempts INCLUDING the first. 3 means one try plus two retries. */
 export const MAX_ATTEMPTS = 3;
 
@@ -112,4 +126,35 @@ export async function withRetry<T>(
   }
 
   throw lastError;
+}
+
+/**
+ * Races a promise against a deadline.
+ *
+ * The rejected value is a plain Error with a message the `toAppError` mapper
+ * already classifies as `unreachable` — so a timeout is reported the same way
+ * as any other failure to reach a dependency, rather than as its own special
+ * case that every caller has to know about.
+ */
+export function withDeadline<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+
+  /**
+   * The timer is CLEARED on settle, not `unref`ed.
+   *
+   * `unref()` was the first attempt and it silently broke the deadline: an
+   * unref'd timer does not hold the event loop, and a pending promise does not
+   * either — so a process whose only remaining work was "wait for the deadline
+   * on a hung call" exited cleanly before the timer ever fired. The test caught
+   * it by ending mid-run with no summary.
+   *
+   * Clearing on settle gets both properties: the deadline genuinely fires while
+   * the call is outstanding, and a fast call leaves nothing behind to delay
+   * process exit.
+   */
+  return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
 }

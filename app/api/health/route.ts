@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { createAdminClient } from '@/lib/db/admin';
+import { toAppError } from '@/lib/errors/app-error';
 
 /**
  * Health check for Railway.
@@ -43,13 +44,35 @@ export async function GET() {
       .select('key', { count: 'exact', head: true });
 
     checks.database = error ? 'fail' : 'ok';
-    // Supabase error messages describe the failure, not the credential — safe
-    // to surface, and the difference between "invalid key" and "not found"
-    // is exactly what you need when a deploy is misconfigured.
-    if (error) databaseError = error.message;
+
+    /**
+     * CLASSIFIED, not echoed.
+     *
+     * This endpoint is unauthenticated — it has to be, Railway probes it before
+     * any session exists. It previously surfaced `error.message` verbatim on
+     * the argument that Supabase describes the failure rather than the
+     * credential. That is true of the errors you see while everything works,
+     * and it is exactly the wrong thing to rely on: the messages that appear
+     * during a real outage are the ones carrying a host, a port or a role name,
+     * and by then they are already public.
+     *
+     * `verify:degradation` could not catch this, because it only ever ran
+     * against a healthy database — the failure branch was never exercised.
+     *
+     * The classified kind still distinguishes "cannot reach it" from "it
+     * rejected our credentials", which is the whole diagnostic value the raw
+     * text was there for.
+     */
+    if (error) {
+      const failure = toAppError(new Error(error.message), 'database');
+      databaseError = failure.kind;
+      console.error('[api/health] database check failed:', failure.kind, failure.detail);
+    }
   } catch (err) {
     checks.database = 'fail';
-    databaseError = err instanceof Error ? err.message : 'unknown error';
+    const failure = toAppError(err, 'database');
+    databaseError = failure.kind;
+    console.error('[api/health] database check threw:', failure.kind, failure.detail);
   }
 
   // Encryption: without this the app cannot decrypt any provider key, so it

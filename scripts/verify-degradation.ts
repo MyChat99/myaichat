@@ -17,6 +17,8 @@
  *
  *   npm run verify:degradation
  */
+import { readFileSync } from 'node:fs';
+
 import './_env';
 
 import {
@@ -304,11 +306,48 @@ async function verifyLive() {
   const health = await fetch(`${BASE}/api/health`);
   const healthBody = await health.text();
   check('the health endpoint leaks nothing', leaks(healthBody) === null, healthBody.slice(0, 120));
+  // Source-level, because the failure branch cannot be triggered against a
+  // healthy database and this is the property that matters.
+  const healthSource = readFileSync('app/api/health/route.ts', 'utf8');
+  check(
+    'the health route does not echo raw dependency text',
+    !healthSource.includes('databaseError = error.message') &&
+      !healthSource.includes('databaseError = err instanceof Error ? err.message'),
+    'an unauthenticated endpoint echoing an outage message publishes it',
+  );
+
   check(
     'the health endpoint names each dependency',
     healthBody.includes('database') && healthBody.includes('encryption'),
     healthBody.slice(0, 120),
   );
+
+  /**
+   * The health endpoint's FAILURE branch, which the live checks above cannot
+   * reach because the database is up.
+   *
+   * It is unauthenticated by necessity, so whatever it says on failure is
+   * public. It used to echo `error.message` verbatim; the messages that appear
+   * during a real outage are exactly the ones carrying a host, a port or a role
+   * name. It now reports the classified kind instead, and this asserts the
+   * classifier produces nothing leaky for the shapes a database outage yields.
+   */
+  const outageShapes = [
+    'connect ECONNREFUSED 10.1.2.3:5432',
+    'getaddrinfo ENOTFOUND db.abcdefgh.supabase.co',
+    'FATAL: password authentication failed for user "postgres"',
+    'permission denied for relation system_settings',
+  ];
+
+  for (const shape of outageShapes) {
+    const classified = toAppError(new Error(shape), 'database');
+    check(
+      `a database outage reports a kind, not "${shape.slice(0, 26)}…"`,
+      /^[a-z_]+$/.test(classified.kind) && !classified.kind.includes(' '),
+      classified.kind,
+    );
+    check(`  and the kind leaks nothing`, leaks(classified.kind) === null);
+  }
 
   // A 404 and a 500 must both be JSON for an API caller — an HTML error page
   // reaching a fetch() is how ISSUE-011 happened.
