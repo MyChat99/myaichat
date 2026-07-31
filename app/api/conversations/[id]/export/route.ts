@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 
 import { createClient } from '@/lib/db/server';
+import { checkEndpointLimit, limitMessage } from '@/lib/security/endpoint-limit';
 
 /**
  * Downloads one conversation as Markdown or JSON.
@@ -74,6 +75,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
+  }
+
+  // An export reads an entire conversation and serialises it. Cheap once,
+  // not cheap in a loop.
+  const limited = await checkEndpointLimit(user.id, 'conversations.export');
+  if (!limited.allowed) {
+    return NextResponse.json(
+      { error: limitMessage(limited) },
+      { status: 429, headers: { 'retry-after': String(limited.retryAfterSeconds) } },
+    );
   }
 
   const { id } = await params;

@@ -206,6 +206,22 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['audit_logs']['Row']>;
         Relationships: [];
       };
+      api_usage: {
+        Row: {
+          id: string;
+          user_id: string;
+          endpoint: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          endpoint: string;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['api_usage']['Row']>;
+        Relationships: [];
+      };
       auth_attempts: {
         Row: {
           id: string;
@@ -259,6 +275,10 @@ export interface Database {
       is_admin: {
         Args: { uid?: string };
         Returns: boolean;
+      };
+      prune_api_usage: {
+        Args: Record<never, never>;
+        Returns: undefined;
       };
       prune_auth_attempts: {
         Args: Record<never, never>;

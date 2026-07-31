@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { createClient } from '@/lib/db/server';
 import { isStorageConfigured, keyBelongsToUser, presignDownload } from '@/lib/r2/storage';
+import { checkEndpointLimit, limitMessage } from '@/lib/security/endpoint-limit';
 
 /**
  * Redirects to a short-lived presigned GET.
@@ -30,6 +31,17 @@ export async function GET(request: NextRequest) {
   const parsed = querySchema.safeParse({ key: request.nextUrl.searchParams.get('key') });
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+  }
+
+  // This route had no limit at all: the previous approach counted `audit_logs`
+  // rows, and downloads are not audited, so there was nothing to count. Each
+  // call signs a URL and bills R2 egress.
+  const limited = await checkEndpointLimit(user.id, 'uploads.download');
+  if (!limited.allowed) {
+    return NextResponse.json(
+      { error: limitMessage(limited) },
+      { status: 429, headers: { 'retry-after': String(limited.retryAfterSeconds) } },
+    );
   }
 
   const { key } = parsed.data;
