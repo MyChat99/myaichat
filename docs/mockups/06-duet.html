@@ -1,0 +1,679 @@
+<title>Duet — myaichat concept 06</title>
+
+<!--
+  DUET — concept 06 of 06
+  ────────────────────────────────────────────────────────────────────────
+  The thesis of this product is that it is not tied to one provider. Every
+  interface so far expresses that as a dropdown. This one makes it the
+  entire layout.
+
+  One prompt, both models, at the same time, racing. You watch them answer
+  side by side — including the part nobody shows you, which is that they
+  finish at different times, cost different amounts, and are often not
+  equally good. Then you keep one, and the other folds away.
+
+  No glass, no grid, no ambient light: flat, saturated colour blocking.
+  Each provider owns a field, and the fields are the design.
+
+  Press RUN ON BOTH. The two streams are genuinely independent — different
+  speeds, different lengths, different finish times.
+
+  DELIBERATELY SINGLE-THEME: the colour blocking IS the interface.
+-->
+
+<style>
+  :root {
+    --spine: #16161a;
+    --spine-2: #1f1f25;
+    --edge: #2e2e37;
+    --paper: #f4f3f0;
+    --dim: rgb(244 243 240 / 0.62);
+    --dimmer: rgb(244 243 240 / 0.38);
+
+    /* Anthropic lane — warm clay */
+    --a-field: #24140f;
+    --a-field-2: #2f1b14;
+    --a-ink: #ec8055;
+    --a-glow: rgb(236 128 85 / 0.22);
+
+    /* OpenAI lane — cool green */
+    --o-field: #0b201c;
+    --o-field-2: #102a25;
+    --o-ink: #2ad19f;
+    --o-glow: rgb(42 209 159 / 0.2);
+
+    --gold: #f2c14e;
+
+    --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  .duet {
+    height: 100vh;
+    background: var(--spine);
+    color: var(--paper);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.55;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  .k {
+    font-family: var(--mono);
+    font-size: 9.5px; letter-spacing: 0.17em;
+    text-transform: uppercase;
+  }
+
+  /* ═══════════════════════════════════ prompt bar */
+  .prompt {
+    border-bottom: 1px solid var(--edge);
+    background: var(--spine-2);
+    padding: 12px 18px;
+    display: flex; align-items: center; gap: 16px;
+    flex: none;
+  }
+
+  .brand { display: flex; align-items: center; gap: 10px; flex: none; }
+  .brand-m {
+    width: 27px; height: 27px;
+    display: grid; place-items: center;
+    font-weight: 800; font-size: 13px;
+    background: linear-gradient(115deg, var(--a-ink) 0 50%, var(--o-ink) 50% 100%);
+    color: var(--spine);
+  }
+  .brand-n { font-weight: 700; font-size: 14px; letter-spacing: -0.015em; }
+
+  .field {
+    flex: 1;
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 14px;
+    background: var(--spine);
+    border: 1px solid var(--edge);
+    min-width: 0;
+    transition: border-color 0.25s;
+  }
+  .field:hover { border-color: #45454f; }
+  .field-t { flex: 1; font-size: 14px; color: var(--paper); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .run {
+    flex: none;
+    position: relative; overflow: hidden;
+    padding: 10px 20px;
+    font-weight: 800; font-size: 12px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--spine);
+    background: var(--paper);
+    transition: transform 0.18s var(--ease), opacity 0.2s;
+  }
+  /* the button is split down the middle in the two lane colours, and the
+     halves sweep in from the outside on hover — the action, previewed */
+  .run::before, .run::after {
+    content: '';
+    position: absolute; top: 0; bottom: 0; width: 50%;
+    transition: transform 0.42s var(--ease);
+    z-index: 0;
+  }
+  .run::before { left: 0; background: var(--a-ink); transform: translateX(-101%); }
+  .run::after { right: 0; background: var(--o-ink); transform: translateX(101%); }
+  .run:hover::before, .run:hover::after { transform: none; }
+  .run span { position: relative; z-index: 1; }
+  .run:active { transform: scale(0.97); }
+  .run:disabled { opacity: 0.4; cursor: default; }
+
+  /* ═══════════════════════════════════ arena */
+  .arena {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 58px 1fr;
+    min-height: 0;
+    /* fr values interpolate, so collapsing a lane is a single transition */
+    transition: grid-template-columns 0.85s var(--ease);
+  }
+  .arena.won-a { grid-template-columns: 1fr 58px 0fr; }
+  .arena.won-b { grid-template-columns: 0fr 58px 1fr; }
+
+  .lane {
+    display: flex; flex-direction: column;
+    min-width: 0; min-height: 0;
+    position: relative;
+    overflow: hidden;
+    transition: filter 0.6s var(--ease), opacity 0.6s;
+  }
+  .lane-a { background: var(--a-field); }
+  .lane-b { background: var(--o-field); }
+
+  /* the lane in front gets a faint bloom from its own ink */
+  .lane::before {
+    content: '';
+    position: absolute; inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.7s var(--ease);
+  }
+  .lane-a::before { background: radial-gradient(120% 60% at 50% 0%, var(--a-glow), transparent 70%); }
+  .lane-b::before { background: radial-gradient(120% 60% at 50% 0%, var(--o-glow), transparent 70%); }
+  .lane.leading::before { opacity: 1; }
+  .lane.behind { filter: saturate(0.75) brightness(0.88); }
+
+  .lane-head {
+    flex: none;
+    padding: 16px 22px 14px;
+    border-bottom: 1px solid rgb(244 243 240 / 0.1);
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px;
+    position: relative; z-index: 1;
+  }
+  .lane-name {
+    font-size: clamp(19px, 2.2vw, 26px);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1;
+  }
+  .lane-a .lane-name { color: var(--a-ink); }
+  .lane-b .lane-name { color: var(--o-ink); }
+  .lane-vendor { margin-top: 5px; color: var(--dimmer); }
+
+  .flag {
+    flex: none;
+    padding: 4px 9px;
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    border: 1px solid currentColor;
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity 0.35s var(--ease), transform 0.35s var(--ease);
+  }
+  .flag.show { opacity: 1; transform: none; }
+  .flag.first { background: var(--gold); border-color: var(--gold); color: var(--spine); }
+
+  .lane-body {
+    flex: 1; overflow-y: auto;
+    padding: 20px 22px;
+    position: relative; z-index: 1;
+  }
+  .lane-body::-webkit-scrollbar { width: 7px; }
+  .lane-body::-webkit-scrollbar-thumb { background: rgb(244 243 240 / 0.13); }
+
+  .say { font-size: 14.5px; line-height: 1.68; color: var(--dim); }
+  .say p { margin: 0 0 12px; }
+  .say strong { color: var(--paper); font-weight: 600; }
+
+  .idle {
+    display: flex; flex-direction: column; gap: 8px;
+    color: var(--dimmer);
+    padding-top: 8px;
+  }
+  .ghost-line {
+    height: 9px;
+    background: rgb(244 243 240 / 0.07);
+  }
+  .ghost-line:nth-child(1) { width: 92%; }
+  .ghost-line:nth-child(2) { width: 78%; }
+  .ghost-line:nth-child(3) { width: 85%; }
+  .ghost-line:nth-child(4) { width: 46%; }
+
+  .tip {
+    display: inline-block;
+    width: 8px; height: 1.05em;
+    vertical-align: text-bottom;
+    animation: bl 0.85s steps(2) infinite;
+  }
+  .lane-a .tip { background: var(--a-ink); }
+  .lane-b .tip { background: var(--o-ink); }
+  @keyframes bl { 50% { opacity: 0; } }
+
+  .lane-foot {
+    flex: none;
+    padding: 11px 22px 13px;
+    border-top: 1px solid rgb(244 243 240 / 0.1);
+    display: flex; gap: 22px;
+    position: relative; z-index: 1;
+  }
+  .m-v { font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums; }
+  .m-l { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dimmer); margin-top: 2px; }
+
+  .keep {
+    margin-left: auto; align-self: center;
+    padding: 7px 15px;
+    font-weight: 700; font-size: 11px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--spine);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.35s var(--ease), transform 0.2s var(--ease);
+  }
+  .lane-a .keep { background: var(--a-ink); }
+  .lane-b .keep { background: var(--o-ink); }
+  .keep.show { opacity: 1; pointer-events: auto; }
+  .keep:hover { transform: translateY(-2px); }
+
+  /* ═══════════════════════════════════ spine */
+  .divider {
+    background: var(--spine-2);
+    border-left: 1px solid var(--edge);
+    border-right: 1px solid var(--edge);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 16px 0;
+    gap: 14px;
+    position: relative;
+  }
+
+  .vs {
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.14em;
+    color: var(--dimmer);
+    writing-mode: vertical-rl;
+  }
+
+  /* a single vertical track: two fills growing from the centre outward,
+     so the lead is readable without reading a number */
+  .race {
+    flex: 1;
+    width: 5px;
+    background: rgb(244 243 240 / 0.08);
+    position: relative;
+    overflow: hidden;
+  }
+  .race i {
+    position: absolute; left: 0; right: 0;
+    height: 0;
+    transition: height 0.24s linear;
+  }
+  .race .ra { top: 0; background: var(--a-ink); }
+  .race .rb { bottom: 0; background: var(--o-ink); }
+
+  .mid {
+    position: absolute; left: -6px; right: -6px; top: 50%;
+    height: 1px; background: var(--edge);
+  }
+
+  .tick { font-family: var(--mono); font-size: 9.5px; color: var(--dimmer); }
+
+  /* ═══════════════════════════════════ verdict */
+  .verdict {
+    flex: none;
+    border-top: 1px solid var(--edge);
+    background: var(--spine-2);
+    padding: 11px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px;
+  }
+  .verdict-l { display: flex; align-items: center; gap: 18px; }
+  .vstat { display: flex; align-items: baseline; gap: 7px; }
+  .vstat b { font-family: var(--mono); font-size: 13px; font-weight: 500; }
+  .vstat span { color: var(--dimmer); font-size: 11px; }
+
+  .note {
+    font-size: 12px; color: var(--dimmer);
+    max-width: 46ch;
+  }
+
+  .reset {
+    padding: 7px 14px;
+    border: 1px solid var(--edge);
+    font-size: 12px; color: var(--dim);
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .reset:hover { border-color: var(--paper); color: var(--paper); }
+
+  /* ═══════════════════════════════════ entrance */
+  @keyframes wipeIn { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+  @keyframes wipeInR { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0 0 0 0); } }
+  .lane-a { animation: wipeIn 0.75s 0.1s var(--ease) both; }
+  .lane-b { animation: wipeInR 0.75s 0.1s var(--ease) both; }
+  @keyframes fall { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+  .prompt { animation: fall 0.5s var(--ease) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .verdict { animation: rise 0.5s 0.2s var(--ease) both; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  @media (max-width: 860px) {
+    .arena { grid-template-columns: 1fr; grid-template-rows: 1fr auto 1fr; }
+    .arena.won-a, .arena.won-b { grid-template-columns: 1fr; }
+    .divider { flex-direction: row; padding: 8px 16px; gap: 12px; }
+    .vs { writing-mode: horizontal-tb; }
+    .race { flex: 1; height: 5px; width: auto; }
+    .race i { top: 0; bottom: 0; height: auto; width: 0; transition: width 0.24s linear; }
+    .race .ra { left: 0; right: auto; }
+    .race .rb { right: 0; left: auto; }
+    .note { display: none; }
+  }
+</style>
+
+<div class="duet">
+  <!-- ═══════════════════════════ prompt -->
+  <div class="prompt">
+    <div class="brand">
+      <div class="brand-m">m</div>
+      <div class="brand-n">myaichat</div>
+    </div>
+
+    <div class="field">
+      <span class="k" style="color: var(--dimmer)">PROMPT</span>
+      <span class="field-t" id="promptText">Which model are you, and how do you know?</span>
+      <span class="k" style="color: var(--dimmer)">9 TOK</span>
+    </div>
+
+    <button class="run" id="run"><span>Run on both</span></button>
+  </div>
+
+  <!-- ═══════════════════════════ arena -->
+  <div class="arena" id="arena">
+    <!-- Anthropic -->
+    <section class="lane lane-a" id="laneA">
+      <div class="lane-head">
+        <div>
+          <div class="lane-name">Haiku 4.5</div>
+          <div class="lane-vendor k">Anthropic · $1 / $5 per MTok</div>
+        </div>
+        <span class="flag" id="flagA">—</span>
+      </div>
+
+      <div class="lane-body" id="bodyA">
+        <div class="idle" id="idleA">
+          <span class="ghost-line"></span>
+          <span class="ghost-line"></span>
+          <span class="ghost-line"></span>
+          <span class="ghost-line"></span>
+        </div>
+      </div>
+
+      <div class="lane-foot">
+        <div>
+          <div class="m-v" id="tokA">0</div>
+          <div class="m-l">tokens</div>
+        </div>
+        <div>
+          <div class="m-v" id="tpsA">—</div>
+          <div class="m-l">tok / sec</div>
+        </div>
+        <div>
+          <div class="m-v" id="costA">$0.0000</div>
+          <div class="m-l">cost</div>
+        </div>
+        <button class="keep" id="keepA">Keep this</button>
+      </div>
+    </section>
+
+    <!-- spine -->
+    <div class="divider">
+      <span class="tick" id="clockA">0.0s</span>
+      <div class="race">
+        <i class="ra" id="raceA"></i>
+        <i class="rb" id="raceB"></i>
+        <span class="mid"></span>
+      </div>
+      <span class="vs">VERSUS</span>
+      <span class="tick" id="clockB">0.0s</span>
+    </div>
+
+    <!-- OpenAI -->
+    <section class="lane lane-b" id="laneB">
+      <div class="lane-head">
+        <div>
+          <div class="lane-name">GPT-5.4 mini</div>
+          <div class="lane-vendor k">OpenAI · $0.40 / $1.60 per MTok</div>
+        </div>
+        <span class="flag" id="flagB">—</span>
+      </div>
+
+      <div class="lane-body" id="bodyB">
+        <div class="idle" id="idleB">
+          <span class="ghost-line"></span>
+          <span class="ghost-line"></span>
+          <span class="ghost-line"></span>
+          <span class="ghost-line"></span>
+        </div>
+      </div>
+
+      <div class="lane-foot">
+        <div>
+          <div class="m-v" id="tokB">0</div>
+          <div class="m-l">tokens</div>
+        </div>
+        <div>
+          <div class="m-v" id="tpsB">—</div>
+          <div class="m-l">tok / sec</div>
+        </div>
+        <div>
+          <div class="m-v" id="costB">$0.0000</div>
+          <div class="m-l">cost</div>
+        </div>
+        <button class="keep" id="keepB">Keep this</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ═══════════════════════════ verdict -->
+  <div class="verdict">
+    <div class="verdict-l">
+      <div class="vstat"><b id="vWinner">—</b><span>first to finish</span></div>
+      <div class="vstat"><b id="vCheap">—</b><span>cheaper</span></div>
+      <div class="vstat"><b id="vTotal">$0.0000</b><span>spent on this comparison</span></div>
+    </div>
+    <div class="note" id="note">
+      Both providers receive the same prompt at the same moment. Keeping one
+      writes only that answer to the thread; the other is discarded and never
+      billed again.
+    </div>
+    <button class="reset" id="reset">Reset</button>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const $ = (id) => document.getElementById(id);
+
+    /* Two genuinely different answers, because that is the honest version of
+       this feature — the models do not agree, do not run at the same speed,
+       and do not cost the same. A demo where both produce identical text at
+       identical speed would be selling something the product cannot do. */
+    const A = {
+      rate: { in: 1.0 / 1e6, out: 5.0 / 1e6 },
+      speed: [10, 26],   // ms between bursts
+      ttft: 340,
+      text:
+        "I'm Claude Haiku 4.5, reached through this app's Anthropic adapter.\n\n" +
+        "The honest part is that I couldn't tell you unaided. A model ships after its training " +
+        "data was collected, so asking one to name its own version is asking it to recall " +
+        "something it was never told — which is exactly why models elsewhere answer this " +
+        "confidently and wrongly.\n\n" +
+        "What makes it reliable here is that the app puts the selected model's display name into " +
+        "the system prompt on every request. That is also why the answer in the other column " +
+        "will be correct about itself, and not about me.",
+    };
+
+    const B = {
+      rate: { in: 0.4 / 1e6, out: 1.6 / 1e6 },
+      speed: [7, 17],    // faster, and shorter — which is the point
+      ttft: 520,
+      text:
+        'I am GPT-5.4 mini, served through this application\'s OpenAI adapter.\n\n' +
+        'I know this because the application states it in the system prompt for this request. ' +
+        'Left to my own knowledge I could not confirm my exact version — that information is not ' +
+        'part of what I was trained on.',
+    };
+
+    const IN_TOK = 9;
+    let running = false;
+    let done = { a: null, b: null };
+
+    function reset() {
+      running = false;
+      done = { a: null, b: null };
+      ['A', 'B'].forEach((s) => {
+        $('body' + s).innerHTML =
+          '<div class="idle"><span class="ghost-line"></span><span class="ghost-line"></span>' +
+          '<span class="ghost-line"></span><span class="ghost-line"></span></div>';
+        $('tok' + s).textContent = '0';
+        $('tps' + s).textContent = '—';
+        $('cost' + s).textContent = '$0.0000';
+        $('clock' + s).textContent = '0.0s';
+        $('flag' + s).className = 'flag';
+        $('flag' + s).textContent = '—';
+        $('keep' + s).classList.remove('show');
+        $('race' + s).style.height = '0';
+        $('race' + s).style.width = '';
+      });
+      $('laneA').className = 'lane lane-a';
+      $('laneB').className = 'lane lane-b';
+      $('arena').className = 'arena';
+      $('vWinner').textContent = '—';
+      $('vCheap').textContent = '—';
+      $('vTotal').textContent = '$0.0000';
+      $('run').disabled = false;
+    }
+
+    /* One lane's run. Both are started in the same tick, then diverge on their
+       own timers — no shared clock, no interleaving, no fairness correction. */
+    function race(side, cfg) {
+      const S = side.toUpperCase();
+      const lane = $('lane' + S);
+      const body = $('body' + S);
+      const t0 = performance.now();
+
+      body.innerHTML = '<div class="idle"><span class="ghost-line"></span><span class="ghost-line"></span></div>';
+
+      setTimeout(() => {
+        body.innerHTML = '';
+        const say = document.createElement('div');
+        say.className = 'say';
+        const tip = document.createElement('span');
+        tip.className = 'tip';
+        body.appendChild(say);
+        say.appendChild(tip);
+
+        const first = performance.now() - t0;
+        $('flag' + S).textContent = Math.round(first) + 'ms to first token';
+        $('flag' + S).classList.add('show');
+
+        let i = 0;
+        const startStream = performance.now();
+        const total = cfg.text.length;
+
+        (function step() {
+          if (i >= total) {
+            tip.remove();
+            const elapsed = (performance.now() - t0) / 1000;
+            const outTok = Math.round(total / 3.9);
+            const cost = IN_TOK * cfg.rate.in + outTok * cfg.rate.out;
+            done[side] = { ms: elapsed, cost, tok: outTok };
+
+            $('flag' + S).textContent = 'done in ' + elapsed.toFixed(2) + 's';
+            $('keep' + S).classList.add('show');
+            lane.classList.remove('leading');
+            settle();
+            return;
+          }
+
+          i += 2 + Math.floor(Math.random() * 4);
+          const shown = cfg.text.slice(0, i);
+          say.innerHTML = shown.split('\n\n').map((p) => '<p>' + p + '</p>').join('') ;
+          say.appendChild(tip);
+
+          const secs = (performance.now() - startStream) / 1000;
+          const outTok = Math.round(i / 3.9);
+          $('tok' + S).textContent = outTok.toLocaleString();
+          $('tps' + S).textContent = secs > 0.2 ? Math.round(outTok / secs) : '—';
+          $('cost' + S).textContent = '$' + (IN_TOK * cfg.rate.in + outTok * cfg.rate.out).toFixed(4);
+          $('clock' + S).textContent = ((performance.now() - t0) / 1000).toFixed(1) + 's';
+
+          // progress through THIS answer, so the meter compares completion
+          // rather than raw token count — the shorter answer is not penalised
+          const pct = (i / total) * 100;
+          const el = $('race' + S);
+          if (window.innerWidth > 860) el.style.height = pct / 2 + '%';
+          else el.style.width = pct / 2 + '%';
+
+          // whoever is further through leads, and the lanes say so
+          const other = side === 'a' ? 'b' : 'a';
+          const otherPct = Number(($('race' + other.toUpperCase()).style.height || '0').replace('%', '')) * 2;
+          lane.classList.toggle('leading', pct > otherPct && !done[side]);
+          $('lane' + other.toUpperCase()).classList.toggle('behind', pct > otherPct + 6);
+
+          body.scrollTop = body.scrollHeight;
+          setTimeout(step, cfg.speed[0] + Math.random() * (cfg.speed[1] - cfg.speed[0]));
+        })();
+      }, cfg.ttft);
+    }
+
+    function settle() {
+      if (!done.a || !done.b) return;
+      running = false;
+      $('run').disabled = false;
+
+      const firstSide = done.a.ms < done.b.ms ? 'A' : 'B';
+      $('flag' + firstSide).classList.add('first');
+      $('vWinner').textContent = firstSide === 'A' ? 'Haiku 4.5' : 'GPT-5.4 mini';
+
+      const cheapSide = done.a.cost < done.b.cost ? 'A' : 'B';
+      const ratio = Math.max(done.a.cost, done.b.cost) / Math.min(done.a.cost, done.b.cost);
+      $('vCheap').textContent =
+        (cheapSide === 'A' ? 'Haiku 4.5' : 'GPT-5.4 mini') + ' · ' + ratio.toFixed(1) + '×';
+
+      $('vTotal').textContent = '$' + (done.a.cost + done.b.cost).toFixed(4);
+
+      $('note').textContent =
+        'Both finished. ' +
+        (firstSide === 'A' ? 'Haiku' : 'GPT-5.4 mini') +
+        ' was first by ' +
+        Math.abs(done.a.ms - done.b.ms).toFixed(2) +
+        's, and the shorter answer is not automatically the worse one — read both, then keep one.';
+
+      $('laneA').classList.remove('behind', 'leading');
+      $('laneB').classList.remove('behind', 'leading');
+    }
+
+    $('run').addEventListener('click', () => {
+      if (running) return;
+      reset();
+      running = true;
+      $('run').disabled = true;
+
+      if (reduced) {
+        [['A', A], ['B', B]].forEach(([S, cfg]) => {
+          $('body' + S).innerHTML =
+            '<div class="say">' + cfg.text.split('\n\n').map((p) => '<p>' + p + '</p>').join('') + '</div>';
+          const outTok = Math.round(cfg.text.length / 3.9);
+          $('tok' + S).textContent = outTok;
+          $('cost' + S).textContent = '$' + (IN_TOK * cfg.rate.in + outTok * cfg.rate.out).toFixed(4);
+          $('keep' + S).classList.add('show');
+        });
+        done = { a: { ms: 4.1, cost: 0.0011, tok: 280 }, b: { ms: 3.2, cost: 0.0003, tok: 92 } };
+        settle();
+        return;
+      }
+
+      race('a', A);
+      race('b', B);
+    });
+
+    /* keeping one folds the other away — the grid does the work */
+    $('keepA').addEventListener('click', () => {
+      $('arena').classList.add('won-a');
+      $('note').textContent = 'Kept the Haiku 4.5 answer. The GPT-5.4 mini reply was discarded and will not be billed again.';
+    });
+    $('keepB').addEventListener('click', () => {
+      $('arena').classList.add('won-b');
+      $('note').textContent = 'Kept the GPT-5.4 mini answer. The Haiku 4.5 reply was discarded and will not be billed again.';
+    });
+
+    $('reset').addEventListener('click', reset);
+  })();
+</script>
