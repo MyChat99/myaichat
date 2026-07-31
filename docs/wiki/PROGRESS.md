@@ -800,3 +800,28 @@ migration lands on its own.
 | No admin bypass used | pass |
 | Full suite after all bumps | pass — 17 suites, nothing regressed |
 | `lint` / `type-check` / `format:check` / `build` | pass |
+
+## Away session 3 — ISSUE-024 resolved · message sequence · 2026-07-31
+
+The one genuinely code-resolvable open issue. Truncation for regenerate and
+edit-and-resubmit deleted by `created_at >=`, and `now()` is transaction time —
+so several rows written by one statement share a value and the boundary was
+ambiguous. Regenerating an assistant reply could delete the question that
+prompted it.
+
+Migration `20260731140001` adds `messages.seq` (monotonic) and the truncation,
+history window, title derivation, thread render and export all order by it.
+`created_at` stays as the display timestamp and is no longer load-bearing for
+order.
+
+The backfill is the part worth reviewing: it orders by `(created_at, id)` rather
+than letting `bigserial` number rows in physical order, because physical order
+on an updated table is not insertion order — the lazy version would have quietly
+reshuffled existing conversations.
+
+| Criterion | Result |
+| --- | --- |
+| Migration applied and confirmed | pass |
+| `verify:api` | pass — 65/65, four of them the new collision case |
+| Full DB suite incl. `verify:chat` | pass — nothing regressed |
+| `lint` / `type-check` / `build` | pass |

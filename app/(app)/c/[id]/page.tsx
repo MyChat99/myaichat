@@ -38,7 +38,9 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     .from('messages')
     .select('id, role, content')
     .eq('conversation_id', id)
-    .order('created_at', { ascending: true });
+    // `seq`, not `created_at`: two messages written in one transaction share a
+    // timestamp, and a tie would render them in arbitrary order.
+    .order('seq', { ascending: true });
 
   const initialMessages: UiMessage[] = (messages ?? [])
     .filter(
