@@ -41,35 +41,90 @@ const DEFAULT_SETTINGS: {
  *
  * Costs are per 1K tokens (Claude Opus 5 is $5 / $25 per million).
  */
-const PROVIDER = { name: 'anthropic', enabled: true };
+type SeedModel = {
+  model_id: string;
+  display_name: string;
+  max_tokens: number;
+  default_temperature: number;
+  input_cost_per_1k: number;
+  output_cost_per_1k: number;
+  enabled: boolean;
+};
 
-const MODELS = [
+const CATALOGUE: { provider: string; models: SeedModel[] }[] = [
   {
-    model_id: 'claude-opus-5',
-    display_name: 'Claude Opus 5',
-    max_tokens: 8192,
-    default_temperature: 1.0,
-    input_cost_per_1k: 0.005,
-    output_cost_per_1k: 0.025,
-    enabled: true,
+    provider: 'anthropic',
+    models: [
+      {
+        model_id: 'claude-opus-5',
+        display_name: 'Claude Opus 5',
+        max_tokens: 8192,
+        default_temperature: 1.0,
+        input_cost_per_1k: 0.005,
+        output_cost_per_1k: 0.025,
+        enabled: true,
+      },
+      {
+        model_id: 'claude-haiku-4-5',
+        display_name: 'Claude Haiku 4.5',
+        max_tokens: 8192,
+        default_temperature: 1.0,
+        input_cost_per_1k: 0.001,
+        output_cost_per_1k: 0.005,
+        enabled: true,
+      },
+    ],
+  },
+  {
+    provider: 'openai',
+    models: [
+      {
+        model_id: 'gpt-5.4-mini',
+        display_name: 'GPT-5.4 mini',
+        max_tokens: 8192,
+        default_temperature: 1.0,
+        input_cost_per_1k: 0.00025,
+        output_cost_per_1k: 0.002,
+        enabled: true,
+      },
+      {
+        model_id: 'gpt-5.4',
+        display_name: 'GPT-5.4',
+        max_tokens: 8192,
+        default_temperature: 1.0,
+        input_cost_per_1k: 0.00125,
+        output_cost_per_1k: 0.01,
+        enabled: true,
+      },
+    ],
   },
 ];
 
-async function seedProviderAndModels() {
-  const { data: provider, error: providerError } = await admin
-    .from('providers')
-    .upsert(PROVIDER, { onConflict: 'name' })
-    .select('id')
-    .single();
-  if (providerError) throw providerError;
-  console.log(`  ok    provider "${PROVIDER.name}" upserted`);
+/**
+ * `encrypted_api_key` stays null: keys live in `.env.local` until Phase 4 adds
+ * AES-256-GCM storage and the admin panel that writes them.
+ *
+ * Costs are per 1K tokens. They drive the `usage_logs.estimated_cost` figure
+ * only — nothing routes on them — so an approximate rate is acceptable here and
+ * becomes editable in the Phase 4 admin panel.
+ */
+async function seedProvidersAndModels() {
+  for (const entry of CATALOGUE) {
+    const { data: provider, error: providerError } = await admin
+      .from('providers')
+      .upsert({ name: entry.provider, enabled: true }, { onConflict: 'name' })
+      .select('id')
+      .single();
+    if (providerError) throw providerError;
 
-  const { error: modelsError } = await admin.from('models').upsert(
-    MODELS.map((m) => ({ ...m, provider_id: provider.id })),
-    { onConflict: 'provider_id,model_id' },
-  );
-  if (modelsError) throw modelsError;
-  console.log(`  ok    ${MODELS.length} model(s) upserted`);
+    const { error: modelsError } = await admin.from('models').upsert(
+      entry.models.map((m) => ({ ...m, provider_id: provider.id })),
+      { onConflict: 'provider_id,model_id' },
+    );
+    if (modelsError) throw modelsError;
+
+    console.log(`  ok    provider "${entry.provider}" + ${entry.models.length} model(s) upserted`);
+  }
 }
 
 async function findUserByEmail(email: string) {
@@ -136,7 +191,7 @@ async function main() {
   if (settingsError) throw settingsError;
   console.log(`  ok    ${DEFAULT_SETTINGS.length} system settings upserted`);
 
-  await seedProviderAndModels();
+  await seedProvidersAndModels();
 
   console.log('\nSeed complete.');
 }

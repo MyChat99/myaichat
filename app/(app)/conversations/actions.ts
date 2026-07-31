@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { createClient } from '@/lib/db/server';
+import { defaultModel, resolveModel } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
 
 /**
@@ -17,16 +18,16 @@ import { requireUser } from '@/lib/security/auth';
 const idSchema = z.string().uuid();
 const titleSchema = z.string().trim().min(1).max(200);
 
-async function insertConversation(): Promise<string> {
+async function insertConversation(preferredModelId?: string): Promise<string> {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { data: model } = await supabase
-    .from('models')
-    .select('id')
-    .eq('enabled', true)
-    .limit(1)
-    .maybeSingle();
+  // Honour a model chosen in the selector before the first send; otherwise take
+  // the registry default. Both go through resolveModel so a disabled or
+  // adapter-less model can't be pinned.
+  const model = preferredModelId
+    ? ((await resolveModel(preferredModelId)) ?? (await defaultModel()))
+    : await defaultModel();
 
   const { data, error } = await supabase
     .from('conversations')
@@ -50,10 +51,31 @@ export async function createConversation() {
  * existence once the user actually sends something — so browsing to `/` does
  * not litter the sidebar with empty threads.
  */
-export async function createConversationForMessage(): Promise<string> {
-  const id = await insertConversation();
+export async function createConversationForMessage(preferredModelId?: string): Promise<string> {
+  const id = await insertConversation(preferredModelId);
   revalidatePath('/', 'layout');
   return id;
+}
+
+/**
+ * Pins a model to a conversation. Subsequent messages use it; earlier replies
+ * are left alone, so a thread can legitimately contain answers from more than
+ * one model.
+ */
+export async function setConversationModel(id: string, modelId: string) {
+  await requireUser();
+  const parsedId = idSchema.parse(id);
+  const parsedModelId = idSchema.parse(modelId);
+
+  // Validate against the registry rather than trusting the id: this rejects a
+  // model that is disabled, or whose provider has no adapter.
+  const model = await resolveModel(parsedModelId);
+  if (!model) throw new Error('That model is not available.');
+
+  const supabase = await createClient();
+  await supabase.from('conversations').update({ model_id: parsedModelId }).eq('id', parsedId);
+
+  revalidatePath('/', 'layout');
 }
 
 export async function renameConversation(id: string, title: string) {

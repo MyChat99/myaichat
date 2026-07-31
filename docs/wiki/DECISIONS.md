@@ -18,6 +18,21 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 
 ---
 
+### DEC-011 — `validateKey()` must spend a token, never just list models
+
+**Date:** 2026-07-30 | **Phase:** 3 | **Status:** Active
+**Decision:** Every adapter's `validateKey()` performs a real (tiny) generation. Listing models is explicitly not acceptable as a validation check.
+**Why:** An unfunded key authenticates perfectly and lists models happily — it fails only when asked to do work. The first OpenAI key supplied for this project did exactly that: HTTP 200 on `/v1/models`, `insufficient_quota` on every completion. A models-list check would have reported it healthy and Phase 4's "Test Connection" button would have lied to the admin.
+**Tradeoff:** Validation costs a fraction of a cent and a round trip. Worth it — the alternative is a green tick on a key that cannot work.
+**Gotcha:** the probe needs a real token budget. OpenAI raises `invalid_request_error` when `max_completion_tokens` can't fit a whole message, so a 1-token probe fails on a healthy key; Anthropic truncates instead. The OpenAI probe uses 16.
+
+### DEC-010 — Provider marks are lettermark badges, not vendor logos
+
+**Date:** 2026-07-30 | **Phase:** 3 | **Status:** Active
+**Decision:** The model selector shows a coloured lettermark per provider rather than the vendors' actual logos.
+**Why:** The phase file asks for "provider logos", but reproducing a trademark from memory ships a wrong approximation of someone else's brand. A neutral badge is honest and swappable.
+**Tradeoff:** Less polished than real logos. `components/chat/provider-logo.tsx` is the single swap point if official assets are obtained — and an unknown provider degrades to its initial automatically, so new providers need no artwork.
+
 ### DEC-009 — Chat streams as newline-delimited JSON, not SSE
 
 **Date:** 2026-07-30 | **Phase:** 2 | **Status:** Active

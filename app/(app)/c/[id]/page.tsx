@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { ChatThread } from '@/components/chat/chat-thread';
 import type { UiMessage } from '@/components/chat/message-list';
 import { createClient } from '@/lib/db/server';
+import { listAvailableModels } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
 
 export const metadata: Metadata = { title: 'Chat · myaichat' };
@@ -22,11 +23,13 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
   const { data: conversation } = await supabase
     .from('conversations')
-    .select('id')
+    .select('id, model_id')
     .eq('id', id)
     .maybeSingle();
 
   if (!conversation) notFound();
+
+  const models = await listAvailableModels();
 
   const { data: messages } = await supabase
     .from('messages')
@@ -42,5 +45,17 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
   // Keyed by id so navigating between conversations remounts with fresh state
   // rather than needing a prop-to-state sync effect.
-  return <ChatThread key={id} conversationId={id} initialMessages={initialMessages} />;
+  return (
+    <ChatThread
+      key={id}
+      conversationId={id}
+      initialMessages={initialMessages}
+      models={models.map((m) => ({
+        id: m.id,
+        displayName: m.displayName,
+        providerName: m.providerName,
+      }))}
+      selectedModelId={conversation.model_id}
+    />
+  );
 }

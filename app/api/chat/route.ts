@@ -3,20 +3,19 @@ import { z } from 'zod';
 
 import { createAdminClient } from '@/lib/db/admin';
 import { createClient } from '@/lib/db/server';
-import { anthropicProvider } from '@/lib/providers/anthropic';
+import { defaultModel, getAdapter, resolveModel } from '@/lib/providers/registry';
 import type { ChatMessage } from '@/lib/providers/types';
 import { checkChatRateLimit } from '@/lib/security/rate-limit';
 
 /**
- * Streaming chat endpoint.
+ * Streaming chat endpoint — provider-agnostic.
  *
- * The provider API key is read only inside `lib/providers/anthropic.ts`, which
- * is `server-only`. Nothing about the key crosses this boundary — the client
- * receives text deltas and token counts, nothing else.
+ * This file names no vendor and imports no vendor SDK. It resolves the
+ * conversation's model through the registry and talks to whatever adapter
+ * comes back, so a third provider needs no change here.
  *
  * Wire format is newline-delimited JSON rather than SSE: this is a POST (so
- * EventSource is unusable anyway) and NDJSON is trivially parseable from a
- * fetch reader.
+ * EventSource is unusable) and NDJSON is trivially parseable from a fetch reader.
  */
 
 export const runtime = 'nodejs';
@@ -38,11 +37,27 @@ function ndjson(event: unknown): Uint8Array {
   return new TextEncoder().encode(`${JSON.stringify(event)}\n`);
 }
 
-/** First line of the first user message, trimmed to something sidebar-sized. */
 function deriveTitle(text: string): string {
   const firstLine = text.split('\n').find((l) => l.trim().length > 0) ?? 'New chat';
   const clean = firstLine.trim();
   return clean.length > 60 ? `${clean.slice(0, 57)}…` : clean;
+}
+
+/**
+ * Telling the model what it is.
+ *
+ * Without this an LLM cannot reliably name its own version — models ship after
+ * their training cutoff, so they genuinely do not know. Passing the selected
+ * model's display name makes "which model are you?" answerable.
+ */
+function systemPrompt(displayName: string): string {
+  return [
+    `You are ${displayName}, an AI assistant in a chat application.`,
+    'Format responses in Markdown. Use fenced code blocks with a language tag for code.',
+    // Generic tag instruction, NOT a don't-reason instruction — the latter
+    // makes internal-tag leakage worse on thinking-disabled models. See DEC-008.
+    'Do not include internal or system XML tags in your response.',
+  ].join(' ');
 }
 
 export async function POST(request: NextRequest) {
@@ -81,6 +96,23 @@ export async function POST(request: NextRequest) {
       { error: `Hourly limit of ${rate.limit} messages reached.`, retryable: true },
       { status: 429, headers: { 'retry-after': String(rate.retryAfterSeconds) } },
     );
+  }
+
+  // Resolve which model to call. `resolveModel` returns null when the pinned
+  // model was disabled or deleted, so fall back rather than 500.
+  const model =
+    (conversation.model_id ? await resolveModel(conversation.model_id) : null) ??
+    (await defaultModel());
+
+  if (!model) {
+    return NextResponse.json(
+      { error: 'No model is configured. Run `npm run seed`.' },
+      { status: 503 },
+    );
+  }
+
+  if (conversation.model_id !== model.id) {
+    await supabase.from('conversations').update({ model_id: model.id }).eq('id', conversationId);
   }
 
   const admin = createAdminClient();
@@ -128,45 +160,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Nothing to send.' }, { status: 400 });
   }
 
-  // Title the conversation from its first exchange.
   if (conversation.title === 'New chat' && messages[0]) {
-    const title = deriveTitle(messages[0].content);
-    await supabase.from('conversations').update({ title }).eq('id', conversationId);
+    await supabase
+      .from('conversations')
+      .update({ title: deriveTitle(messages[0].content) })
+      .eq('id', conversationId);
   }
 
-  // Resolve the model to call. Falls back to the enabled default if the
-  // conversation predates any model row.
-  let modelId = conversation.model_id;
-  if (!modelId) {
-    const { data: fallback } = await supabase
-      .from('models')
-      .select('id')
-      .eq('enabled', true)
-      .limit(1)
-      .maybeSingle();
-    modelId = fallback?.id ?? null;
-    if (modelId) {
-      await supabase.from('conversations').update({ model_id: modelId }).eq('id', conversationId);
-    }
-  }
-
-  const { data: model } = modelId
-    ? await supabase
-        .from('models')
-        .select('model_id, max_tokens, input_cost_per_1k, output_cost_per_1k')
-        .eq('id', modelId)
-        .maybeSingle()
-    : { data: null };
-
-  if (!model) {
-    return NextResponse.json(
-      { error: 'No model is configured. Run `npm run seed`.' },
-      { status: 503 },
-    );
-  }
+  const adapter = getAdapter(model.providerName);
 
   // Aborts when the client disconnects or presses Stop — this is what makes the
-  // stop button halt generation server-side rather than just hiding output.
+  // stop button halt generation upstream rather than just hiding output.
   const abort = new AbortController();
   request.signal.addEventListener('abort', () => abort.abort());
 
@@ -177,10 +181,11 @@ export async function POST(request: NextRequest) {
       let outputTokens = 0;
 
       try {
-        for await (const event of anthropicProvider.streamChat({
-          model: model.model_id,
+        for await (const event of adapter.streamChat({
+          model: model.modelId,
+          system: systemPrompt(model.displayName),
           messages,
-          maxTokens: Math.min(model.max_tokens, MAX_TOKENS),
+          maxTokens: Math.min(model.maxTokens, MAX_TOKENS),
           signal: abort.signal,
         })) {
           if (event.type === 'text') {
@@ -196,7 +201,7 @@ export async function POST(request: NextRequest) {
       } catch (err) {
         console.error('[api/chat] stream error:', err);
         controller.enqueue(
-          ndjson({ type: 'error', message: 'Streaming failed.', retryable: true }),
+          ndjson({ type: 'error', kind: 'unknown', message: 'Streaming failed.', retryable: true }),
         );
       }
 
@@ -221,12 +226,12 @@ export async function POST(request: NextRequest) {
           .eq('id', conversationId);
 
         const estimatedCost =
-          (inputTokens / 1000) * Number(model.input_cost_per_1k) +
-          (outputTokens / 1000) * Number(model.output_cost_per_1k);
+          (inputTokens / 1000) * model.inputCostPer1k +
+          (outputTokens / 1000) * model.outputCostPer1k;
 
         await admin.from('usage_logs').insert({
           user_id: user.id,
-          model_id: modelId,
+          model_id: model.id,
           input_tokens: inputTokens,
           output_tokens: outputTokens,
           estimated_cost: Number(estimatedCost.toFixed(6)),

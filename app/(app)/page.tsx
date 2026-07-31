@@ -1,4 +1,5 @@
 import { ChatThread } from '@/components/chat/chat-thread';
+import { listAvailableModels } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
 
 /**
@@ -7,5 +8,19 @@ import { requireUser } from '@/lib/security/auth';
  */
 export default async function NewChatPage() {
   await requireUser();
-  return <ChatThread conversationId={null} initialMessages={[]} />;
+
+  const models = await listAvailableModels();
+
+  return (
+    <ChatThread
+      conversationId={null}
+      initialMessages={[]}
+      models={models.map((m) => ({
+        id: m.id,
+        displayName: m.displayName,
+        providerName: m.providerName,
+      }))}
+      selectedModelId={models[0]?.id ?? null}
+    />
+  );
 }

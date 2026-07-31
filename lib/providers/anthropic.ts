@@ -2,66 +2,65 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 
-import type { ChatProvider, ChatStreamEvent, StreamChatParams } from './types';
+import {
+  ProviderError,
+  type ChatProvider,
+  type ChatStreamEvent,
+  type KeyValidation,
+  type ProviderModel,
+  type StreamChatParams,
+} from './types';
 
 /**
  * Anthropic adapter.
  *
  * `server-only`: the API key must never reach a client bundle (CLAUDE.md rule 1).
- * Phase 2 reads it from the environment; Phase 4 swaps this for the AES-256-GCM
- * encrypted value in `providers.encrypted_api_key` — only `getClient()` changes.
+ * Phase 4 swaps the env var for the AES-256-GCM value in
+ * `providers.encrypted_api_key` — only `getClient()` changes.
  */
-
-/**
- * Thinking is DISABLED for chat: snappier first token and lower cost, which is
- * the right trade for an interactive product (docs/wiki/DECISIONS.md DEC-008).
- *
- * With thinking off, Claude Opus 5 can occasionally emit internal XML into the
- * visible response. Anthropic's documented mitigation is a *generic* tag
- * instruction — and explicitly NOT an instruction telling the model not to
- * reason, which makes the leakage worse. Hence the wording below.
- */
-const SYSTEM_PROMPT = [
-  'You are a helpful AI assistant in a chat application.',
-  'Format responses in Markdown. Use fenced code blocks with a language tag for code.',
-  'Do not include internal or system XML tags in your response.',
-].join(' ');
 
 let client: Anthropic | null = null;
 
 function getClient(): Anthropic {
   if (!client) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set');
+    if (!apiKey) throw new ProviderError('auth', 'Anthropic is not configured.', false);
     client = new Anthropic({ apiKey });
   }
   return client;
 }
 
-/** Maps SDK errors onto our neutral event shape, without leaking key material. */
-function toErrorEvent(err: unknown): ChatStreamEvent {
-  if (err instanceof Anthropic.RateLimitError) {
-    return {
-      type: 'error',
-      message: 'Rate limited by the provider. Try again shortly.',
-      retryable: true,
-    };
-  }
+/** Maps SDK errors onto the shared kinds, without leaking key material. */
+function normalise(err: unknown): ProviderError {
+  if (err instanceof ProviderError) return err;
+
   if (err instanceof Anthropic.AuthenticationError) {
-    // Deliberately vague to the client; the real cause is in the server log.
-    return { type: 'error', message: 'Provider authentication failed.', retryable: false };
+    return new ProviderError('auth', 'Anthropic rejected the API key.', false);
+  }
+  if (err instanceof Anthropic.RateLimitError) {
+    return new ProviderError('rate_limit', 'Anthropic is rate limiting requests.', true);
   }
   if (err instanceof Anthropic.APIConnectionError) {
-    return { type: 'error', message: 'Could not reach the provider.', retryable: true };
+    return new ProviderError('network', 'Could not reach Anthropic.', true);
   }
   if (err instanceof Anthropic.APIError) {
-    return {
-      type: 'error',
-      message: 'The provider returned an error.',
-      retryable: err.status !== undefined && err.status >= 500,
-    };
+    // 400s here are usually an over-long conversation.
+    if (err.status === 400 && /token|context|long/i.test(err.message)) {
+      return new ProviderError(
+        'context_length',
+        'This conversation is too long for the model.',
+        false,
+      );
+    }
+    if (err.status === 403 || /credit|billing|quota/i.test(err.message)) {
+      return new ProviderError('quota', 'Anthropic credit is exhausted.', false);
+    }
+    if (err.status !== undefined && err.status >= 500) {
+      return new ProviderError('provider', 'Anthropic returned a server error.', true);
+    }
+    return new ProviderError('provider', 'Anthropic rejected the request.', false);
   }
-  return { type: 'error', message: 'Unexpected error while streaming.', retryable: true };
+  return new ProviderError('unknown', 'Unexpected error talking to Anthropic.', true);
 }
 
 export const anthropicProvider: ChatProvider = {
@@ -75,10 +74,11 @@ export const anthropicProvider: ChatProvider = {
         {
           model,
           max_tokens: maxTokens,
-          // Accepted at effort `high` or below — `high` is the default, so this
-          // is valid. Pairing `disabled` with xhigh/max would be a 400.
+          // Thinking is ON by default on Opus 5 — this is an explicit opt-out
+          // for chat latency (DECISIONS.md DEC-008). Only valid at effort
+          // `high` or below, which is the default.
           thinking: { type: 'disabled' },
-          system: system ?? SYSTEM_PROMPT,
+          system,
           messages: messages.map((m) => ({ role: m.role, content: m.content })),
         },
         { signal },
@@ -101,8 +101,41 @@ export const anthropicProvider: ChatProvider = {
       // An aborted stream is the user pressing Stop, not a failure.
       if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) return;
 
-      console.error('[anthropic] stream failed:', err);
-      yield toErrorEvent(err);
+      const normalised = normalise(err);
+      console.error('[anthropic] stream failed:', normalised.kind, err);
+      yield {
+        type: 'error',
+        kind: normalised.kind,
+        message: normalised.message,
+        retryable: normalised.retryable,
+      };
+    }
+  },
+
+  async listModels(): Promise<ProviderModel[]> {
+    try {
+      const page = await getClient().models.list({ limit: 100 });
+      return page.data.map((m) => ({ id: m.id, displayName: m.display_name }));
+    } catch (err) {
+      throw normalise(err);
+    }
+  },
+
+  async validateKey(): Promise<KeyValidation> {
+    const started = Date.now();
+    try {
+      // Listing models proves authentication but NOT billing — a key with no
+      // credit lists fine and fails on generation. A one-token completion is
+      // the only check that proves the key can actually do work.
+      await getClient().messages.create({
+        model: 'claude-haiku-4-5',
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'hi' }],
+      });
+      return { valid: true, latencyMs: Date.now() - started };
+    } catch (err) {
+      const normalised = normalise(err);
+      return { valid: false, reason: normalised.message, latencyMs: Date.now() - started };
     }
   },
 };

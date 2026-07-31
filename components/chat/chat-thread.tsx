@@ -8,12 +8,15 @@ import { toast } from 'sonner';
 import { createConversationForMessage } from '@/app/(app)/conversations/actions';
 import { Composer } from '@/components/chat/composer';
 import { MessageList, type UiMessage } from '@/components/chat/message-list';
+import { ModelSelector, type SelectableModel } from '@/components/chat/model-selector';
 import { Button } from '@/components/ui/button';
 
 type Props = {
   /** Null on the root page — the conversation is created on first send. */
   conversationId: string | null;
   initialMessages: UiMessage[];
+  models: SelectableModel[];
+  selectedModelId: string | null;
 };
 
 const STARTERS = [
@@ -26,7 +29,7 @@ const STARTERS = [
 /** Distance from the bottom, in px, still treated as "pinned to bottom". */
 const STICK_THRESHOLD_PX = 120;
 
-export function ChatThread({ conversationId, initialMessages }: Props) {
+export function ChatThread({ conversationId, initialMessages, models, selectedModelId }: Props) {
   const router = useRouter();
 
   const [messages, setMessages] = useState<UiMessage[]>(initialMessages);
@@ -35,6 +38,7 @@ export function ChatThread({ conversationId, initialMessages }: Props) {
   const [atBottom, setAtBottom] = useState(true);
   // Survives the first send on the root page, where the thread starts id-less.
   const [activeId, setActiveId] = useState<string | null>(conversationId);
+  const [modelId, setModelId] = useState<string | null>(selectedModelId ?? models[0]?.id ?? null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -85,7 +89,9 @@ export function ChatThread({ conversationId, initialMessages }: Props) {
         // without a navigation — a router.push here would remount mid-stream.
         let id = activeId;
         if (!id) {
-          id = await createConversationForMessage();
+          // Pass the selector's choice so the first send honours it rather than
+          // silently falling back to the default model.
+          id = await createConversationForMessage(modelId ?? undefined);
           setActiveId(id);
           window.history.replaceState(null, '', `/c/${id}`);
         }
@@ -154,7 +160,7 @@ export function ChatThread({ conversationId, initialMessages }: Props) {
         router.refresh();
       }
     },
-    [activeId, router, scrollToBottom],
+    [activeId, modelId, router, scrollToBottom],
   );
 
   function send(text?: string) {
@@ -199,6 +205,15 @@ export function ChatThread({ conversationId, initialMessages }: Props) {
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
+      <div className="border-border flex items-center justify-end border-b px-4 py-1.5">
+        <ModelSelector
+          models={models}
+          selectedId={modelId}
+          conversationId={activeId}
+          onSelect={setModelId}
+        />
+      </div>
+
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
         {empty ? (
           <div className="mx-auto flex h-full max-w-3xl flex-col items-center justify-center gap-6 px-4">

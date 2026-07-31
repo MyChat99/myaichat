@@ -4,11 +4,10 @@ Pending action items and what comes after the eight planned phases.
 
 ## Immediate next steps
 
-1. **Start Phase 3** — read [PHASE-3-provider-abstraction.md](../phases/PHASE-3-provider-abstraction.md) in full, propose a plan, then implement. Nothing is blocking it: the OpenAI key is already in `.env.local` with `gpt-5.4-mini` as its default ([DEC-007](DECISIONS.md)), and `lib/providers/` already carries the `ChatProvider` interface Phase 3 formalises.
+1. **Close out Phase 3** — one browser click: open the model selector, switch provider mid-conversation, confirm the next reply comes from the new model.
+2. **Start Phase 4** — read [PHASE-4-admin-panel.md](../phases/PHASE-4-admin-panel.md) in full, propose a plan, then implement. It needs `ENCRYPTION_MASTER_KEY` in `.env.local` (`openssl rand -base64 32`) for AES-256-GCM provider key storage. `validateKey()` already exists on every adapter, so the "Test Connection" button is wiring, not new logic.
 
-While in Phase 3, also pass the selected model's display name into the system prompt — without it the assistant cannot name its own model.
-
-Phases 1 and 2 are Verified. Both providers' keys are present and confirmed working against their live APIs.
+Phases 1 and 2 are Verified; Phase 3 is Done pending that click. Both providers stream live, and models are selectable per conversation.
 
 Worth doing soon, not blocking: install Docker to get a local Supabase stack, which also restores `supabase gen types` and removes the hand-maintained types file ([ISSUE-004](ISSUES.md), [ISSUE-005](ISSUES.md)).
 

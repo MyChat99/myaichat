@@ -11,7 +11,7 @@ Single source of truth for build status. Update immediately after any phase work
 | 0   | Repo & docs setup                                                                  | Verified    | 2026-07-30 | 2026-07-30 |
 | 1   | [Foundation — scaffold, auth, schema, RLS](../phases/PHASE-1-foundation.md)        | Verified    | 2026-07-30 | 2026-07-30 |
 | 2   | [Chat interface with streaming](../phases/PHASE-2-chat-streaming.md)               | Verified    | 2026-07-30 | 2026-07-30 |
-| 3   | [Provider abstraction + model selector](../phases/PHASE-3-provider-abstraction.md) | Not Started | —          | —          |
+| 3   | [Provider abstraction + model selector](../phases/PHASE-3-provider-abstraction.md) | Done        | 2026-07-30 | —          |
 | 4   | [Admin panel — keys, models, users](../phases/PHASE-4-admin-panel.md)              | Not Started | —          | —          |
 | 5   | [Theming & appearance](../phases/PHASE-5-theming.md)                               | Not Started | —          | —          |
 | 6   | [R2 uploads + Resend emails](../phases/PHASE-6-storage-email.md)                   | Not Started | —          | —          |
@@ -133,6 +133,44 @@ A phase moves to **Verified** only when all four pass:
 
 - [ISSUE-011](ISSUES.md) — the proxy redirected unauthenticated API calls to the HTML login page, so `POST /api/chat` returned 200 and the handler's own 401 was unreachable.
 
-**Carried into Phase 3**
+**Carried into Phase 3** — done: the selected model's display name is now passed into the system prompt, so "which model are you?" is answerable.
 
-- The assistant cannot reliably name its own model — expected for any LLM, not a misconfiguration. Once Phase 3 adds the model selector, pass the selected model's display name into the system prompt so the answer is accurate.
+---
+
+## Phase 3 — Provider abstraction + model selector · Done · 2026-07-30
+
+Not yet **Verified** — the model selector needs a browser click, see below.
+
+**Built**
+
+- `ChatProvider` interface with `streamChat()`, `listModels()`, `validateKey()`, plus a normalised `ProviderError` taxonomy (`auth`, `quota`, `rate_limit`, `context_length`, `network`, `provider`, `unknown`) the UI reacts to instead of vendor status codes
+- Anthropic and OpenAI adapters, each the only file in the codebase that knows its vendor's API
+- Registry mapping `providers`/`models` rows to adapters; `/api/chat` names no vendor and imports no vendor SDK
+- Model selector in the chat header, grouped by provider, persisted to the conversation. Switching mid-conversation applies to subsequent messages.
+- The selected model's display name is passed into the system prompt
+- [lib/providers/README.md](../../lib/providers/README.md) documenting the add-a-provider path and the vendor differences the abstraction absorbs
+
+**Verification** — `npm run verify:providers`, 20 checks
+
+| Criterion | Result |
+| --- | --- |
+| `npm run lint` / `type-check` / `build` | pass |
+| Same UX against both providers | pass — the same conversation flow streams from Anthropic and OpenAI |
+| Switching models works | pass — automated at the API level; **selector UI click outstanding** |
+| Third provider = one adapter file + DB rows | pass — enforced by `git grep`: no vendor SDK import and no provider name outside `lib/providers`. A passing two-provider chat does not prove this; an if/else in the route would pass that too. |
+| `usage_logs` with correct token counts | pass — per provider, attributed to the right model, including after a mid-conversation switch |
+| `/lib/providers/README.md` documents it | pass |
+
+**Deviations from the phase file**
+
+- Provider marks are lettermark badges, not vendor logos ([DEC-010](DECISIONS.md)).
+- `listModels()` is implemented and tested but not yet wired to admin UI — model management is Phase 4's scope.
+
+**Bugs found and fixed during the phase**
+
+- [ISSUE-012](ISSUES.md) — the first OpenAI key authenticated but had no credit. Led to [DEC-011](DECISIONS.md): `validateKey()` must spend a token, never just list models.
+- A 1-token validation probe failed on a healthy OpenAI key — OpenAI errors where Anthropic truncates. Documented in the provider README.
+
+**To reach Verified**
+
+Open the model selector in the chat header, switch from Claude to GPT mid-conversation, and confirm the next reply comes from the new model.

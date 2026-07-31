@@ -63,6 +63,7 @@ npm run verify:rls      # users cannot reach each other's data
 npm run verify:seed     # exactly one admin, settings intact
 npm run verify:gates    # route gates (needs `npm run dev` running)
 npm run verify:chat     # streaming, persistence, stop, XSS (needs `npm run dev`)
+npm run verify:providers # abstraction holds, both providers stream (needs `npm run dev`)
 ```
 
 `verify:gates` defaults to `http://localhost:3000`; override with `BASE_URL=http://localhost:3001`.
@@ -91,8 +92,12 @@ Security posture:
 
 ## Adding a new AI provider
 
-Arrives in Phase 3. The intent is one adapter file in `lib/providers/` implementing the
-`ChatProvider` interface, plus database rows — no changes to routes or UI.
+One adapter file in [lib/providers/](lib/providers/) implementing `ChatProvider`, one line
+in the registry, and database rows. No route or UI changes. Full instructions and the
+vendor differences the abstraction absorbs: [lib/providers/README.md](lib/providers/README.md).
+
+`npm run verify:providers` enforces this with `git grep` — no vendor SDK import and no
+provider name may appear outside `lib/providers`.
 
 ## Project layout
 
