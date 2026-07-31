@@ -1,4 +1,4 @@
-import { KeyRound, Settings2, SlidersHorizontal, Users } from 'lucide-react';
+import { BarChart3, KeyRound, ScrollText, Settings2, SlidersHorizontal, Users } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -7,10 +7,12 @@ import { requireAdmin } from '@/lib/security/auth';
 export const metadata: Metadata = { title: 'Admin · myaichat' };
 
 const NAV = [
+  { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/admin/providers', label: 'Providers', icon: KeyRound },
   { href: '/admin/models', label: 'Models', icon: SlidersHorizontal },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/settings', label: 'Settings', icon: Settings2 },
+  { href: '/admin/audit', label: 'Audit log', icon: ScrollText },
 ];
 
 /**
@@ -19,7 +21,7 @@ const NAV = [
  * `requireAdmin()` here covers every nested page — but each page calls it too.
  * A layout is not an authorisation boundary on its own: a future route added
  * outside this subtree, or a change to how layouts compose, would silently
- * lose the gate. Analytics and Audit Log join this nav in Phase 7.
+ * lose the gate.
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   await requireAdmin();
