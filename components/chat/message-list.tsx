@@ -96,7 +96,12 @@ function UserMessage({
 
   return (
     <div className="group flex flex-col items-end gap-1">
-      <div className="bg-primary text-primary-foreground max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap">
+      {/* data-message drives the Document/Bubbles style from CSS, so the
+          choice is applied on first paint rather than after hydration. */}
+      <div
+        data-message="user"
+        className="bg-primary text-primary-foreground max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap"
+      >
         {message.content}
       </div>
       <div className="flex opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">

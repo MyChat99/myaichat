@@ -64,7 +64,7 @@ export function AuthForm({ mode, action, next, notice }: Props) {
         {notice ? (
           <p
             role="status"
-            className="mb-4 rounded-md border border-green-600/30 bg-green-600/10 px-3 py-2 text-sm"
+            className="border-success/30 bg-success/10 mb-4 rounded-md border px-3 py-2 text-sm"
           >
             {notice}
           </p>

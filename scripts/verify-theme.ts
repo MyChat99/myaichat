@@ -52,6 +52,8 @@ function checkMode(themeLabel: string, mode: 'light' | 'dark', t: ThemeTokens) {
 
   // Error text has to be legible in exactly the moment things go wrong.
   check(`${prefix}: destructive on background`, contrastRatioHex(t.destructive, t.background));
+  check(`${prefix}: success on background`, contrastRatioHex(t.success, t.background));
+  check(`${prefix}: success on surface`, contrastRatioHex(t.success, t.surface));
 }
 
 console.log('WCAG AA contrast — every theme, both modes\n');

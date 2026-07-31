@@ -177,7 +177,7 @@ function ProviderRow({ provider }: { provider: ProviderCard }) {
           {test ? (
             <span
               role="status"
-              className={`flex items-center gap-1.5 text-xs ${test.ok ? 'text-green-600' : 'text-destructive'}`}
+              className={`flex items-center gap-1.5 text-xs ${test.ok ? 'text-success' : 'text-destructive'}`}
             >
               {test.ok ? <CheckCircle2 className="size-3.5" /> : <XCircle className="size-3.5" />}
               {test.message}

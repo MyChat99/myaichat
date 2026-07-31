@@ -28,6 +28,8 @@ export type ThemeTokens = {
   /** Secondary text. Still body text, so still held to AA — not decorative. */
   textMuted: string;
   destructive: string;
+  /** Positive confirmations: passing connection tests, saved states. */
+  success: string;
 };
 
 export type ThemeDefinition = {
@@ -51,6 +53,7 @@ export const THEMES: ThemeDefinition[] = [
       text: '#09090b',
       textMuted: '#52525b',
       destructive: '#b91c1c',
+      success: '#15803d',
     },
     dark: {
       background: '#09090b',
@@ -62,6 +65,7 @@ export const THEMES: ThemeDefinition[] = [
       text: '#fafafa',
       textMuted: '#a1a1aa',
       destructive: '#f87171',
+      success: '#4ade80',
     },
   },
   {
@@ -77,6 +81,7 @@ export const THEMES: ThemeDefinition[] = [
       text: '#0f172a',
       textMuted: '#475569',
       destructive: '#b91c1c',
+      success: '#15803d',
     },
     dark: {
       background: '#020617',
@@ -88,6 +93,7 @@ export const THEMES: ThemeDefinition[] = [
       text: '#f1f5f9',
       textMuted: '#94a3b8',
       destructive: '#f87171',
+      success: '#4ade80',
     },
   },
   {
@@ -103,6 +109,7 @@ export const THEMES: ThemeDefinition[] = [
       text: '#042f2e',
       textMuted: '#155e57',
       destructive: '#b91c1c',
+      success: '#15803d',
     },
     dark: {
       background: '#04211f',
@@ -114,6 +121,7 @@ export const THEMES: ThemeDefinition[] = [
       text: '#ecfdf5',
       textMuted: '#8fdcd0',
       destructive: '#f87171',
+      success: '#4ade80',
     },
   },
   {
@@ -129,6 +137,7 @@ export const THEMES: ThemeDefinition[] = [
       text: '#0f2417',
       textMuted: '#2f5d3f',
       destructive: '#b91c1c',
+      success: '#15803d',
     },
     dark: {
       background: '#0b1a10',
@@ -140,6 +149,7 @@ export const THEMES: ThemeDefinition[] = [
       text: '#eaf6ee',
       textMuted: '#a0cfae',
       destructive: '#f87171',
+      success: '#4ade80',
     },
   },
   {
@@ -155,6 +165,7 @@ export const THEMES: ThemeDefinition[] = [
       text: '#2c1608',
       textMuted: '#7c4a1d',
       destructive: '#b91c1c',
+      success: '#15803d',
     },
     dark: {
       background: '#1c0f06',
@@ -166,6 +177,7 @@ export const THEMES: ThemeDefinition[] = [
       text: '#fff3e6',
       textMuted: '#e5ac7c',
       destructive: '#f87171',
+      success: '#4ade80',
     },
   },
   {
@@ -181,6 +193,7 @@ export const THEMES: ThemeDefinition[] = [
       text: '#2d0a14',
       textMuted: '#7d1f37',
       destructive: '#b91c1c',
+      success: '#15803d',
     },
     dark: {
       background: '#1b0710',
@@ -192,6 +205,7 @@ export const THEMES: ThemeDefinition[] = [
       text: '#ffeef2',
       textMuted: '#e79db1',
       destructive: '#f87171',
+      success: '#4ade80',
     },
   },
   {
@@ -207,6 +221,7 @@ export const THEMES: ThemeDefinition[] = [
       text: '#000000',
       textMuted: '#525252',
       destructive: '#b91c1c',
+      success: '#15803d',
     },
     dark: {
       background: '#000000',
@@ -218,6 +233,7 @@ export const THEMES: ThemeDefinition[] = [
       text: '#ffffff',
       textMuted: '#a3a3a3',
       destructive: '#f87171',
+      success: '#4ade80',
     },
   },
 ];

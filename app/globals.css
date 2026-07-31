@@ -30,6 +30,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -67,6 +68,7 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  --success: #15803d;
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -102,6 +104,7 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  --success: #4ade80;
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
@@ -190,38 +193,84 @@
   }
 }
 
-/* highlight.js tokens, mapped onto the theme */
+/* highlight.js tokens, mapped onto theme variables.
+   No literal hues: every colour here derives from a token, so syntax
+   highlighting follows the active theme instead of fighting it. */
 .hljs-comment,
 .hljs-quote {
-  @apply text-muted-foreground italic;
+  color: var(--muted-foreground);
+  font-style: italic;
 }
 .hljs-keyword,
 .hljs-selector-tag,
 .hljs-literal,
 .hljs-type {
-  color: color-mix(in oklch, var(--primary) 85%, var(--foreground));
+  color: color-mix(in oklch, var(--primary) 80%, var(--foreground));
 }
 .hljs-string,
 .hljs-regexp,
 .hljs-addition {
-  color: color-mix(in oklch, green 55%, var(--foreground));
+  color: color-mix(in oklch, var(--success) 80%, var(--foreground));
 }
 .hljs-number,
 .hljs-built_in,
 .hljs-attr {
-  color: color-mix(in oklch, orange 60%, var(--foreground));
+  color: color-mix(in oklch, var(--primary) 55%, var(--foreground));
 }
 .hljs-title,
 .hljs-section,
 .hljs-name {
-  @apply font-semibold;
+  font-weight: 600;
 }
 .hljs-deletion {
-  color: color-mix(in oklch, red 60%, var(--foreground));
+  color: color-mix(in oklch, var(--destructive) 80%, var(--foreground));
 }
 .hljs-emphasis {
-  @apply italic;
+  font-style: italic;
 }
 .hljs-strong {
-  @apply font-bold;
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------ appearance
+   Message style: `bubbles` keeps chat framing, `flat` reads as a document.
+   Driven by a data attribute the server renders, so it is correct on first
+   paint like the rest of the theme. */
+
+html[data-bubble='flat'] [data-message='user'] {
+  background: transparent;
+  color: var(--foreground);
+  border-radius: 0;
+  padding: 0;
+  font-weight: 600;
+  max-width: 100%;
+}
+
+/* ------------------------------------------------------------ motion
+   Honour the OS setting. WCAG 2.1 AA (2.3.3) — and animation during a
+   streaming response is exactly the kind of motion that causes trouble. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Theme cross-fade. Deliberately only background and colour — transitioning
+   `all` makes every layout change animate, which looks broken during
+   streaming. Suppressed entirely under prefers-reduced-motion above. */
+@media (prefers-reduced-motion: no-preference) {
+  html.theme-transition,
+  html.theme-transition body,
+  html.theme-transition [data-message],
+  html.theme-transition .prose-chat pre {
+    transition:
+      background-color 200ms ease,
+      color 200ms ease,
+      border-color 200ms ease;
+  }
 }

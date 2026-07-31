@@ -37,6 +37,7 @@ const MAP: Record<string, keyof ThemeTokens> = {
   '--accent-foreground': 'text',
 
   '--destructive': 'destructive',
+  '--success': 'success',
   '--border': 'border',
   '--input': 'border',
   '--ring': 'accent',

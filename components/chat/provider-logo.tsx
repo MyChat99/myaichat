@@ -1,3 +1,5 @@
+import { PROVIDER_BRAND } from '@/lib/theme/brand';
+
 /**
  * Provider marks for the model selector.
  *
@@ -7,11 +9,6 @@
  * to change, and an unknown provider degrades to its initial automatically.
  */
 
-const STYLES: Record<string, string> = {
-  anthropic: 'bg-[#d97757] text-white',
-  openai: 'bg-[#10a37f] text-white',
-};
-
 export function ProviderLogo({
   provider,
   className = '',
@@ -19,13 +16,19 @@ export function ProviderLogo({
   provider: string;
   className?: string;
 }) {
-  const style = STYLES[provider] ?? 'bg-muted text-muted-foreground';
+  // Brand colours live in lib/theme/brand.ts — fixed values, not theme tokens,
+  // so a vendor's mark looks the same in every theme. An unknown provider falls
+  // back to theme tokens and needs no entry.
+  const brand = PROVIDER_BRAND[provider];
 
   return (
     <span
       aria-hidden
       title={provider}
-      className={`inline-flex size-4 shrink-0 items-center justify-center rounded-[4px] text-[10px] font-bold uppercase ${style} ${className}`}
+      className={`inline-flex size-4 shrink-0 items-center justify-center rounded-[4px] text-[10px] font-bold uppercase ${
+        brand ? '' : 'bg-muted text-muted-foreground'
+      } ${className}`}
+      style={brand ? { backgroundColor: brand.background, color: brand.foreground } : undefined}
     >
       {provider.charAt(0)}
     </span>
