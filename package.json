@@ -16,6 +16,7 @@
     "verify:rls": "tsx scripts/verify-rls.ts",
     "verify:schema": "tsx scripts/verify-schema.ts",
     "verify:gates": "tsx scripts/verify-auth-gates.ts",
+    "verify:api": "tsx scripts/verify-api-contracts.ts",
     "verify:headers": "tsx scripts/verify-headers.ts",
     "verify:authz": "tsx scripts/verify-authz.ts",
     "verify:attachments": "tsx scripts/verify-attachments.ts",

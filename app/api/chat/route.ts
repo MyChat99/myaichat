@@ -224,14 +224,30 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { data: history } = await supabase
+  /**
+   * The most recent turns, in chronological order.
+   *
+   * ⚠️ The ordering here is load-bearing. `ascending: true` with a LIMIT
+   * returns the OLDEST rows — so once a conversation passed
+   * MAX_HISTORY_MESSAGES the model was sent the beginning of the thread and
+   * never saw the question that had just been asked. It answered, fluently,
+   * about something from forty messages ago. Nothing errored, which is why it
+   * survived: the only symptom is an assistant that seems to stop paying
+   * attention on long threads.
+   *
+   * Newest-first with a limit, then reversed, is what "keep the last N" has to
+   * be in SQL.
+   */
+  const { data: recent } = await supabase
     .from('messages')
     .select('role, content, attachments')
     .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(MAX_HISTORY_MESSAGES);
 
-  const messages: ChatMessage[] = (history ?? [])
+  const history = (recent ?? []).reverse();
+
+  const messages: ChatMessage[] = history
     .filter((m) => m.role !== 'system')
     .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
@@ -266,11 +282,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Nothing to send.' }, { status: 400 });
   }
 
-  if (conversation.title === 'New chat' && messages[0]) {
-    await supabase
-      .from('conversations')
-      .update({ title: deriveTitle(messages[0].content) })
-      .eq('id', conversationId);
+  /**
+   * Title from the thread's FIRST message, fetched explicitly.
+   *
+   * It used to read `messages[0]`, which was the first message only because
+   * history happened to be ordered oldest-first — the same ordering that was
+   * the bug above. Fixing that would have silently retitled long threads from
+   * whatever message happened to fall at the window edge. One extra query on a
+   * path that runs once per conversation is worth not depending on that.
+   */
+  if (conversation.title === 'New chat') {
+    const { data: first } = await supabase
+      .from('messages')
+      .select('content')
+      .eq('conversation_id', conversationId)
+      .eq('role', 'user')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (first?.content) {
+      await supabase
+        .from('conversations')
+        .update({ title: deriveTitle(first.content) })
+        .eq('id', conversationId);
+    }
   }
 
   // Resolves the encrypted key and builds a configured adapter. Throws a

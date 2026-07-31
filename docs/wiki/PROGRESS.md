@@ -572,3 +572,45 @@ verification order. Nothing in it requires a code change.
 | `verify:storage` | pass — rejection paths hold |
 | Picker, drag-drop, paste, remove all behave | **NEEDS HUMAN VERIFICATION** — no credentials, so no upload completes |
 | The PUT to R2 | **BLOCKED** — ISSUE-016, awaiting credentials |
+
+## Away session — Priority 3 · Adversarial self-review · 2026-07-31
+
+Read Phases 1–7 as a hostile reviewer looking for authorisation gaps,
+unvalidated input, races, missing RLS, leaky errors and dead code.
+
+**One high-severity bug found and fixed — [ISSUE-023](ISSUES.md).** The chat
+route sent the model the **oldest** forty messages rather than the newest, so
+past forty turns it never saw the question just asked. Nothing errored; the only
+symptom was an assistant that appeared to lose the thread on long conversations,
+which reads as a model limitation rather than our bug. The longest conversation
+here is 31 messages, so it had not surfaced yet.
+
+**One structural issue logged, not fixed — [ISSUE-024](ISSUES.md).** Truncation
+deletes by `created_at >=`, and `now()` is transaction time, so colliding
+timestamps would over-delete. The correct fix is a sequence column plus a
+migration and changes to every read path that assumes `created_at` ordering —
+structural, so logged per the standing instruction.
+
+**Checked and found sound:** `keyBelongsToUser` prefix matching (fixed-length
+UUIDs plus a trailing slash, so no prefix confusion); self-demotion and
+self-suspension guards on the admin actions; the 404-not-403 choice on foreign
+resources; every mutation running through the RLS-bound client rather than the
+admin client; error responses carrying no internals.
+
+**`npm run verify:api` — 47 checks, refusals only.** Every route now has tests
+proving it rejects: no session, malformed body, out-of-schema values, another
+user's resource. Two assertions carry more weight than the rest:
+
+- **Status *and* content type.** ISSUE-011 was an unauthenticated POST returning
+  200 with an HTML login page — a test checking only "not 2xx" would have passed
+  it, and one checking only status would have missed JSON callers getting HTML.
+- **A foreign conversation is byte-identical to a missing one.** Otherwise the
+  difference between 403 and 404 is an existence oracle.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:api` | pass — 47/47 |
+| `verify:attachments` | pass — 33/33 |
+| Every API route has a rejection test | done — chat, presign, download, health |
+| Every admin page refuses a non-admin | pass — all 7 |
+| History-window regression is guarded | pass |

@@ -16,6 +16,45 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-024 — Truncation deletes by timestamp, so a collision over-deletes
+
+**Status:** Open (logged, not fixed) | **Severity:** Low | **Phase:** 2 | **Opened:** 2026-07-31
+**Problem:** Regenerate and edit-and-resubmit drop the pivot message and everything after it:
+
+```ts
+.delete().eq('conversation_id', id).gte('created_at', pivot.created_at)
+```
+
+`created_at` defaults to `now()`, which in Postgres is **transaction time** — several rows inserted in one statement share an identical value. If a user message and its assistant reply ever land on the same timestamp, regenerating from the assistant reply deletes the user's question too.
+
+**Why it is not fixed here:** it has never been observed, and the correct fix is a monotonic sequence column on `messages` — a migration plus a change to every read path that assumes `created_at` ordering. That is structural, and the standing instruction is to log structural work rather than refactor. Two viable fixes when it is picked up:
+
+1. Add `messages.seq bigserial`, order and truncate on that. Correct, and a migration.
+2. Delete by `created_at > pivot` **plus** `id != pivot.id` for the equal case. Cheaper, still wrong if three rows collide.
+
+**Mitigating:** the demo-seed script writes explicit spaced timestamps precisely so it cannot manufacture this, and `verify:api` does the same.
+
+### ISSUE-023 — The model was sent the OLDEST 40 messages, not the newest
+
+**Status:** Resolved | **Severity:** High | **Phase:** 2 | **Opened:** 2026-07-31 | **Resolved:** 2026-07-31
+**Found by:** adversarial self-review, not by a test or a user report.
+
+**Problem:** `/api/chat` built its history like this:
+
+```ts
+.order('created_at', { ascending: true }).limit(MAX_HISTORY_MESSAGES)
+```
+
+`ORDER BY created_at ASC LIMIT 40` returns the **oldest** forty rows. So once a conversation passed forty messages, the model received the beginning of the thread and **never saw the question that had just been asked** — including the message inserted moments earlier in the same request.
+
+**Why it survived this long:** nothing errors. No exception, no failed insert, no bad status code. The assistant answers fluently, about something from forty messages ago. The only symptom is a model that seems to lose the thread on long conversations — which reads as a model limitation rather than a bug in our code, and would have been reported that way. The longest conversation in this database is 31 messages, so it had not triggered in practice yet.
+
+**Resolution:** newest-first with the limit, then reversed back to chronological — which is what "keep the last N" has to be in SQL.
+
+Title derivation was fixed in the same change. It read `messages[0]`, which was the thread's first message *only because* history happened to be ordered oldest-first. Fixing the ordering would have silently started retitling long threads from whichever message fell at the window edge. The first message is now fetched explicitly — one extra query, on a path that runs once per conversation.
+
+**Guarded by:** `npm run verify:api`, which inserts 45 messages with explicit spaced timestamps and asserts the window **ends with the newest** and **excludes the oldest**. A test asserting only "40 rows returned" would have passed the broken version.
+
 ### ISSUE-022 — Pre-publish audit: repository is clean, with three identifiers to decide on
 
 **Status:** Open (decision, not a defect) | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-07-31
