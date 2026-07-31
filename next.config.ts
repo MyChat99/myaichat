@@ -16,15 +16,31 @@ import type { NextConfig } from 'next';
  *  - `frame-ancestors 'none'` is the modern X-Frame-Options; both are sent, as
  *    older browsers honour only the header.
  */
-function contentSecurityPolicy(): string {
+export function contentSecurityPolicy(dev = process.env.NODE_ENV !== 'production'): string {
   const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
   const r2 = process.env.R2_ACCOUNT_ID
     ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
     : '';
 
+  /**
+   * `'unsafe-eval'` in DEVELOPMENT ONLY.
+   *
+   * React's development build uses `eval()` to reconstruct call stacks across
+   * the server/client boundary. Blocking it does not break the app, but every
+   * page logs an error and the dev overlay shows a permanent "1 Issue" — which
+   * is worse than it sounds: a console that always has an error in it is a
+   * console nobody reads, so the next real error goes unnoticed.
+   *
+   * React never uses `eval()` in production, so the shipped policy is unchanged
+   * and `verify:headers` asserts that explicitly against the production build.
+   */
+  const scriptSrc = dev
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+    : "script-src 'self' 'unsafe-inline'";
+
   return [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",
+    scriptSrc,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",

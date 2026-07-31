@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { createConversationForMessage } from '@/app/(app)/conversations/actions';
+import { useAttachments } from '@/components/chat/attachments';
 import { CommandPalette } from '@/components/command/command-palette';
 import { Composer } from '@/components/chat/composer';
 import { MessageList, type UiMessage } from '@/components/chat/message-list';
@@ -20,6 +21,9 @@ type Props = {
   selectedModelId: string | null;
   /** For the command palette's conversation search. */
   conversations?: { id: string; title: string }[];
+  /** False until R2 credentials exist; disables the paperclip with a reason. */
+  storageEnabled?: boolean;
+  maxUploadMb?: number;
 };
 
 const STARTERS = [
@@ -38,6 +42,8 @@ export function ChatThread({
   models,
   selectedModelId,
   conversations = [],
+  storageEnabled = false,
+  maxUploadMb,
 }: Props) {
   const router = useRouter();
 
@@ -48,6 +54,8 @@ export function ChatThread({
   // Survives the first send on the root page, where the thread starts id-less.
   const [activeId, setActiveId] = useState<string | null>(conversationId);
   const [modelId, setModelId] = useState<string | null>(selectedModelId ?? models[0]?.id ?? null);
+
+  const attachments = useAttachments({ storageEnabled, maxUploadMb });
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -83,7 +91,12 @@ export function ChatThread({
    * how both regenerate and edit-and-resubmit rewind the thread.
    */
   const run = useCallback(
-    async (opts: { message?: string; truncateFrom?: string; optimistic?: UiMessage[] }) => {
+    async (opts: {
+      message?: string;
+      truncateFrom?: string;
+      optimistic?: UiMessage[];
+      attachments?: ReturnType<typeof useAttachments>['payload'];
+    }) => {
       const controller = new AbortController();
       abortRef.current = controller;
       setStreaming(true);
@@ -112,6 +125,7 @@ export function ChatThread({
             conversationId: id,
             message: opts.message,
             truncateFromMessageId: opts.truncateFrom,
+            attachments: opts.attachments?.length ? opts.attachments : undefined,
           }),
           signal: controller.signal,
         });
@@ -174,11 +188,28 @@ export function ChatThread({
 
   function send(text?: string) {
     const content = (text ?? input).trim();
-    if (!content || streaming) return;
+    const files = attachments.payload;
+
+    // An attachment with no words is a valid message; empty-and-attachment-less
+    // is not. Uploads still in flight block send rather than being dropped.
+    if ((!content && files.length === 0) || streaming || attachments.uploading) return;
+
     setInput('');
+    // Cleared before the request, not after: the files are already in R2 and
+    // referenced by key, so leaving the chips up would invite a double-send.
+    attachments.clear();
+
     void run({
-      message: content,
-      optimistic: [...messages, { id: `local-${Date.now()}`, role: 'user', content }],
+      message: content || `Sent ${files.length} file${files.length === 1 ? '' : 's'}`,
+      attachments: files,
+      optimistic: [
+        ...messages,
+        {
+          id: `local-${Date.now()}`,
+          role: 'user',
+          content: content || `📎 ${files.map((f) => f.name).join(', ')}`,
+        },
+      ],
     });
   }
 
@@ -224,7 +255,31 @@ export function ChatThread({
         onSelectModel={setModelId}
       />
 
-      <div className="border-border flex items-center justify-end border-b px-4 py-1.5">
+      <div className="border-border flex items-center justify-end gap-1 border-b px-4 py-1.5">
+        {activeId ? (
+          <>
+            {/* Plain anchors, not fetch + Blob: the browser already knows how
+                to save a response with a content-disposition header, and doing
+                it by hand means holding the whole export in memory first. */}
+            <a
+              href={`/api/conversations/${activeId}/export?format=md`}
+              download
+              className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md px-2 py-1 text-xs transition"
+              title="Download this conversation as Markdown"
+            >
+              .md
+            </a>
+            <a
+              href={`/api/conversations/${activeId}/export?format=json`}
+              download
+              className="text-muted-foreground hover:bg-accent hover:text-foreground mr-1 rounded-md px-2 py-1 text-xs transition"
+              title="Download this conversation as JSON"
+            >
+              .json
+            </a>
+          </>
+        ) : null}
+
         <ModelSelector
           models={models}
           selectedId={modelId}
@@ -282,6 +337,13 @@ export function ChatThread({
         onSubmit={() => send()}
         onStop={stop}
         streaming={streaming}
+        attachments={attachments.items}
+        onAddFiles={attachments.addFiles}
+        onRemoveAttachment={attachments.remove}
+        dragging={attachments.dragging}
+        dropHandlers={attachments.dropHandlers}
+        storageEnabled={storageEnabled}
+        uploading={attachments.uploading}
       />
     </div>
   );

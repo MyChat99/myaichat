@@ -2,6 +2,8 @@ import 'server-only';
 
 import { randomUUID } from 'node:crypto';
 
+import { ALLOWED_MIME, type AttachmentKind } from '@/lib/upload/types';
+
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -26,17 +28,10 @@ const UPLOAD_URL_TTL_SECONDS = 60 * 5; // long enough to upload, short enough to
 const DOWNLOAD_URL_TTL_SECONDS = 60 * 10;
 
 /** Allow-list, not a block-list: anything not named here is refused. */
-export const ALLOWED_MIME: Record<string, { ext: string; kind: 'image' | 'document' | 'text' }> = {
-  'image/png': { ext: 'png', kind: 'image' },
-  'image/jpeg': { ext: 'jpg', kind: 'image' },
-  'image/webp': { ext: 'webp', kind: 'image' },
-  'image/gif': { ext: 'gif', kind: 'image' },
-  'application/pdf': { ext: 'pdf', kind: 'document' },
-  'text/plain': { ext: 'txt', kind: 'text' },
-  'text/markdown': { ext: 'md', kind: 'text' },
-};
-
-export type AttachmentKind = 'image' | 'document' | 'text';
+// The accepted-type table lives in lib/upload/types.ts so the composer can
+// apply the SAME list client-side without pulling this server-only module into
+// a browser bundle. Re-exported here so existing server imports keep working.
+export { ALLOWED_MIME, type AttachmentKind };
 
 export type StoredAttachment = {
   key: string;

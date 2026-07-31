@@ -1,0 +1,657 @@
+<title>Riso — myaichat concept 05</title>
+
+<!--
+  RISO — concept 05 of 06
+  ────────────────────────────────────────────────────────────────────────
+  Every concept so far has been made of light. This one is made of ink.
+
+  The reference is risograph printing: cheap stock, two or three spot
+  colours laid down one plate at a time, halftone dots you can see, and
+  registration that is never quite perfect. The two inks here are real Riso
+  stock colours — Federal Blue and Fluorescent Pink — and where they overlap
+  they multiply into a third colour rather than being told to.
+
+  Why for a chat app: the other five treatments are instruments. This one is
+  a place to think. Low density, wide margins, generous type, nothing
+  blinking. The only animated moment is the plates coming into register on
+  load, the way a print does.
+
+  The display face is a heavy grotesque, NOT a serif — the character comes
+  from the ink and the halftone, and a serif on cream would just be the
+  expected move.
+
+  DELIBERATELY SINGLE-THEME: this is printed matter. Paper does not have a
+  dark mode.
+-->
+
+<style>
+  :root {
+    /* newsprint, with a green undertone so it never reads as cream */
+    --paper: #f1eee2;
+    --paper-2: #e8e4d5;
+    --paper-3: #dedac9;
+
+    /* real Riso stock inks */
+    --blue: #3d5588;       /* Federal Blue */
+    --pink: #ff48b0;       /* Fluorescent Pink */
+    --yellow: #ffe800;     /* Yellow, used once */
+    --overprint: #2b2f6b;  /* what blue + pink actually make */
+
+    --ink: #1d2230;
+    --ink-2: #414a5e;
+    --muted: #7a8094;
+
+    --sans: system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  .riso {
+    height: 100vh;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.55;
+    display: grid;
+    grid-template-columns: 236px 1fr;
+    overflow: hidden;
+    position: relative;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* paper tooth — a fine grain over absolutely everything */
+  .riso::after {
+    content: '';
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 60;
+    opacity: 0.5;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)' opacity='0.42'/%3E%3C/svg%3E");
+  }
+
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--pink); outline-offset: 3px; }
+
+  /* ── halftone: a dot screen, applied to any ink field ── */
+  .screen { position: relative; }
+  .screen::before {
+    content: '';
+    position: absolute; inset: 0;
+    pointer-events: none;
+    background-image: radial-gradient(circle at center, rgb(255 255 255 / 0.5) 0.9px, transparent 1px);
+    background-size: 3.6px 3.6px;
+    mix-blend-mode: screen;
+    opacity: 0.5;
+  }
+
+  .stamp {
+    font-family: var(--mono);
+    font-size: 9.5px; letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  /* ═══════════════════════════════════════ left: the slips */
+  .slips {
+    background: var(--paper-2);
+    border-right: 2px solid var(--ink);
+    display: flex; flex-direction: column;
+    min-height: 0;
+    position: relative; z-index: 2;
+  }
+
+  .masthead { padding: 18px 16px 14px; border-bottom: 2px solid var(--ink); }
+
+  /* the registration moment: a pink plate that slides into alignment */
+  .wordmark {
+    position: relative;
+    display: inline-block;
+    font-size: 27px; font-weight: 800;
+    letter-spacing: -0.045em;
+    line-height: 1;
+    color: var(--blue);
+  }
+  .wordmark span {
+    position: absolute; inset: 0;
+    color: var(--pink);
+    mix-blend-mode: multiply;
+    animation: register 1.5s 0.25s var(--ease) both;
+  }
+  @keyframes register {
+    0%   { transform: translate(7px, -5px) rotate(1.4deg); opacity: 0; }
+    22%  { opacity: 1; }
+    100% { transform: none; }
+  }
+
+  .issue { margin-top: 5px; color: var(--muted); }
+
+  .draft {
+    margin: 14px 14px 12px;
+    padding: 11px 13px;
+    background: var(--pink);
+    color: var(--paper);
+    border: 2px solid var(--ink);
+    display: flex; align-items: center; justify-content: space-between;
+    font-weight: 700; font-size: 13.5px;
+    box-shadow: 4px 4px 0 var(--ink);
+    transition: transform 0.16s var(--ease), box-shadow 0.16s var(--ease);
+  }
+  .draft:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--ink); }
+  .draft:active { transform: translate(4px, 4px); box-shadow: 0 0 0 var(--ink); }
+  .draft small { font-family: var(--mono); font-weight: 400; font-size: 10px; opacity: 0.9; }
+
+  .slip-scroll { flex: 1; overflow-y: auto; padding: 0 14px 20px; }
+  .slip-scroll::-webkit-scrollbar { width: 8px; }
+  .slip-scroll::-webkit-scrollbar-thumb { background: var(--paper-3); border: 2px solid var(--paper-2); }
+
+  .divider {
+    display: flex; align-items: center; gap: 8px;
+    margin: 16px 0 9px;
+    color: var(--muted);
+  }
+  .divider::after { content: ''; flex: 1; height: 2px; background: var(--paper-3); }
+
+  .slip {
+    display: block; width: 100%; text-align: left;
+    padding: 10px 11px;
+    margin-bottom: 7px;
+    background: var(--paper);
+    border: 1.5px solid var(--ink);
+    position: relative;
+    transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease);
+  }
+  .slip:hover { transform: translate(-2px, -2px); box-shadow: 4px 4px 0 var(--blue); }
+
+  /* the chosen slip is overprinted, not merely tinted */
+  .slip.on { background: var(--blue); border-color: var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+  .slip.on .slip-t { color: var(--paper); }
+  .slip.on .slip-m { color: rgb(241 238 226 / 0.72); }
+  .slip.on::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: var(--pink);
+    mix-blend-mode: multiply;
+    opacity: 0.42;
+    pointer-events: none;
+  }
+
+  .slip-t { font-size: 13px; font-weight: 600; line-height: 1.35; position: relative; z-index: 1; }
+  .slip-m {
+    position: relative; z-index: 1;
+    margin-top: 5px; display: flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 9.5px; color: var(--muted);
+  }
+  .sq { width: 7px; height: 7px; flex: none; border: 1px solid currentColor; }
+  .sq.f { background: currentColor; }
+
+  /* ═══════════════════════════════════════ right: the page */
+  .page { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; z-index: 1; }
+
+  .rule {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 13px 26px;
+    border-bottom: 2px solid var(--ink);
+    background: var(--paper);
+  }
+  .rule-l { display: flex; align-items: center; gap: 12px; }
+  .folio { font-weight: 700; font-size: 15px; letter-spacing: -0.02em; }
+
+  .ticket {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 9px;
+    border: 1.5px solid var(--ink);
+    background: var(--yellow);
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    transition: transform 0.16s var(--ease), box-shadow 0.16s;
+  }
+  .ticket:hover { transform: translate(-1.5px, -1.5px); box-shadow: 3px 3px 0 var(--ink); }
+
+  .tabs { display: flex; gap: 16px; }
+  .tab {
+    font-size: 13px; color: var(--muted);
+    padding-bottom: 2px;
+    border-bottom: 2.5px solid transparent;
+    transition: color 0.18s, border-color 0.18s;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.on { color: var(--blue); border-color: var(--pink); }
+
+  .sheet { flex: 1; overflow-y: auto; }
+  .sheet::-webkit-scrollbar { width: 10px; }
+  .sheet::-webkit-scrollbar-thumb { background: var(--paper-3); border: 3px solid var(--paper); }
+
+  .column { max-width: 660px; margin: 0 auto; padding: 44px 26px 20px; }
+
+  /* ── the opening spread ── */
+  .lede-num {
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.2em; color: var(--pink);
+    margin-bottom: 14px;
+  }
+
+  .headline {
+    font-size: clamp(34px, 5.2vw, 54px);
+    font-weight: 800;
+    letter-spacing: -0.045em;
+    line-height: 0.98;
+    margin: 0 0 18px;
+    color: var(--blue);
+    text-wrap: balance;
+    position: relative;
+  }
+  /* one word carries the second ink */
+  .headline mark {
+    background: none;
+    color: var(--pink);
+    mix-blend-mode: multiply;
+  }
+
+  .standfirst {
+    font-size: 16.5px; line-height: 1.55;
+    color: var(--ink-2);
+    max-width: 46ch;
+    margin: 0 0 32px;
+    padding-left: 14px;
+    border-left: 3px solid var(--pink);
+  }
+
+  .picks { display: grid; gap: 9px; margin-bottom: 34px; }
+
+  .pick {
+    display: flex; align-items: flex-start; gap: 14px;
+    text-align: left;
+    padding: 14px 15px;
+    background: var(--paper);
+    border: 1.5px solid var(--ink);
+    transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), background 0.2s;
+  }
+  .pick:hover { transform: translate(-3px, -3px); box-shadow: 6px 6px 0 var(--blue); background: var(--paper-2); }
+  .pick:hover .pick-n { background: var(--pink); color: var(--paper); }
+
+  .pick-n {
+    flex: none;
+    width: 30px; height: 30px;
+    display: grid; place-items: center;
+    border: 1.5px solid var(--ink);
+    font-family: var(--mono); font-size: 12px; font-weight: 700;
+    transition: background 0.2s, color 0.2s;
+  }
+  .pick-t { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .pick-d { font-size: 13px; color: var(--muted); }
+
+  .colophon {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    border: 2px solid var(--ink);
+    background: var(--paper-2);
+  }
+  .col-c { padding: 13px 14px; border-right: 1.5px solid var(--ink); }
+  .col-c:last-child { border-right: 0; }
+  .col-v { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; color: var(--blue); margin-top: 3px; }
+  .col-l { font-family: var(--mono); font-size: 9px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--muted); }
+
+  /* ── correspondence ── */
+  .letters { max-width: 660px; margin: 0 auto; padding: 34px 26px 16px; }
+
+  .letter { margin-bottom: 30px; }
+  .letter-h {
+    display: flex; align-items: center; gap: 9px;
+    margin-bottom: 9px;
+  }
+  .initial {
+    width: 26px; height: 26px; flex: none;
+    display: grid; place-items: center;
+    border: 1.5px solid var(--ink);
+    font-weight: 800; font-size: 12px;
+  }
+  .initial.you { background: var(--yellow); }
+  .initial.ai { background: var(--pink); color: var(--paper); }
+  .letter-n { font-weight: 700; font-size: 13px; }
+  .letter-w { margin-left: auto; font-family: var(--mono); font-size: 9.5px; color: var(--muted); }
+
+  .letter-x { font-size: 15.5px; line-height: 1.72; color: var(--ink-2); }
+  .letter-x p { margin: 0 0 13px; }
+  .letter-x strong { color: var(--ink); font-weight: 700; }
+
+  /* the assistant's words sit on a tinted field, so the two voices differ
+     in material and not only in position */
+  .letter.ai .letter-x {
+    background: var(--paper-2);
+    border-left: 3px solid var(--blue);
+    padding: 14px 16px;
+  }
+
+  .nib {
+    display: inline-block;
+    width: 9px; height: 1.05em;
+    background: var(--pink);
+    vertical-align: text-bottom;
+    animation: nib 0.8s steps(2) infinite;
+  }
+  @keyframes nib { 50% { opacity: 0; } }
+
+  /* ── the coupon ── */
+  .coupon-wrap { padding: 8px 26px 22px; }
+  .coupon {
+    max-width: 660px; margin: 0 auto;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    box-shadow: 5px 5px 0 var(--blue);
+    transition: box-shadow 0.22s var(--ease), transform 0.22s var(--ease);
+  }
+  .coupon:hover, .coupon:focus-within {
+    box-shadow: 5px 5px 0 var(--pink);
+    transform: translate(-1px, -1px);
+  }
+
+  .coupon-l {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 12px;
+    border-bottom: 1.5px dashed var(--paper-3);
+  }
+  .coupon-f { padding: 14px 16px; font-size: 15px; color: var(--muted); min-height: 48px; }
+  .coupon-b {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px 10px 14px;
+    border-top: 1.5px solid var(--ink);
+  }
+  .quill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px;
+    border: 1.5px solid var(--ink);
+    background: var(--blue); color: var(--paper);
+    font-weight: 700; font-size: 12px;
+    letter-spacing: 0.07em; text-transform: uppercase;
+    transition: transform 0.16s var(--ease), box-shadow 0.16s;
+  }
+  .quill:hover { transform: translate(-2px, -2px); box-shadow: 3px 3px 0 var(--ink); }
+  .quill:active { transform: translate(1px, 1px); box-shadow: none; }
+  .quill:disabled { opacity: 0.5; cursor: default; transform: none; box-shadow: none; }
+
+  .setting {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 9px;
+    border: 1.5px solid var(--ink);
+    font-family: var(--mono); font-size: 10px;
+    transition: background 0.16s;
+  }
+  .setting:hover { background: var(--paper-2); }
+
+  /* ═══════════════════════════════════════ entrance */
+  /* everything arrives as if the plates were laid down one after another */
+  @keyframes plate {
+    from { opacity: 0; transform: translate(4px, -3px); }
+    to { opacity: 1; transform: none; }
+  }
+  .lay { opacity: 0; animation: plate 0.65s var(--ease) forwards; }
+  .slips { animation: plate 0.6s var(--ease) both; }
+  .page { animation: plate 0.6s 0.08s var(--ease) both; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    .lay { opacity: 1; }
+  }
+
+  @media (max-width: 880px) {
+    .riso { grid-template-columns: 1fr; }
+    .slips { display: none; }
+    .colophon { grid-template-columns: 1fr; }
+    .col-c { border-right: 0; border-bottom: 1.5px solid var(--ink); }
+  }
+</style>
+
+<div class="riso">
+  <!-- ═══════════════════════════ slips -->
+  <aside class="slips">
+    <div class="masthead">
+      <div class="wordmark">myaichat<span aria-hidden="true">myaichat</span></div>
+      <div class="issue stamp">No. 14 · 31 July</div>
+    </div>
+
+    <button class="draft screen">
+      <span>Start a page</span>
+      <small>⌘K</small>
+    </button>
+
+    <div class="slip-scroll">
+      <div class="divider stamp">Today</div>
+
+      <button class="slip on lay" style="animation-delay: 0.3s">
+        <div class="slip-t">Which model are you?</div>
+        <div class="slip-m"><span class="sq f"></span> Haiku 4.5 · 4 notes</div>
+      </button>
+
+      <button class="slip lay" style="animation-delay: 0.35s">
+        <div class="slip-t">Rate limiting the chat endpoint</div>
+        <div class="slip-m"><span class="sq"></span> GPT-5.4 · 22 notes</div>
+      </button>
+
+      <button class="slip lay" style="animation-delay: 0.4s">
+        <div class="slip-t">Untitled</div>
+        <div class="slip-m"><span class="sq f"></span> Haiku 4.5 · blank</div>
+      </button>
+
+      <div class="divider stamp">Yesterday</div>
+
+      <button class="slip lay" style="animation-delay: 0.45s">
+        <div class="slip-t">Closures, with a worked example</div>
+        <div class="slip-m"><span class="sq f"></span> Haiku 4.5 · 8 notes</div>
+      </button>
+
+      <button class="slip lay" style="animation-delay: 0.5s">
+        <div class="slip-t">Duplicate rows in the usage table</div>
+        <div class="slip-m"><span class="sq"></span> GPT-5.4 · 15 notes</div>
+      </button>
+
+      <div class="divider stamp">Back issues</div>
+
+      <button class="slip lay" style="animation-delay: 0.55s">
+        <div class="slip-t">Row-level security review</div>
+        <div class="slip-m"><span class="sq"></span> GPT-5.4 · 31 notes</div>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════ page -->
+  <main class="page">
+    <div class="rule">
+      <div class="rule-l">
+        <span class="folio">Which model are you?</span>
+        <button class="ticket">Haiku 4.5 ▾</button>
+      </div>
+      <nav class="tabs">
+        <button class="tab on">Page</button>
+        <button class="tab">Profile</button>
+        <button class="tab">Appearance</button>
+        <button class="tab">Admin</button>
+      </nav>
+    </div>
+
+    <div class="sheet" id="sheet">
+      <!-- opening spread -->
+      <section class="column" id="spread">
+        <div class="lede-num lay" style="animation-delay: 0.25s">THURSDAY · 31 JULY · TWO PRESSES RUNNING</div>
+
+        <h1 class="headline lay" style="animation-delay: 0.32s">
+          A quiet place<br />to <mark>think out loud</mark>.
+        </h1>
+
+        <p class="standfirst lay" style="animation-delay: 0.4s">
+          Two models are inked and ready. Ask something badly, change your mind
+          halfway through, and start again — nothing here is precious.
+        </p>
+
+        <div class="picks">
+          <button class="pick lay" style="animation-delay: 0.46s">
+            <span class="pick-n">01</span>
+            <span>
+              <span class="pick-t">Pick up the rate limiting thread</span>
+              <span class="pick-d">Twenty-two notes deep, last touched this morning</span>
+            </span>
+          </button>
+          <button class="pick lay" style="animation-delay: 0.52s">
+            <span class="pick-n">02</span>
+            <span>
+              <span class="pick-t">Set the same question to both presses</span>
+              <span class="pick-d">Anthropic and OpenAI, answers side by side</span>
+            </span>
+          </button>
+          <button class="pick lay" style="animation-delay: 0.58s">
+            <span class="pick-n">03</span>
+            <span>
+              <span class="pick-t">Account for the month</span>
+              <span class="pick-d">Where 1.2 million tokens actually went</span>
+            </span>
+          </button>
+        </div>
+
+        <div class="colophon lay" style="animation-delay: 0.64s">
+          <div class="col-c">
+            <div class="col-l">Notes set</div>
+            <div class="col-v" data-count="1247">0</div>
+          </div>
+          <div class="col-c">
+            <div class="col-l">Ink used</div>
+            <div class="col-v" data-count="18" data-prefix="$" data-suffix=".40">0</div>
+          </div>
+          <div class="col-c">
+            <div class="col-l">Presses</div>
+            <div class="col-v">2 / 2</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- correspondence -->
+      <section class="letters" id="letters" hidden>
+        <div class="letter">
+          <div class="letter-h">
+            <span class="initial you">M</span>
+            <span class="letter-n">Muhammad</span>
+            <span class="letter-w">09:14 · 9 words</span>
+          </div>
+          <div class="letter-x"><p>Which model are you, and how do you know?</p></div>
+        </div>
+
+        <div class="letter ai">
+          <div class="letter-h">
+            <span class="initial ai">C</span>
+            <span class="letter-n">Claude Haiku 4.5</span>
+            <span class="letter-w" id="wc">setting…</span>
+          </div>
+          <div class="letter-x" id="out"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="coupon-wrap">
+      <div class="coupon">
+        <div class="coupon-l stamp">
+          <span>Compose</span>
+          <span>Enter to set · Shift+Enter for a new line</span>
+        </div>
+        <div class="coupon-f">Write here…</div>
+        <div class="coupon-b">
+          <button class="setting">
+            <span class="sq f"></span> HAIKU 4.5
+          </button>
+          <button class="quill" id="press">Set it ⏎</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  (function () {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const $ = (id) => document.getElementById(id);
+
+    /* ══ slips ══ */
+    document.querySelectorAll('.slip').forEach((s) => {
+      s.addEventListener('click', () => {
+        document.querySelectorAll('.slip').forEach((x) => x.classList.remove('on'));
+        s.classList.add('on');
+      });
+    });
+    document.querySelectorAll('.tab').forEach((t) => {
+      t.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach((x) => x.classList.remove('on'));
+        t.classList.add('on');
+      });
+    });
+
+    /* ══ colophon figures ══ */
+    document.querySelectorAll('[data-count]').forEach((el) => {
+      const target = Number(el.dataset.count);
+      const pre = el.dataset.prefix || '', suf = el.dataset.suffix || '';
+      if (reduced) { el.textContent = pre + target.toLocaleString() + suf; return; }
+      const t0 = performance.now();
+      function tick(now) {
+        const p = Math.min(1, (now - t0) / 1150);
+        el.textContent = pre + Math.round(target * (1 - Math.pow(1 - p, 3))).toLocaleString() + suf;
+        if (p < 1) requestAnimationFrame(tick);
+      }
+      setTimeout(() => requestAnimationFrame(tick), 750);
+    });
+
+    /* ══ setting the type ══
+       Word by word rather than character by character. Characters read as a
+       machine; words read as someone composing a sentence, which is the whole
+       register this concept is written in. */
+    const REPLY = [
+      "I'm Claude Haiku 4.5, set through this app's Anthropic press.",
+      "Though the honest answer is that I couldn't tell you unaided. A model is finished after its training material is gathered, so asking one to name its own edition is asking it to remember something it was never shown. It is why models elsewhere answer this confidently and wrongly.",
+      "What makes it reliable here is plain: the app prints the chosen model's name into the system prompt on every request. Change the press above and ask again — the answer changes, because the setting does.",
+    ];
+
+    $('press').addEventListener('click', function () {
+      this.disabled = true;
+      $('spread').hidden = true;
+      $('letters').hidden = false;
+      const out = $('out');
+      out.innerHTML = '';
+
+      if (reduced) {
+        out.innerHTML = REPLY.map((p) => '<p>' + p + '</p>').join('');
+        $('wc').textContent = '09:14 · 121 words';
+        this.disabled = false;
+        return;
+      }
+
+      const words = REPLY.join(' ¶ ').split(' ');
+      const nib = document.createElement('span');
+      nib.className = 'nib';
+      const body = document.createElement('div');
+      out.appendChild(body);
+      out.appendChild(nib);
+
+      let i = 0;
+      (function set() {
+        if (i >= words.length) {
+          nib.remove();
+          $('wc').textContent = '09:14 · ' + words.filter((w) => w !== '¶').length + ' words';
+          $('press').disabled = false;
+          return;
+        }
+        i++;
+        body.innerHTML = words
+          .slice(0, i)
+          .join(' ')
+          .split(' ¶ ')
+          .map((p) => '<p>' + p + '</p>')
+          .join('');
+        $('sheet').scrollTop = $('sheet').scrollHeight;
+        // a comma or full stop earns a longer beat, the way reading aloud does
+        const last = words[i - 1] || '';
+        const pause = /[.!?]$/.test(last) ? 190 : /,$/.test(last) ? 110 : 34 + Math.random() * 46;
+        setTimeout(set, pause);
+      })();
+    });
+  })();
+</script>
