@@ -4,6 +4,7 @@ import { Check, Copy, Pencil, RefreshCw, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { Markdown } from '@/components/chat/markdown';
+import { MessageEntrance } from '@/components/motion/motion';
 import { Button } from '@/components/ui/button';
 
 export type UiMessage = {
@@ -131,7 +132,9 @@ export function MessageList({ messages, streaming, onRegenerate, onEdit }: Props
       {messages.map((message) => {
         if (message.role === 'user') {
           return (
-            <UserMessage key={message.id} message={message} disabled={streaming} onEdit={onEdit} />
+            <MessageEntrance key={message.id}>
+              <UserMessage message={message} disabled={streaming} onEdit={onEdit} />
+            </MessageEntrance>
           );
         }
 

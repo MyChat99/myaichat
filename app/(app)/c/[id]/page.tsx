@@ -6,6 +6,7 @@ import type { UiMessage } from '@/components/chat/message-list';
 import { createClient } from '@/lib/db/server';
 import { listAvailableModels } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
+import { listConversationTitles } from '@/lib/db/conversations';
 
 export const metadata: Metadata = { title: 'Chat · myaichat' };
 
@@ -56,6 +57,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         providerName: m.providerName,
       }))}
       selectedModelId={conversation.model_id}
+      conversations={await listConversationTitles()}
     />
   );
 }

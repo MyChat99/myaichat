@@ -16,7 +16,7 @@ Single source of truth for build status. Update immediately after any phase work
 | 5   | [Theming & appearance](../phases/PHASE-5-theming.md)                               | Done        | 2026-07-31 | —          |
 | 6   | [R2 uploads + Resend emails](../phases/PHASE-6-storage-email.md)                   | Partial     | 2026-07-31 | —          |
 | 7   | [Analytics, audit UI, polish](../phases/PHASE-7-analytics-polish.md)               | Partial     | 2026-07-31 | —          |
-| 8   | [CI/CD + Railway deployment](../phases/PHASE-8-cicd-deploy.md)                     | Not Started | —          | —          |
+| 8   | [CI/CD + Railway deployment](../phases/PHASE-8-cicd-deploy.md)                     | Partial     | 2026-07-31 | —          |
 
 ## Deployed
 
@@ -24,9 +24,11 @@ Live at **https://myaichat-production.up.railway.app** (Railway, US West), auto-
 Verified in production 2026-07-30: health endpoint green, and the gates, chat, providers and admin
 suites all pass against the live URL — not just localhost.
 
-Deployment was pulled forward from Phase 8 at the user's request. Phase 8 still owns CI/CD:
-**pushes to `main` currently deploy with nothing gating them**, so a broken commit reaches
-production unchallenged.
+Deployment was pulled forward from Phase 8 at the user's request. Since 2026-07-31 a GitHub
+Actions pipeline runs lint, type-check, format, build and the credential-free verification
+suites on every push and pull request. Railway still deploys from `main` on its own — CI and
+the deploy are not yet chained, so a red build does not *block* a deploy, it only reports one.
+Closing that gap needs branch protection, which needs a paid plan on a private repo (ISSUE-018).
 
 ## Verification checklist (per phase)
 
@@ -322,3 +324,80 @@ it without reintroducing the flash Phase 5 exists to eliminate. The trade is
 documented at the top of `next.config.ts`. Removing it would require moving theme
 resolution to a cookie read in `proxy.ts` — possible, and worth doing if CSP
 strictness ever matters more than the flash.
+
+---
+
+## Session 2 — Priority 1 & 2 · 2026-07-31
+
+Overnight work, additive only. Nothing in Phases 1–4 was modified.
+
+### Priority 1 — Phase 8 groundwork · Done
+
+- **CI pipeline** (`.github/workflows/ci.yml`): three jobs. `quality` runs lint,
+  type-check, format:check and build **with no secrets present** — which also
+  proves the lazy-env fix from ISSUE-014 holds, since a build that needed runtime
+  credentials would fail here. `tests` runs only the credential-free suites.
+  `security` runs the audit non-blocking.
+- **Railway deploy job is present but DISABLED** (`if: false`), by instruction and
+  because Railway already auto-deploys from GitHub — enabling both would race two
+  deploys against one another. The comment in the file lists the exact three steps
+  to switch over.
+- **`/api/health`**: already existed from the deployment work; now exercised by CI.
+- **`SECURITY.md`**: security model, the four authorisation layers, and incident
+  checklists for a leaked provider key, a leaked master key, a compromised account
+  and an exposed database.
+- **`README.md`**: setup, scripts, architecture summary.
+- **`.github/dependabot.yml`**: weekly npm updates grouped production/development,
+  monthly Actions. Majors for `next`/`react`/`react-dom` arrive individually rather
+  than inside a group, so a framework major is never buried in a batch.
+- **`scripts/security-audit.ts`** (`npm run security:audit`): secret-shape grep over
+  tracked files, `npm audit` parsing, and an RLS check that reads the **pg catalog**
+  through a new `rls_status()` function rather than trusting that migrations ran.
+
+**NEEDS HUMAN VERIFICATION**
+
+- Branch protection could not be enabled — GitHub returns 403 for rulesets on a
+  private repo without a paid plan (ISSUE-018). Three options are written up there;
+  the decision is yours.
+- Two Dependabot PRs (#5 typescript 7, #6 eslint 10) fail CI for a real upstream
+  reason, not a flake — `eslint-config-next` bundles a react plugin incompatible
+  with ESLint 10. Recommendation: close both (ISSUE-019).
+
+### Priority 2 — Interface polish · Done, visually unverified
+
+- **Motion primitives** (`components/motion/motion.tsx`): message entrance, overlay
+  and panel variants, press feedback. Every one consults `useReducedMotion()`, and
+  when it is on the duration collapses to **zero**, not merely shorter — a fast
+  animation is still animation, and that setting exists for people for whom that is
+  the problem.
+- **Command palette** (`Cmd/Ctrl+K`) with new chat, appearance, profile, model
+  switching and conversation search; `?` opens a shortcuts modal. Written without
+  `cmdk` on purpose: the surface is one filtered list, and the focus-trap and
+  focus-restore behaviour is the actual work — worth owning rather than inheriting.
+  `?` is ignored while typing, or a question mark could never be typed anywhere.
+- **Error boundaries**: `app/error.tsx`, `app/global-error.tsx`, `app/not-found.tsx`
+  and a shared `ErrorState`. The boundary never renders `error.message` — in
+  production Next replaces it with a digest anyway, and in development it carries
+  internals no user should read — but it *does* show the digest, which is the string
+  that makes a support report traceable to a server log. `global-error.tsx` uses
+  inline styles and a neutral palette because the layout that defines the theme
+  tokens is precisely what has failed by the time it renders.
+- **Security headers hardened** (`next.config.ts`), **CSP deliberately untouched** —
+  that decision is the owner's. Added: `Cross-Origin-Opener-Policy: same-origin`,
+  `Cross-Origin-Resource-Policy: same-origin`, `X-DNS-Prefetch-Control: off`, a
+  twelve-feature `Permissions-Policy` deny list, and `Cache-Control: no-store` on
+  `/api/*`. `Cross-Origin-Embedder-Policy` was **not** added: `require-corp` would
+  demand CORP headers from every third-party resource, which Supabase-hosted avatars
+  do not send, so it would break images to buy isolation this app does not need.
+- **`npm run verify:headers`** (24 checks) asserts all of the above against
+  `next.config.ts` and runs in CI. It reports the `unsafe-inline` exception as a note
+  rather than a failure, so the known trade stays visible without going red.
+
+| Criterion | Result |
+| --- | --- |
+| `lint` / `type-check` / `build` | pass |
+| `verify:headers` | pass — 24/24 |
+| `verify:theme` / `appearance` / `gates` / `rls` / `providers` / `admin` | pass |
+| Palette opens on ⌘K, arrows and Enter work | **NEEDS HUMAN VERIFICATION** — needs a keyboard |
+| Animations feel right, and stop under reduced motion | **NEEDS HUMAN VERIFICATION** — needs eyes and an OS setting |
+| Error and 404 pages look correct | **NEEDS HUMAN VERIFICATION** — code paths exist, appearance unchecked |

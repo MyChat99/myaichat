@@ -80,6 +80,9 @@ jobs:
       - name: Email templates
         run: npm run verify:email
 
+      - name: Security headers
+        run: npm run verify:headers
+
   security:
     name: Security audit (non-blocking)
     runs-on: ubuntu-latest

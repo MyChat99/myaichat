@@ -1,6 +1,7 @@
 import { ChatThread } from '@/components/chat/chat-thread';
 import { listAvailableModels } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
+import { listConversationTitles } from '@/lib/db/conversations';
 
 /**
  * New-chat surface. Starts without a conversation id — one is created on the
@@ -21,6 +22,7 @@ export default async function NewChatPage() {
         providerName: m.providerName,
       }))}
       selectedModelId={models[0]?.id ?? null}
+      conversations={await listConversationTitles()}
     />
   );
 }

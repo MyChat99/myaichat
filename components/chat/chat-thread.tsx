@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { createConversationForMessage } from '@/app/(app)/conversations/actions';
+import { CommandPalette } from '@/components/command/command-palette';
 import { Composer } from '@/components/chat/composer';
 import { MessageList, type UiMessage } from '@/components/chat/message-list';
 import { ModelSelector, type SelectableModel } from '@/components/chat/model-selector';
@@ -17,6 +18,8 @@ type Props = {
   initialMessages: UiMessage[];
   models: SelectableModel[];
   selectedModelId: string | null;
+  /** For the command palette's conversation search. */
+  conversations?: { id: string; title: string }[];
 };
 
 const STARTERS = [
@@ -29,7 +32,13 @@ const STARTERS = [
 /** Distance from the bottom, in px, still treated as "pinned to bottom". */
 const STICK_THRESHOLD_PX = 120;
 
-export function ChatThread({ conversationId, initialMessages, models, selectedModelId }: Props) {
+export function ChatThread({
+  conversationId,
+  initialMessages,
+  models,
+  selectedModelId,
+  conversations = [],
+}: Props) {
   const router = useRouter();
 
   const [messages, setMessages] = useState<UiMessage[]>(initialMessages);
@@ -205,6 +214,16 @@ export function ChatThread({ conversationId, initialMessages, models, selectedMo
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
+      <CommandPalette
+        conversations={conversations}
+        models={models.map((m) => ({
+          id: m.id,
+          displayName: m.displayName,
+          providerName: m.providerName,
+        }))}
+        onSelectModel={setModelId}
+      />
+
       <div className="border-border flex items-center justify-end border-b px-4 py-1.5">
         <ModelSelector
           models={models}

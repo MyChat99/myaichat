@@ -36,6 +36,51 @@ function contentSecurityPolicy(): string {
   ].join('; ');
 }
 
+/**
+ * Everything below the CSP, kept separate so the CSP decision can be revisited
+ * on its own.
+ *
+ *  - COOP severs the `window.opener` relationship, which is what makes
+ *    cross-origin tabs able to probe this one (XS-Leaks) or navigate it away
+ *    (tabnabbing). COEP is deliberately NOT set: `require-corp` would demand
+ *    CORP headers on every third-party resource, and avatars served from
+ *    Supabase storage do not send them.
+ *  - CORP stops other origins embedding our responses as subresources.
+ *  - Permissions-Policy denies the full sensor/payment surface rather than the
+ *    three most-cited features; this app needs none of them, so the safe list
+ *    is the empty one.
+ */
+const HARDENING_HEADERS = [
+  // Only meaningful over HTTPS; inert on localhost.
+  {
+    key: 'Strict-Transport-Security',
+    value: 'max-age=63072000; includeSubDomains; preload',
+  },
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+  { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
+  { key: 'X-DNS-Prefetch-Control', value: 'off' },
+  {
+    key: 'Permissions-Policy',
+    value: [
+      'accelerometer=()',
+      'autoplay=()',
+      'browsing-topics=()',
+      'camera=()',
+      'display-capture=()',
+      'geolocation=()',
+      'gyroscope=()',
+      'interest-cohort=()',
+      'magnetometer=()',
+      'microphone=()',
+      'payment=()',
+      'usb=()',
+    ].join(', '),
+  },
+];
+
 const nextConfig: NextConfig = {
   async headers() {
     return [
@@ -43,19 +88,15 @@ const nextConfig: NextConfig = {
         source: '/:path*',
         headers: [
           { key: 'Content-Security-Policy', value: contentSecurityPolicy() },
-          // Only meaningful over HTTPS; inert on localhost.
-          {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=63072000; includeSubDomains; preload',
-          },
-          { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          {
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
-          },
+          ...HARDENING_HEADERS,
         ],
+      },
+      {
+        // Authenticated JSON must never be held by a shared cache. Next marks
+        // dynamic routes private already; this is the belt-and-braces version
+        // for proxies that read only the header.
+        source: '/api/:path*',
+        headers: [{ key: 'Cache-Control', value: 'no-store, max-age=0' }],
       },
     ];
   },
