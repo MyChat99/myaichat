@@ -1290,3 +1290,37 @@ every figure on this deployment as `$0.00`.
 | `lint` / `type-check` / `build` | pass |
 | `verify:authz` / `gates` / `api` | pass — the new page is gated like the rest |
 | The cards render correctly with real data | **NEEDS HUMAN VERIFICATION** |
+
+## Away session 4A — Priority 3b · Per-user usage drill-in · 2026-07-31
+
+`/admin/users/[id]` — spend, tokens, conversations, last active, and a per-model
+breakdown over 30 days. Reached from a **Usage** link on each row of the users
+list.
+
+Kept as a separate query module rather than extra columns on the list, because
+it is a different shape: the list is one row per user with no joins, this is an
+aggregation over `usage_logs` for a single id. The "just add a column" instinct
+turns one query into N.
+
+Three details:
+
+- **A deleted model still shows its spend**, labelled "Deleted model". Usage rows
+  outlive the model row, and dropping them would make the totals disagree with
+  the account's actual bill.
+- **The row cap is named in the UI when it bites.** Above 50,000 usage rows the
+  page says so rather than silently showing a subset — a truncated total that
+  looks complete is worse than one that admits it.
+- **A non-UUID id 404s before it reaches Postgres**, rather than surfacing a
+  driver error.
+
+`verify:authz` picked the new route up on its own (37 → 38 checks) — that is the
+suite working as intended, since a route added under an already-gated subtree is
+exactly where a missing gate goes unnoticed. It is also now in `verify:api`'s
+non-admin refusal list.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:authz` | pass — 38, the new route detected automatically |
+| `verify:api` | pass — the drill-in refuses a non-admin |
+| `lint` / `type-check` / `build` | pass |
+| The page renders correctly with real usage | **NEEDS HUMAN VERIFICATION** |
