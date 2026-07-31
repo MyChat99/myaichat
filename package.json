@@ -21,7 +21,7 @@
     "verify:authz": "tsx scripts/verify-authz.ts",
     "verify:attachments": "tsx scripts/verify-attachments.ts",
     "verify:security": "tsx --conditions=react-server scripts/verify-security.ts",
-    "verify:session": "tsx scripts/verify-session.ts",
+    "verify:session": "tsx --conditions=react-server scripts/verify-session.ts",
     "verify:seed": "tsx scripts/verify-seed.ts",
     "verify:chat": "tsx scripts/verify-chat.ts",
     "verify:providers": "tsx --conditions=react-server scripts/verify-providers.ts",

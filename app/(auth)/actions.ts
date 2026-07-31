@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/db/server';
 import { isDisposableEmail } from '@/lib/security/disposable-domains';
 import { signUpPasswordSchema } from '@/lib/security/password';
+import { noteSignIn } from '@/lib/security/login-alert';
 import { checkThrottle, clientIp, recordAttempt } from '@/lib/security/throttle';
 import { redirectPathSchema, signUpSchema } from '@/lib/security/validation';
 
@@ -35,7 +36,8 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
 
   if (!parsed.success) return { error: firstIssue(parsed.error) };
 
-  const ip = clientIp(await headers());
+  const requestHeaders = await headers();
+  const ip = clientIp(requestHeaders);
 
   const throttle = await checkThrottle(parsed.data.email, ip, 'login');
   if (!throttle.allowed) {
@@ -44,11 +46,50 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  const { data: signedIn, error } = await supabase.auth.signInWithPassword(parsed.data);
 
   await recordAttempt(parsed.data.email, ip, 'login', !error);
 
   if (error) return { error: GENERIC_CREDENTIALS_ERROR };
+
+  /**
+   * Alert an administrator signing in from an unrecognised device.
+   *
+   * Awaited rather than fire-and-forget: a Server Action's process can be torn
+   * down the moment it returns, so a floating promise here would be dropped
+   * often enough to make the alert unreliable — and an unreliable security
+   * alert is worse than none, because it is trusted. `noteSignIn` never throws
+   * and swallows its own failures, so this cannot break a login.
+   */
+  if (signedIn.user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', signedIn.user.id)
+      .maybeSingle();
+
+    const userAgent = requestHeaders.get('user-agent') ?? 'unknown';
+
+    const verdict = await noteSignIn({
+      userId: signedIn.user.id,
+      email: parsed.data.email,
+      isAdmin: profile?.role === 'admin',
+      ip,
+      userAgent,
+    });
+
+    if (verdict.shouldAlert) {
+      // Sent here rather than inside noteSignIn so the policy stays testable
+      // without a mail transport. Failure is swallowed: an admin must not be
+      // unable to sign in because Resend was briefly unreachable.
+      const { sendNewLoginEmail } = await import('@/lib/email/send');
+      await sendNewLoginEmail(parsed.data.email, {
+        when: new Date().toISOString(),
+        ip,
+        userAgent,
+      }).catch((err) => console.error('[login-alert] send failed:', err));
+    }
+  }
 
   const next = redirectPathSchema.parse(formData.get('next') ?? '/');
   revalidatePath('/', 'layout');

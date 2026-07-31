@@ -282,7 +282,7 @@ async function auditRls() {
   // Tables that are meant to have zero policies: RLS on with nothing granted is
   // deny-all, which is exactly right for state only the service role may touch.
   // Anything NOT on this list with no policies is almost certainly an oversight.
-  const INTENTIONALLY_DENY_ALL = new Set(['auth_attempts', 'api_usage']);
+  const INTENTIONALLY_DENY_ALL = new Set(['auth_attempts', 'api_usage', 'known_logins']);
 
   for (const row of rows) {
     if (!row.rls_enabled) {

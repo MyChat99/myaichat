@@ -238,12 +238,118 @@ async function verifyRefreshTokens() {
   }
 }
 
+// ────────────────────────────────────────────── new-login alerting
+
+async function verifyLoginAlerts() {
+  section('New-login alerts (admin accounts)');
+
+  const { fingerprint, noteSignIn } = await import('../lib/security/login-alert');
+
+  if (!process.env.ENCRYPTION_MASTER_KEY) {
+    console.log('  skip  ENCRYPTION_MASTER_KEY not set');
+    return;
+  }
+
+  const CHROME_141 =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/141.0.0.0 Safari/537.36';
+  const CHROME_142 = CHROME_141.replace('141.0.0.0', '142.0.0.0');
+  const FIREFOX =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:131.0) Gecko/20100101 Firefox/131.0';
+
+  const a = fingerprint('203.0.113.5', CHROME_141);
+  check('a fingerprint is produced', typeof a === 'string' && a.length > 20);
+
+  // A browser auto-update must not read as a new device. Chrome ships a new
+  // MAJOR every four weeks, so keeping the major version — the obvious
+  // implementation — alerts every admin monthly about their own laptop.
+  check('a browser version bump is the SAME device', fingerprint('203.0.113.5', CHROME_142) === a);
+
+  // The OS patch level moves too, and for the same reason must not count.
+  check(
+    'an OS point release is the SAME device',
+    fingerprint('203.0.113.5', CHROME_141.replace('10_15_7', '10_15_8')) === a,
+  );
+
+  check('a different browser is a different device', fingerprint('203.0.113.5', FIREFOX) !== a);
+  check('a different address is a different device', fingerprint('198.51.100.9', CHROME_141) !== a);
+
+  // The raw values must not be recoverable from what is stored.
+  check('the fingerprint does not contain the address', !a!.includes('203.0.113'));
+  check('the fingerprint does not contain the agent', !a!.toLowerCase().includes('chrome'));
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.log('  skip  no database credentials for the policy checks');
+    return;
+  }
+
+  const admin = createClient(SUPABASE_URL(), SECRET_KEY(), { auth: { persistSession: false } });
+  const email = `alert-probe-${Date.now()}@example.invalid`;
+  const { data: made } = await admin.auth.admin.createUser({
+    email,
+    password: PASSWORD,
+    email_confirm: true,
+  });
+
+  if (!made?.user) {
+    check('could create a probe user', false);
+    return;
+  }
+
+  try {
+    const base = { userId: made.user.id, email, ip: '203.0.113.5', userAgent: CHROME_141 };
+
+    // A non-admin must produce no record at all — this is admin-only by design.
+    await noteSignIn({ ...base, isAdmin: false });
+    const { count: afterNonAdmin } = await admin
+      .from('known_logins')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', made.user.id);
+    check('a non-admin sign-in is not recorded', (afterNonAdmin ?? 0) === 0);
+
+    // First admin login: recorded, but NOT alerted — there is nothing to
+    // compare against, so the mail would only say "you signed up".
+    const first = await noteSignIn({ ...base, isAdmin: true });
+    check('the first admin device is recorded', !first.known);
+    check('  but does not alert', !first.shouldAlert);
+
+    // Same device again: known, silent.
+    const repeat = await noteSignIn({ ...base, isAdmin: true });
+    check('a returning device is recognised', repeat.known);
+    check('  and stays silent', !repeat.shouldAlert);
+
+    // New device: this is the one that must alert.
+    const moved = await noteSignIn({ ...base, isAdmin: true, ip: '198.51.100.9' });
+    check('a NEW device is not recognised', !moved.known);
+    check('  and alerts', moved.shouldAlert);
+
+    // And is then remembered, so it alerts once rather than every time.
+    const movedAgain = await noteSignIn({ ...base, isAdmin: true, ip: '198.51.100.9' });
+    check(
+      'the new device alerts once, not repeatedly',
+      movedAgain.known && !movedAgain.shouldAlert,
+    );
+
+    // Stored values must be hashes.
+    const { data: stored } = await admin
+      .from('known_logins')
+      .select('fingerprint')
+      .eq('user_id', made.user.id);
+    check(
+      'no raw address is stored',
+      (stored ?? []).every((r) => !r.fingerprint.includes('.')),
+    );
+  } finally {
+    await admin.auth.admin.deleteUser(made.user.id).catch(() => {});
+  }
+}
+
 async function main() {
   console.log(`Session security${STRICT ? ' (strict)' : ''}`);
 
   verifyIdlePolicy();
   verifyMarker();
   await verifyRefreshTokens();
+  await verifyLoginAlerts();
 
   console.log(
     failures === 0

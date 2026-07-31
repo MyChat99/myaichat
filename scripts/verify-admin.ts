@@ -10,7 +10,6 @@
  *   npm run dev           # in another terminal
  *   npm run verify:admin  # BASE_URL=http://localhost:3001 to override the port
  */
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createClient, type Session } from '@supabase/supabase-js';
 

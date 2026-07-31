@@ -203,3 +203,61 @@ export function AdminAlertEmail({
     </Shell>
   );
 }
+
+/**
+ * Sent to an administrator when their account signs in from a device that has
+ * not been seen before.
+ *
+ * Written so the recipient can decide in one glance. The recognisable case —
+ * "that was me" — needs no action and the mail says so; the alarming case gets
+ * a specific instruction rather than "contact support". A security email that
+ * ends without telling you what to do is one you archive and forget.
+ */
+export function NewLoginEmail({
+  when,
+  ip,
+  userAgent,
+}: {
+  when: string;
+  ip: string;
+  userAgent: string;
+}) {
+  return (
+    <Shell preview="New sign-in to your myaichat admin account" heading="New sign-in">
+      <Text className="email-text" style={{ color: TEXT, fontSize: '14px', margin: '0 0 12px' }}>
+        Your <strong>administrator</strong> account was used to sign in from a device we have not
+        seen before.
+      </Text>
+
+      <Text
+        className="email-code"
+        style={{
+          backgroundColor: SURFACE,
+          borderRadius: '6px',
+          color: MUTED,
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+          fontSize: '12px',
+          lineHeight: '1.7',
+          margin: '0 0 16px',
+          padding: '12px 14px',
+        }}
+      >
+        When: {when}
+        <br />
+        Address: {ip}
+        <br />
+        Browser: {userAgent.slice(0, 120)}
+      </Text>
+
+      <Text className="email-text" style={{ color: TEXT, fontSize: '14px', margin: '0 0 8px' }}>
+        <strong>If this was you</strong>, nothing to do — this address will not be flagged again.
+      </Text>
+
+      <Text className="email-text" style={{ color: TEXT, fontSize: '14px', margin: 0 }}>
+        <strong>If it was not</strong>, change your password now. That signs out every session and
+        invalidates the tokens behind them. Then check the audit log in the admin panel for anything
+        you did not do, and rotate any provider key that may have been read.
+      </Text>
+    </Shell>
+  );
+}

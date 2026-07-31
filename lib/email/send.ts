@@ -6,6 +6,7 @@ import { Resend } from 'resend';
 import {
   AdminAlertEmail,
   MagicLinkEmail,
+  NewLoginEmail,
   PasswordResetEmail,
   WelcomeEmail,
 } from '@/emails/templates';
@@ -77,6 +78,14 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
 export async function sendMagicLinkEmail(to: string, magicUrl: string): Promise<EmailResult> {
   const html = await render(MagicLinkEmail({ magicUrl }));
   return deliver(to, 'Your myaichat sign-in link', html);
+}
+
+export async function sendNewLoginEmail(
+  to: string,
+  context: { when: string; ip: string; userAgent: string },
+): Promise<EmailResult> {
+  const html = await render(NewLoginEmail(context));
+  return deliver(to, 'New sign-in to your myaichat admin account', html);
 }
 
 export async function sendAdminAlertEmail(
