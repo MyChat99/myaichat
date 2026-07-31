@@ -411,7 +411,36 @@ CORS on the bucket must allow `PUT` from your app origin, or browser uploads fai
 
 ### ISSUE-015 — Verification suites share database state and interfere when chained
 
-**Status:** Open | **Severity:** Medium | **Phase:** 8 | **Opened:** 2026-07-30 | **Resolved:** —
+**Status:** Resolved | **Severity:** Medium | **Phase:** 8 | **Opened:** 2026-07-30 | **Resolved:** 2026-07-31
+
+**Resolution:** `npm run verify:all` — the runner this issue asked for. It does
+four things a shell loop does not:
+
+1. **Refuses to start on dirty state.** If a previous run died before its
+   `finally`, a provider is disabled *right now*, and every later run builds on
+   that. It is caught before anything executes, and the message names the fix.
+2. **Orders the suites.** Credential-free first (a typo fails in two seconds,
+   not after four minutes of database work), mutating suites last, never
+   adjacent to a suite that reads what they break.
+3. **Checks after each mutating suite**, so the blame lands on the suite that
+   leaked rather than the next one to trip over it.
+4. **Reports timings**, which is how the 22-second `verify:session` became
+   visible as the slow one.
+
+The dirt detector was **proved to fail** rather than assumed: setting
+`rate_limit_messages_per_hour` to 1 makes the runner refuse to start and print
+the remedy. A clean-state check that has never fired is a clean-state check you
+are trusting on faith.
+
+⚠️ **Still not safe to run against production while people are using it.**
+Serialising removes the interference between suites; it does not remove the
+seconds during which a provider genuinely is disabled. That remaining fix is a
+separate Supabase project for tests — infrastructure, not code — and is tracked
+in ROADMAP rather than here.
+
+**Original report below.**
+
+**Status (original):** Open | **Severity:** Medium | **Phase:** 8 | **Opened:** 2026-07-30
 **Problem:** `verify:admin` mutates rows every other suite reads — it disables a provider and breaks a stored key, restoring both in `finally`. Run back-to-back with `verify:providers`, assertions in one can observe the other's mid-flight state. Chaining them against production produced four failures that all passed when each suite ran alone.
 **Partly fixed:** the target provider is now chosen from an **ordered** query. It was unordered, so each run disabled a different provider and the same bug looked like a different one each time.
 **Still open:** there is one Supabase project for local and production, so a suite that dies before its `finally` can leave a provider disabled for real users. Two fixes, either sufficient: a separate Supabase project for tests, or a `verify:all` runner that serialises the suites and asserts clean state between them. Phase 8's CI work is the natural place — CI must not be able to disable a provider in production.

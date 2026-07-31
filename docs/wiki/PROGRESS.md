@@ -1076,3 +1076,36 @@ npm script it names was checked to exist.
 | Every route has a rejection test | pass — `/auth/confirm` was the last gap |
 | `verify:api` | pass — 80/80 |
 | Scripts named in CONTRIBUTING exist | pass — checked programmatically |
+
+## Away session 4A — Priority 1 · ISSUE-015 resolved · 2026-07-31
+
+Session 3 left no priority unfinished, so Priority 1 came down to the one
+remaining code-resolvable open issue.
+
+**`npm run verify:all`** runs all 17 suites in a deliberate order and proves the
+database is as it started. The ordering is the point: credential-free suites
+first so a typo fails in two seconds rather than after four minutes, and the two
+suites that break shared state (`verify:security`, `verify:admin`) last and
+never adjacent to something that reads what they break.
+
+It **refuses to start** if shared state is already dirty — a previous run that
+died before its `finally` leaves a provider disabled, and every later run then
+builds on that, producing failures that look like new bugs.
+
+**The detector was proved to fail**, not assumed: setting the rate limit to 1
+makes the runner refuse and print the remedy. A clean-state check that has never
+fired is one you are trusting on faith.
+
+Timings came out of it for free — `verify:session` is 22s of the 81s total,
+because it genuinely waits 20 seconds to test refresh-token reuse past the
+provider's interval.
+
+The residual risk is unchanged and stated in the issue: serialising removes
+interference between suites, not the seconds during which a provider really is
+disabled. That fix is a separate Supabase project, which is infrastructure.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:all` | pass — 17 suites, 81.5s, clean before and after |
+| Dirt detection demonstrated failing | pass — refuses to start, names the fix |
+| Nothing regressed | pass |
