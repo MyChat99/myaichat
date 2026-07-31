@@ -58,25 +58,3 @@ export const panelVariants: Variants = {
   visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.18, ease: EASE } },
   exit: { opacity: 0, scale: 0.98, y: -4, transition: { duration: 0.12 } },
 };
-
-/** Button press feedback. Subtle enough to feel like the surface responding. */
-export function Pressable({
-  children,
-  className,
-  onClick,
-  ...rest
-}: React.ComponentProps<typeof motion.button>) {
-  const animate = useMotionSafe();
-
-  return (
-    <motion.button
-      className={className}
-      onClick={onClick}
-      whileTap={animate ? { scale: 0.97 } : undefined}
-      transition={{ duration: 0.1 }}
-      {...rest}
-    >
-      {children}
-    </motion.button>
-  );
-}

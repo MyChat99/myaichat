@@ -1640,3 +1640,39 @@ misses are the screenshot placeholders, which are placeholders on purpose.
 | `DEMO-SCRIPT.md` | written — 3 minutes, six beats |
 | Every relative doc link resolves | pass |
 | `lint` / `build` | pass |
+
+## Away session 4B — Priority 4 · Coverage and dead code · 2026-07-31
+
+**Every route already has a negative-path test.** All seven — chat, health,
+presign, download, both exports and `/auth/confirm` — are probed by
+`verify:api`. Nothing to add; the gap was closed in 4A and the newest route
+(audit export) came with its tests.
+
+### Dead code sweep — reported before removing
+
+**Every dependency is referenced.** No unused packages.
+
+**Exactly one export is provably dead:** `Pressable` in
+`components/motion/motion.tsx`, written in session 2 and never called anywhere.
+Removed — 22 lines.
+
+Four categories were flagged by the crude scan and are **not** dead, which is
+why the sweep reported before deleting:
+
+| Flagged | Verdict |
+| --- | --- |
+| `updateSession` | Used by `proxy.ts`, which sits at the repo root and was outside the scanned directories. A false positive that a less careful sweep would have deleted, taking session refresh with it. |
+| `sendWelcomeEmail`, `sendPasswordResetEmail`, `sendMagicLinkEmail`, `sendAdminAlertEmail` | Built ahead of credentials for Phase 6 (ISSUE-017). Unused *yet*, not dead — deleting them would throw away finished work that is waiting on an account. |
+| `getProviderHealth` | Called in its own file. The export exists so a future refresh control can force a re-check; harmless, and left. |
+| Exported types (`UserUsage`, `RetryOutcome`, `PaletteModel`, …) | API surface. A type used only as an annotation reads as unreferenced to a grep. |
+
+The lesson is in the first row: an automated dead-code sweep would have deleted
+`updateSession` and broken session refresh on every request. "Provably
+unreferenced" has to mean *verified*, not *not found by one grep*.
+
+| Criterion | Result |
+| --- | --- |
+| Routes without a negative-path test | none |
+| Unused dependencies | none |
+| Dead exports removed | 1 (`Pressable`) |
+| `verify:all` | pass — 22 suites |
