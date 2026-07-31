@@ -1,5 +1,80 @@
 # Progress
 
+> ## ⏸ SESSION PAUSED — 2026-07-31
+>
+> **Read this block first. Delete it when work resumes.**
+>
+> ### State at pause
+>
+> Everything is committed, pushed and merged. Working tree clean, `main` in sync
+> with origin, CI green, **17 verification suites all passing**. Nothing was
+> left half-finished — the last task (branch protection) completed, was proven,
+> and merged through PR #7.
+>
+> ### ⚠️ The one thing that changed how you work
+>
+> **`main` is protected and administrators are bound by it.** Direct pushes are
+> rejected. Every change — yours or an agent's — now goes:
+>
+> ```bash
+> git checkout -b <type>/<short-name>
+> # ... work ...
+> git push -u origin <branch>
+> gh pr create --base main --title "..." --body "..."
+> gh run watch $(gh run list --branch <branch> --limit 1 --json databaseId --jq '.[0].databaseId') --exit-status
+> gh pr merge <n> --squash --delete-branch
+> ```
+>
+> `git push origin main` will fail with `GH006`. That is correct, not broken.
+> See [DEC-016](DECISIONS.md); the deliberate bypass is in [ISSUE-018](ISSUES.md).
+>
+> ### First command when you resume
+>
+> ```bash
+> git pull && npm install && npm run lint && npm run type-check && npm run build
+> ```
+>
+> Then, if you want the full picture before deciding anything:
+>
+> ```bash
+> npm run dev                       # a server is needed by six of the suites
+> npm run verify:api                # 61 checks — the broadest single signal
+> ```
+>
+> ### What was in progress
+>
+> **Nothing.** The away session finished all six of its priorities, and the
+> branch-protection task that followed it is closed. There is no partial work,
+> no stashed change, no branch left open.
+>
+> ### What is next, in the order I would do it
+>
+> | # | Task | Blocked by | Where the instructions are |
+> | --- | --- | --- | --- |
+> | 1 | **R2 + Resend credentials → finish Phase 6** | you having accounts | [PHASE-6-CHECKLIST.md](PHASE-6-CHECKLIST.md) — nothing in it needs a code change |
+> | 2 | **Screenshots for the README** | needs a browser | run `npm run seed -- --demo` first; four placeholders wait in `docs/screenshots/` |
+> | 3 | **Four human checks from the away session** | needs your eyes | attachment UI, analytics charts, export links, mobile — listed in the Away-session report |
+> | 4 | **Decide on Dependabot PRs #1–#4** | your call | #2 and #1 want actions at v7; I set v5 last session |
+> | 5 | **ISSUE-024** — truncation deletes by timestamp | nothing; it is just structural | needs a `seq` column, a migration, and every `created_at`-ordered read path updated |
+> | 6 | **Chain CI to the Railway deploy** | your call | comment inside `.github/workflows/ci.yml` |
+>
+> Phase 7's remaining tasks (performance pass, accessibility audit) still need a
+> browser and Lighthouse, so they stay unmeasurable headlessly — see the Phase 7
+> section below.
+>
+> ### Open issues worth knowing about
+>
+> | Issue | What it is |
+> | --- | --- |
+> | [ISSUE-016](ISSUES.md) / [ISSUE-017](ISSUES.md) / [ISSUE-003](ISSUES.md) | Phase 6 credentials — the only thing blocking a phase |
+> | [ISSUE-022](ISSUES.md) | Three identifiers in a now-public repo; all judged safe, your call to revisit |
+> | [ISSUE-024](ISSUES.md) | Timestamp-collision truncation; logged, not fixed, structural |
+> | [ISSUE-015](ISSUES.md) | `verify:admin` and `verify:security` mutate shared state — do not run them while someone is using the app |
+> | [ISSUE-004](ISSUES.md) / [ISSUE-005](ISSUES.md) / [ISSUE-006](ISSUES.md) | No Docker: hand-maintained types, remote migrations, unfixable transitive advisories |
+>
+> ---
+
+
 Single source of truth for build status. Update immediately after any phase work.
 
 **Status legend:** `Not Started` · `In Progress` · `Done` (built, self-checked) · `Verified` (lint + type-check + build + phase acceptance criteria all pass)
@@ -16,7 +91,7 @@ Single source of truth for build status. Update immediately after any phase work
 | 5   | [Theming & appearance](../phases/PHASE-5-theming.md)                               | Done        | 2026-07-31 | —          |
 | 6   | [R2 uploads + Resend emails](../phases/PHASE-6-storage-email.md)                   | Partial     | 2026-07-31 | —          |
 | 7   | [Analytics, audit UI, polish](../phases/PHASE-7-analytics-polish.md)               | Partial     | 2026-07-31 | —          |
-| 8   | [CI/CD + Railway deployment](../phases/PHASE-8-cicd-deploy.md)                     | Partial     | 2026-07-31 | —          |
+| 8   | [CI/CD + Railway deployment](../phases/PHASE-8-cicd-deploy.md)                     | Done        | 2026-07-31 | —          |
 
 ## Deployed
 
@@ -644,3 +719,37 @@ user's resource. Two assertions carry more weight than the rest:
 | Export downloads rather than rendering | pass — asserted on `content-disposition` |
 | `seed --demo` is gated and idempotent | pass — plain `seed` writes none; a second `--demo` run skips |
 | Charts look right with demo data | **NEEDS HUMAN VERIFICATION** — data is in, appearance unchecked |
+
+---
+
+## Session pause — 2026-07-31
+
+Closing state, for the record.
+
+**Branch protection is live and enforcing.** `main` requires a pull request with
+both blocking CI jobs green; force pushes and deletions are blocked; and
+**administrators are bound**, which is what makes it enforcement rather than
+decoration on a single-maintainer repository. Proven in both directions — a
+direct push is rejected with `GH006`, and PR #7 merged cleanly through the
+intended path. See [ISSUE-018](ISSUES.md) and [DEC-016](DECISIONS.md).
+
+Phase 8 moves from **Partial** to **Done**: CI runs on every push and pull
+request, and now *gates* merges rather than only reporting. It is not **Verified**,
+because one acceptance criterion is unmet on purpose — CI and the Railway deploy
+are still unchained, so deploys are always CI-green but are not themselves
+gated. That is a decision waiting on you, not an unfinished task.
+
+**Three stale issues corrected during the pause audit**, all found by reading
+rather than by any check:
+
+- **ISSUE-010** was marked Open for a full day after it was fixed. Phase 2 shipped
+  on 2026-07-30 and the log never caught up. An issue log that lags reality is
+  worse than none, because the next person plans around a blocker that no longer
+  exists.
+- **ISSUE-003** listed Railway alongside R2 and Resend; Railway has been live
+  since 2026-07-30. Rescoped to Phase 6 credentials only.
+- **ISSUE-001** is resolved and now verifiable: with the repo public, the API
+  confirms every commit is linked to the `MyChat99` profile.
+
+**Nothing is in progress.** No partial work, no stash, no open branch. The resume
+point is at the top of this file.

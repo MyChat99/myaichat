@@ -302,19 +302,29 @@ CORS on the bucket must allow `PUT` from your app origin, or browser uploads fai
 
 ### ISSUE-010 — Phase 2 blocked: no Anthropic API key
 
-**Status:** Open | **Severity:** High | **Phase:** 2 | **Opened:** 2026-07-30 | **Resolved:** —
+**Status:** Resolved | **Severity:** High | **Phase:** 2 | **Opened:** 2026-07-30 | **Resolved:** 2026-07-30 (recorded 2026-07-31)
+**Resolution:** A key was provided on 2026-07-30 and Phase 2 shipped the same day; `verify:chat` has been streaming real completions through it ever since. **This entry stayed marked Open for a day after it was fixed** — caught during the pause audit, not by anything automatic. An issue log that lags reality is worse than no log, because the next person plans around a blocker that no longer exists.
 **Problem:** [PHASE-2-chat-streaming.md](../phases/PHASE-2-chat-streaming.md) specifies Anthropic as the single provider for Phase 2. No Anthropic key exists. An OpenAI key is available but was deliberately deferred to Phase 3 rather than swapping the provider order — see [DEC-007](DECISIONS.md).
 **Resolution:** Get a key from console.anthropic.com, add `ANTHROPIC_API_KEY` to `.env.local`, then Phase 2 can start. Nothing else blocks it — Phase 1 is Verified.
 
-### ISSUE-003 — R2, Resend, and Railway credentials not yet provisioned
+### ISSUE-003 — R2 and Resend credentials not yet provisioned
 
-**Status:** Open | **Severity:** Medium | **Phase:** 6, 8 | **Opened:** 2026-07-30 | **Resolved:** —
-**Problem:** No accounts or keys yet for Cloudflare R2 and Resend (Phase 6) or Railway (Phase 8). Each blocks its phase at the point of integration. Split out of ISSUE-002, which covered Supabase as well.
+**Status:** Open | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-07-30 | **Resolved:** —
+**Rescoped 2026-07-31:** Railway is done — provisioned, deployed and live since 2026-07-30 — so this now covers **R2 and Resend only**. Phase 8 dropped from the scope.
+**Problem:** No accounts or keys yet for Cloudflare R2 or Resend. Both block Phase 6 at the point of integration; everything up to that point is built and tested. See [PHASE-6-CHECKLIST.md](PHASE-6-CHECKLIST.md) for the exact sequence once they exist.
 **Resolution:** Provision per phase as needed. Track every new variable in `.env.example`; real values go in Railway, never in the repo.
 
 ### ISSUE-001 — Commit author email may not match GitHub account
 
-**Status:** Open | **Severity:** Low | **Phase:** 0 | **Opened:** 2026-07-30 | **Resolved:** —
+**Status:** Resolved | **Severity:** Low | **Phase:** 0 | **Opened:** 2026-07-30 | **Resolved:** 2026-07-31
+**Resolution:** Confirmed empirically now that the repository is public — the API reports every commit linked to the profile, so the address is verified on the account and contributions are attributed:
+
+```bash
+gh api repos/MyChat99/myaichat/commits --jq '.[0:3][] | {sha: .sha[0:7], linked_login: (.author.login // "NOT LINKED")}'
+# → all three: "linked_login": "MyChat99"
+```
+
+Original concern below.
 **Problem:** Git commits are authored as `myaichatbot@proton.me`, but the GitHub account is `MyChat99`. If that address is not verified on the account, commits will not link to the profile and contributions will not be attributed.
 **Resolution:** Add and verify the address at github.com/settings/emails, or change `git config --global user.email` to the account's verified address. Cosmetic only — does not affect pushes.
 
