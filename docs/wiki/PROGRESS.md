@@ -1506,3 +1506,52 @@ currently exist, for a profiling task.
 | `verify:schema` | pass — index coverage asserted on cost |
 | `verify:all` | pass — 21 suites |
 | `security:audit` | pass — 12 tables, RLS intact |
+
+## Away session 4B — Priority 2b · Chat route pre-flight latency · 2026-07-31
+
+**Measured before changing anything.** A new `prepMs` field records the time
+from request start to the moment the provider call begins — everything above
+that line is ours, everything below is the model's. It is kept separate from
+`durationMs` on purpose: total duration is dominated by how long the model takes
+to write, which is not ours to fix, and without the split "the app feels slow"
+is unattributable.
+
+| | Median `prepMs` |
+| --- | --- |
+| before | **590 ms** (n=3, 578–647) |
+| after | **504 ms** (n=15, 453–590) |
+
+**86 ms, about 15%.** The first sample of each run is discarded — it is a cold
+start, and comparing a cold sample to a warm one would flatter whichever ran
+second. These are dev-server numbers against a remote database, so they are
+noisy; the direction is solid, the precise figure is not.
+
+### What changed
+
+Four pre-flight checks — conversation ownership, suspension, hourly rate limit,
+daily token budget — were four sequential network round trips to Supabase. None
+depends on another: ownership needs the conversation id, the other three need
+only the user id. They are now issued together.
+
+**The results are still evaluated in the original order**, and that is not
+cosmetic: a foreign conversation must 404 *before* a rate limit can 429, or the
+refusal itself tells the caller that someone else's conversation exists. There
+is now a test asserting the order of those four branches in the source, alongside
+the existing contract test proving a foreign conversation is byte-identical to a
+missing one.
+
+The cost of issuing them together is doing a little work for requests that were
+going to be refused anyway. Four cheap indexed reads is a good trade for 86ms on
+every accepted one.
+
+### Also: the success path logged nothing
+
+Only failures produced a log line, so the only observable requests were the
+broken ones — which makes every latency question unanswerable. One line per
+completed turn now, carrying `prepMs`, token counts and the model.
+
+| Criterion | Result |
+| --- | --- |
+| Before/after measured, cold samples excluded | 590ms → 504ms |
+| Refusal ordering preserved | pass — asserted in source and over HTTP |
+| `verify:all` | pass — 21 suites |

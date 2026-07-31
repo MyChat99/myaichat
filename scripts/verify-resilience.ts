@@ -355,6 +355,40 @@ function verifyTimeouts() {
   );
 
   const route = readFileSync('app/api/chat/route.ts', 'utf8');
+
+  // ── pre-flight latency ──
+  //
+  // The four checks were sequential round trips: ~590ms of our own latency
+  // before the provider was called, on every message.
+  check(
+    'the pre-flight checks are issued together',
+    /Promise\.all\(\[[\s\S]{0,900}checkDailyTokenBudget/.test(route),
+    'sequential round trips put ~600ms in front of every message',
+  );
+
+  /**
+   * Issuing them together must NOT reorder the refusals. A foreign
+   * conversation has to 404 before a rate limit can 429 — otherwise the
+   * refusal tells the caller that someone else's conversation exists.
+   */
+  const order = [
+    'Conversation not found',
+    'is suspended',
+    'Hourly limit',
+    'Daily token budget',
+  ].map((needle) => route.indexOf(needle));
+  check(
+    'refusals are still evaluated 404 → 403 → 429(rate) → 429(budget)',
+    order.every((pos, i) => pos > 0 && (i === 0 || pos > order[i - 1]!)),
+    JSON.stringify(order),
+  );
+
+  check(
+    'the route records how long its own prep took',
+    route.includes('prepMs'),
+    'without it, "the app feels slow" is unattributable',
+  );
+
   check('the chat route uses withRetry', route.includes('withRetry('));
   check(
     '  and guards it with hasEmittedOutput',
