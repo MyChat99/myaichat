@@ -6,6 +6,10 @@
 >
 > ### State at pause
 >
+> **Superseded by away session 3 (2026-07-31)** — see the report at the end of
+> [OVERNIGHT-REPORT.md](OVERNIGHT-REPORT.md). Nine PRs merged since; the return
+> checklist there replaces the one below.
+>
 > Everything is committed, pushed and merged. Working tree clean, `main` in sync
 > with origin, CI green, **17 verification suites all passing**. Nothing was
 > left half-finished — the last task (branch protection) completed, was proven,

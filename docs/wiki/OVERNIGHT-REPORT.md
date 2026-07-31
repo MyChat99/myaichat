@@ -582,3 +582,179 @@ npm run smoke                # 18   a running deployment
 ```
 
 17 suites. All green as of this commit.
+
+---
+---
+
+# Away session 3 — 2026-07-31
+
+Nine pull requests, all merged through the protected flow with CI green on their
+own head commit. **No `--admin` bypass at any point** — the protection set up
+last session was left to do its job, which meant re-updating and re-running each
+branch as the ones ahead of it landed.
+
+**Production untouched**: no deploy, no Railway change, no env change. Three
+additive migrations applied.
+
+**Full suite green** — 17 suites, ~550 assertions.
+
+---
+
+## Headline
+
+| Priority | Status | One line |
+| --- | --- | --- |
+| 1 — Clear the queue | **Done** | 4 Dependabot PRs merged · deploy gating prepared, not applied · last code-resolvable issue fixed |
+| 2 — Security round 2 | **Done** | All five items, five PRs — and **one High-severity finding** |
+| 3 — Showcase prep | **Done** | SHOWCASE.md · three LinkedIn drafts · a screenshot spec that names the state, not just the screen |
+| 4 — If time remained | **Done** | Last unguarded route covered · CONTRIBUTING.md |
+
+Merged: #9 queue · #10 message sequence · #11 session hardening · #12 re-auth ·
+#13 rate limits · #14 audit job · #15 login alerts · #16 showcase ·
+#17 CONTRIBUTING. Plus Dependabot #1–#4.
+
+---
+
+## The finding: a stolen refresh token stays valid (ISSUE-028, High)
+
+Refresh-token rotation was **assumed** to be in force, because Supabase rotates
+by default. So I wrote a test that simulated a theft instead of one that
+asserted the assumption:
+
+```
+rotation issues a NEW refresh token   : yes
+replay the original, 20s later        : ACCEPTED
+legitimate token after the replay     : STILL VALID — family not revoked
+```
+
+A refresh token copied out of a browser keeps working alongside the real one,
+and the legitimate user notices nothing, because their session is never
+disturbed. It is refreshed on every use, so in practice it does not expire.
+
+Signing out **does** invalidate it — that is asserted and passing — so the
+exposure is bounded by the user signing out, which most people never do.
+
+**This is a Supabase dashboard setting. No code in this repository can fix it.**
+[ISSUE-028](ISSUES.md) has the exact toggle. `npm run verify:session` measures
+it on every run and warns; `-- --strict` turns that into a failure once the
+setting is correct, so it can be pinned rather than drifting back.
+
+I would not have found this by testing what I believed.
+
+---
+
+## What else shipped
+
+**Message ordering, properly (ISSUE-024).** Truncation for regenerate and edit
+deleted by `created_at >=`, and `now()` is transaction time — several rows in
+one statement share a value, so regenerating an assistant reply could delete the
+question that prompted it. Migration adds a monotonic `seq`. The backfill orders
+by `(created_at, id)` rather than letting `bigserial` number rows in physical
+order; physical order on an updated table is not insertion order, so the lazy
+version would have quietly reshuffled existing conversations.
+
+**Idle session expiry**, default **off**. It runs on the auth path where a
+mistake logs out everyone, so it ships inert until an administrator chooses it.
+An absent marker is `unmarked`, never `expired` — otherwise enabling the setting
+is a mass-logout button, and that is asserted directly. The marker is HMAC-signed
+so it can be deleted but not forward-dated.
+
+**Re-auth extended** to role changes and model deletion. `verify:admin` now
+asserts *completeness*: every privileged action must take a password, call
+`requireAdminWithPassword`, and **return** the failure rather than throw —
+production replaces thrown Server Action errors with a generic message, so a
+thrown "wrong password" reaches the user as "an error occurred".
+
+**Per-endpoint rate limits.** The upload routes had been limiting themselves by
+counting their own `audit_logs` rows — coupling a permanent record to a rolling
+window. Downloads had **no limit at all**, because nothing audited them. Two
+windows per endpoint: an hourly cap alone permits emptying the budget in three
+seconds; a per-minute cap alone permits that burst every minute all day.
+
+**Dependency audit as its own job**, with the report in the job summary rather
+than only an artifact — an artifact you have to unzip is one nobody opens. It
+surfaced two things the summary line hides: advisories are down **12 → 3** after
+this session's bumps (so the figure in ISSUE-006 was stale), and npm's proposed
+"fix" for `next` is `next@9.3.3`, a four-major downgrade.
+
+**New-login alerts for admins**, using the console transport until Resend lands.
+Admins only, new devices only, first-ever login suppressed. Stored values are
+HMACs — a table recording where an administrator physically signs in from is a
+worse thing to hold than the problem it solves.
+
+---
+
+## Three bugs my own tests caught before you saw them
+
+- **The login alert would have fired monthly for everyone.** My first fingerprint
+  kept the browser's *major* version — exactly the digit Chrome changes every
+  four weeks.
+- **`verify:admin` was reading `git show HEAD:`** rather than the working tree,
+  so it validated the last commit instead of the change about to be made. A
+  missing gate passed locally and failed only *after* merging.
+- **PR #3 looked like "the react bump breaks the build"** and was a formatting
+  failure on an unrelated file, inherited from a base commit where `main` itself
+  was red.
+
+That last one exposed something about my own process: **`main` was red for
+about forty minutes during the previous session and I reported the commit as
+pushed and green.** It was pushed. It was not green. Branch protection now makes
+that impossible — a merge is blocked until the checks pass on that exact commit
+— so the fix is structural rather than a promise to be more careful.
+[ISSUE-026](ISSUES.md).
+
+---
+
+## Prepared, deliberately not applied
+
+**[ISSUE-027](ISSUES.md) — gating the Railway deploy on CI.** Exact steps,
+tradeoffs, and a recommendation: **not yet**. Since branch protection landed,
+every deploy already comes from a CI-green commit, so this closes a window of a
+minute or two rather than a hole. The cost is a production-capable token in
+GitHub secrets and a second build path (`railway up` uploads from the runner
+rather than Railway building from git) that has never been proven. One decision
+and one paste when you want it.
+
+---
+
+## Needs your eyes
+
+| # | What | Why I cannot close it |
+| --- | --- | --- |
+| 1 | **ISSUE-028** — the refresh-token setting | Supabase dashboard, not code |
+| 2 | The password dialog on role change / model delete | Server gate tested; the screen is unseen |
+| 3 | The new-login email in a real client | Blocked on Resend (ISSUE-017) |
+| 4 | The idle-timeout logout screen | Policy tested; the redirect is unseen |
+| 5 | Attachment UI, analytics charts, export links | Carried over — still unseen |
+
+---
+
+## Your return checklist
+
+1. **R2 + Resend credentials** → [PHASE-6-CHECKLIST.md](PHASE-6-CHECKLIST.md).
+   Nothing in it needs a code change. Two traps are written down: R2 CORS must
+   allow the `content-type` header, and Resend without a verified domain
+   delivers **only to you** while every real user's mail silently vanishes.
+2. **Finish Phase 6** — the UI is built and wired; only the PUT is missing.
+3. **Your visual sign-offs** — the five rows above.
+4. **ISSUE-028** — one Supabase toggle, then `npm run verify:session -- --strict`
+   to pin it.
+5. **Deploy-gating decision** — [ISSUE-027](ISSUES.md). My recommendation is to
+   leave it.
+6. **Screenshots** — `npm run seed -- --demo` first, then the four in the README
+   table, which names the *state* to capture each in.
+7. **LinkedIn** — three drafts in [LINKEDIN-DRAFTS.md](LINKEDIN-DRAFTS.md),
+   two placeholders to fill.
+
+---
+
+## Suite as it stands
+
+```
+verify:theme        134    verify:api           80    verify:security   42
+verify:session       41    verify:authz         37    verify:attachments 33
+verify:headers       25    smoke                18
++ schema, rls, seed, storage, gates, appearance, providers, admin, chat, email
+```
+
+17 suites, ~550 assertions, all green as of this commit.
