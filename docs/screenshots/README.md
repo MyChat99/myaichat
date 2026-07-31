@@ -5,12 +5,16 @@ image tags.
 
 Suggested set, in this order:
 
-| File | What to capture |
+The authoritative spec — which screen, in which state — is the Screenshots
+table in the root [README](../../README.md). Kept there because that is where a
+reader meets it. Filenames must match:
+
+| File | Screen |
 | --- | --- |
-| `chat.png` | A conversation mid-stream, with the model selector visible |
-| `themes.png` | `/settings` with a non-default preset selected |
-| `admin-providers.png` | `/admin/providers` — masked key, connection test result |
-| `admin-analytics.png` | `/admin/analytics` on the 30-day range |
+| `chat.png` | `/` or `/c/<id>`, mid-stream |
+| `themes.png` | `/settings`, non-default preset |
+| `admin-providers.png` | `/admin/providers`, after Test connection |
+| `admin-analytics.png` | `/admin/analytics`, 30-day range |
 
 Practical notes:
 
