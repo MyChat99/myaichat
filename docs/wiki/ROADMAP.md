@@ -4,9 +4,10 @@ Pending action items and what comes after the eight planned phases.
 
 ## Immediate next steps
 
-1. **Close out Phase 1** — set `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` in `.env.local`, run `npm run seed`, then walk the browser flow once (sign up → login → shell → `/admin`). That is the last criterion before Phase 1 is Verified.
-2. **Get an LLM provider key** — OpenAI or Anthropic, needed to start Phase 2.
-3. **Start Phase 2** — read [PHASE-2-chat-streaming.md](../phases/PHASE-2-chat-streaming.md) in full, propose a plan, then implement.
+1. **Get an LLM provider key** — OpenAI or Anthropic. Phase 2 cannot stream anything without one.
+2. **Start Phase 2** — read [PHASE-2-chat-streaming.md](../phases/PHASE-2-chat-streaming.md) in full, propose a plan, then implement.
+
+Phase 1 is Verified as of 2026-07-30. The admin account is seeded and the auth shell works end to end.
 
 Worth doing soon, not blocking: install Docker to get a local Supabase stack, which also restores `supabase gen types` and removes the hand-maintained types file ([ISSUE-004](ISSUES.md), [ISSUE-005](ISSUES.md)).
 

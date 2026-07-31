@@ -29,8 +29,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </Link>
           ) : null}
 
-          <span className="text-muted-foreground hidden text-sm sm:inline">
-            {user.displayName ?? user.email}
+          {/* Show the email rather than the display name when the two would
+              read as duplicates — the seeded account is literally named
+              "Admin", which rendered as "Admin  Admin" next to the nav link. */}
+          <span className="text-muted-foreground hidden text-sm sm:inline" title={user.email ?? ''}>
+            {user.displayName && user.displayName.toLowerCase() !== 'admin'
+              ? user.displayName
+              : (user.email ?? user.displayName)}
           </span>
 
           <form action={signOut}>

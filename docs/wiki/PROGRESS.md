@@ -9,7 +9,7 @@ Single source of truth for build status. Update immediately after any phase work
 | #   | Phase                                                                              | Status      | Completed  | Verified   |
 | --- | ---------------------------------------------------------------------------------- | ----------- | ---------- | ---------- |
 | 0   | Repo & docs setup                                                                  | Verified    | 2026-07-30 | 2026-07-30 |
-| 1   | [Foundation — scaffold, auth, schema, RLS](../phases/PHASE-1-foundation.md)        | Done        | 2026-07-30 | —          |
+| 1   | [Foundation — scaffold, auth, schema, RLS](../phases/PHASE-1-foundation.md)        | Verified    | 2026-07-30 | 2026-07-30 |
 | 2   | [Chat interface with streaming](../phases/PHASE-2-chat-streaming.md)               | Not Started | —          | —          |
 | 3   | [Provider abstraction + model selector](../phases/PHASE-3-provider-abstraction.md) | Not Started | —          | —          |
 | 4   | [Admin panel — keys, models, users](../phases/PHASE-4-admin-panel.md)              | Not Started | —          | —          |
@@ -50,9 +50,7 @@ A phase moves to **Verified** only when all four pass:
 
 ---
 
-## Phase 1 — Foundation · Done · 2026-07-30
-
-Not yet **Verified** — one acceptance criterion is outstanding, see below.
+## Phase 1 — Foundation · Verified · 2026-07-30
 
 **Built**
 
@@ -75,7 +73,8 @@ Not yet **Verified** — one acceptance criterion is outstanding, see below.
 | Migrations apply cleanly | pass — 4 migrations pushed to the hosted project; `verify:schema` confirms all 9 tables, the view, and `is_admin()` |
 | RLS: user A cannot query user B | pass — `verify:rls`, 23 checks |
 | Non-admin visiting /admin is redirected | pass — `verify:gates`, 7 checks over real HTTP, incl. admin-reaches-`/admin` as a control |
-| Sign up → login → authenticated shell | **outstanding** — not exercised through a browser |
+| Sign up → login → authenticated shell | pass — browser walkthrough on 2026-07-30: login → Welcome shell → /admin → sign out |
+| Seed creates the admin + settings | pass — `verify:seed`; idempotent across 4 consecutive runs |
 
 **Deviations from the phase file**
 
@@ -87,8 +86,9 @@ Not yet **Verified** — one acceptance criterion is outstanding, see below.
 **Bugs found and fixed during the phase**
 
 - [ISSUE-007](ISSUES.md) — recursive `profiles` UPDATE policy (`42P17`) broke every profile edit. Fixed in migration `20260730120004`.
+- [ISSUE-008](ISSUES.md) — seed crashed on a null-valued `system_settings` row, leaving the database half-seeded. Fixed and made provably idempotent.
+- [ISSUE-009](ISSUES.md) — `shadcn init` emitted a self-referential `--font-sans`, so every surface rendered in the browser's default serif instead of Geist. Caught by eye in the browser walkthrough, not by any automated check.
 
-**To reach Verified**
+**Known cosmetic gaps** (deliberately not addressed in Phase 1)
 
-1. Set `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` in `.env.local` and run `npm run seed`
-2. Walk the browser flow once: sign up → confirm → login → shell → `/admin`
+- The shell is unstyled placeholder UI. Design work belongs to Phases 2, 5 and 7.
