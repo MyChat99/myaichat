@@ -11,6 +11,7 @@
  *   npm run verify:admin  # BASE_URL=http://localhost:3001 to override the port
  */
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { createClient, type Session } from '@supabase/supabase-js';
 
 import type { Database } from '../lib/db/types';
@@ -332,6 +333,46 @@ async function main() {
     await admin.auth.admin.deleteUser(superuser.id).catch(() => {});
     console.log('\nTest users cleaned up.');
   }
+
+  // ─────────────────────────────────────────── re-authenticated actions
+  //
+  // These are Server Actions, so they cannot be invoked over HTTP from here.
+  // What IS assertable without a browser is the completeness property: every
+  // privileged mutation must route through requireAdminWithPassword, and must
+  // take a password parameter to do so. A future action added without one is
+  // the failure this catches.
+  console.log('\nRe-authenticated admin actions\n');
+
+  const actionsSource = readFileSync('app/(app)/admin/actions.ts', 'utf8');
+
+  const PRIVILEGED = ['setProviderKey', 'deleteProviderKey', 'setUserRole', 'deleteModel'];
+
+  for (const name of PRIVILEGED) {
+    const match = actionsSource.match(
+      new RegExp(`export async function ${name}\\(([^)]*)\\)`, 's'),
+    );
+    check(`${name} takes a password parameter`, Boolean(match?.[1]?.includes('password')));
+
+    const body = actionsSource.slice(actionsSource.indexOf(`export async function ${name}(`));
+    const end = body.indexOf('\nexport ', 1);
+    const scoped = end === -1 ? body : body.slice(0, end);
+    check(
+      `  ${name} calls requireAdminWithPassword`,
+      scoped.includes('requireAdminWithPassword('),
+      'a privileged action must re-authenticate, not merely requireAdmin',
+    );
+    check(
+      `  ${name} returns the failure rather than throwing`,
+      scoped.includes('ReauthError') && scoped.includes('return { ok: false'),
+      'Next replaces thrown Server Action errors with a generic message in production',
+    );
+  }
+
+  // The inverse: a plain requireAdmin() on something destructive is the mistake.
+  check(
+    'model deletion no longer uses bare requireAdmin',
+    !/export async function deleteModel[\s\S]{0,200}?await requireAdmin\(\)/.test(actionsSource),
+  );
 
   console.log(
     failures === 0 ? '\nAll admin checks passed.' : `\n${failures} admin check(s) FAILED.`,
