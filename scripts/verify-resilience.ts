@@ -92,7 +92,7 @@ function verifyBackoff() {
   // every client that failed against one outage retries at the same instant and
   // keeps the provider down.
   let allInRange = true;
-  let distinct = new Set<number>();
+  const distinct = new Set<number>();
   for (let i = 0; i < 200; i++) {
     const value = backoffMs(3);
     if (value < 0 || value > 1600) allInRange = false;
