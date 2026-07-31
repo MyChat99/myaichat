@@ -143,8 +143,23 @@ async function main() {
     );
 
     // --- admin -------------------------------------------------------------
+    // Since Phase 4, /admin is an index that forwards to /admin/providers. The
+    // assertion must still tell that apart from a non-admin being bounced OUT
+    // of /admin — hence checking where the redirect points, not just that a
+    // redirect happened.
     const adminAdmin = await visit('/admin', superuser.cookie);
-    check('admin reaches /admin', adminAdmin.status === 200, `got ${adminAdmin.status}`);
+    check(
+      'admin reaches /admin (or is forwarded deeper into it)',
+      adminAdmin.status === 200 || adminAdmin.location.includes('/admin/'),
+      `status ${adminAdmin.status} → "${adminAdmin.location}"`,
+    );
+
+    const adminProviders = await visit('/admin/providers', superuser.cookie);
+    check(
+      'admin reaches /admin/providers',
+      adminProviders.status === 200,
+      `got ${adminProviders.status}`,
+    );
   } finally {
     await admin.auth.admin.deleteUser(normal.id).catch(() => {});
     await admin.auth.admin.deleteUser(superuser.id).catch(() => {});

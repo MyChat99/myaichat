@@ -18,6 +18,22 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 
 ---
 
+### DEC-013 — Admin mutations are Server Actions, not route handlers
+
+**Date:** 2026-07-30 | **Phase:** 4 | **Status:** Active
+**Decision:** Every admin mutation is a Next.js Server Action in `app/(app)/admin/actions.ts`. There is no admin REST endpoint.
+**Why:** The phase file requires CSRF protection on admin mutations. Server Actions verify the `Origin` header against the host before the action body runs, so CSRF is handled by the framework rather than by a token scheme we would have to implement, rotate, and get right. A route handler would need that scheme built from scratch.
+**Enforcement:** `verify:admin` greps the actions file and asserts every exported function calls `requireAdmin()` and every mutating one calls `auditLog()`. A route-level test alone would miss an action that forgot the gate.
+**Tradeoff:** No admin API for external scripts. If one is ever needed it must carry its own CSRF and auth, and cannot simply reuse these functions.
+
+### DEC-012 — Suspension is enforced in RLS, not only in the route
+
+**Date:** 2026-07-30 | **Phase:** 4 | **Status:** Active
+**Decision:** `profiles.suspended` gates writes through row-level security (`is_suspended()` in migration `20260730120005`), in addition to the 403 returned by `/api/chat`.
+**Why:** A check that lives only in one route handler is one forgotten call site away from being useless — and Phase 6 adds uploads, Phase 7 adds more endpoints. Putting it in the database means every current and future write path inherits it.
+**Detail:** suspension blocks writes but not reads. A suspended user keeps their history and can sign in; they just cannot add to it. Deleting their data would be a different, much more destructive decision.
+**Note:** `suspended` is not in the master spec's schema, which lists only `role` on `profiles` — but the spec's own feature list asks for suspend/activate, so the column is required to build what was specified.
+
 ### DEC-011 — `validateKey()` must spend a token, never just list models
 
 **Date:** 2026-07-30 | **Phase:** 3 | **Status:** Active

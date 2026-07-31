@@ -31,6 +31,11 @@ Every variable is documented in [.env.example](.env.example). The four needed to
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Project Settings → API Keys → publishable (`sb_publishable_…`) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API Keys → secret (`sb_secret_…`) — **server only** |
 | `SUPABASE_DB_PASSWORD` | Project Settings → Database — used by the CLI for `db push` |
+| `ENCRYPTION_MASTER_KEY` | Generate: `openssl rand -base64 32` — see the warning below |
+
+> **`ENCRYPTION_MASTER_KEY` is unrecoverable.** Every provider API key in the database is
+> encrypted with it. Lose it and they all have to be re-entered; rotating it means
+> re-encrypting every stored key. The same value must be set in Railway at deploy time.
 
 > This project uses Supabase's **new** API key format (`sb_publishable_` / `sb_secret_`), not
 > legacy `anon` / `service_role` JWTs. They are opaque strings — never decode them as JWTs.
@@ -41,8 +46,9 @@ Every variable is documented in [.env.example](.env.example). The four needed to
 Migrations live in [supabase/migrations/](supabase/migrations/) and apply to the hosted project.
 
 ```bash
-npm run db:push     # apply pending migrations
-npm run seed        # create the first admin user + default settings
+npm run db:push      # apply pending migrations
+npm run seed         # create the first admin user + default settings
+npm run keys:encrypt # move provider keys from .env.local into encrypted DB storage
 ```
 
 `npm run seed` needs `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` in `.env.local`. It is
@@ -64,6 +70,7 @@ npm run verify:seed     # exactly one admin, settings intact
 npm run verify:gates    # route gates (needs `npm run dev` running)
 npm run verify:chat     # streaming, persistence, stop, XSS (needs `npm run dev`)
 npm run verify:providers # abstraction holds, both providers stream (needs `npm run dev`)
+npm run verify:admin    # encryption, admin gates, suspension (needs `npm run dev`)
 ```
 
 `verify:gates` defaults to `http://localhost:3000`; override with `BASE_URL=http://localhost:3001`.

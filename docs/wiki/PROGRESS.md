@@ -12,7 +12,7 @@ Single source of truth for build status. Update immediately after any phase work
 | 1   | [Foundation — scaffold, auth, schema, RLS](../phases/PHASE-1-foundation.md)        | Verified    | 2026-07-30 | 2026-07-30 |
 | 2   | [Chat interface with streaming](../phases/PHASE-2-chat-streaming.md)               | Verified    | 2026-07-30 | 2026-07-30 |
 | 3   | [Provider abstraction + model selector](../phases/PHASE-3-provider-abstraction.md) | Verified    | 2026-07-30 | 2026-07-30 |
-| 4   | [Admin panel — keys, models, users](../phases/PHASE-4-admin-panel.md)              | Not Started | —          | —          |
+| 4   | [Admin panel — keys, models, users](../phases/PHASE-4-admin-panel.md)              | Done        | 2026-07-30 | —          |
 | 5   | [Theming & appearance](../phases/PHASE-5-theming.md)                               | Not Started | —          | —          |
 | 6   | [R2 uploads + Resend emails](../phases/PHASE-6-storage-email.md)                   | Not Started | —          | —          |
 | 7   | [Analytics, audit UI, polish](../phases/PHASE-7-analytics-polish.md)               | Not Started | —          | —          |
@@ -169,7 +169,46 @@ A phase moves to **Verified** only when all four pass:
 - [ISSUE-012](ISSUES.md) — the first OpenAI key authenticated but had no credit. Led to [DEC-011](DECISIONS.md): `validateKey()` must spend a token, never just list models.
 - A 1-token validation probe failed on a healthy OpenAI key — OpenAI errors where Anthropic truncates. Documented in the provider README.
 
-**Ready for Phase 4**
+**Ready for Phase 4** — done: keys are now encrypted in the database and adapters take them by injection.
 
-- `validateKey()` already exists on every adapter, so the admin panel's "Test Connection" button is wiring rather than new logic — and it proves the key can *generate*, not merely authenticate ([DEC-011](DECISIONS.md)).
-- `providers.encrypted_api_key` and the column-level grants protecting it have been in place since Phase 1; Phase 4 fills the column and swaps each adapter's `getClient()` over to it.
+---
+
+## Phase 4 — Admin panel · Done · 2026-07-30
+
+Not yet **Verified** — the admin UI needs a browser pass, see below.
+
+**Built**
+
+- AES-256-GCM in `lib/security/crypto.ts`. Format `v1.<iv>.<tag>.<ciphertext>`, fresh random IV per encryption, authenticated so tampering throws rather than returning junk. The version prefix leaves room to rotate algorithms without a flag day.
+- Adapters are now factories taking an API key; the registry resolves it from `providers.encrypted_api_key` and decrypts at call time, with an env-var fallback for a fresh local checkout. `getClient()` no longer reads `process.env`.
+- `npm run keys:encrypt` moved both live keys into the encrypted column.
+- Admin shell with Providers / Models / Users / Settings. Providers: masked key, rotate, delete, enable-disable, Test Connection with latency. Models: full CRUD plus "Fetch from provider". Users: search, promote/demote, suspend/activate. Settings: default model, global prompt, rate limit, upload cap, sign-ups.
+- Audit logging on every mutation — actor, action, target, metadata, IP — written with the admin client because `audit_logs` has no client-facing insert policy. `redactMetadata()` is a backstop against a key ever reaching the trail.
+- Suspension enforced in RLS as well as the route ([DEC-012](DECISIONS.md)), with a banner in the app shell.
+
+**Verification** — `npm run verify:admin`, 40 checks
+
+| Criterion | Result |
+| --- | --- |
+| `npm run lint` / `type-check` / `build` | pass |
+| Keys never in plaintext in DB, client, or logs; masked in UI | pass — stored values are `v1.…` ciphertext, decrypt to real keys, only `key_last4` is clear. Round-trip, IV-uniqueness and tamper-rejection all asserted. |
+| Test Connection distinguishes valid from invalid | pass — delegates to `validateKey()`, which generates rather than lists ([DEC-011](DECISIONS.md)) |
+| Chat uses DB-stored encrypted keys | pass — proved by **breaking only the database value** and confirming chat fails. Had it kept working, that would have exposed a silent env-var fallback. |
+| Disabling a provider hides its models | pass — model list shrinks and excludes that provider, then restores |
+| Non-admins blocked from every /admin route | pass — all 5 routes × anon / non-admin / admin |
+| …and from admin mutations | pass — structurally: every exported action calls `requireAdmin()`. Mutations are Server Actions, so CSRF is the framework's Origin check ([DEC-013](DECISIONS.md)). |
+| Every admin action appears in audit_logs | **partial** — asserted structurally (every mutating action calls `auditLog()`) and that `audit_logs` is unreadable by normal users. An end-to-end write needs the browser pass. |
+
+**Deviations from the phase file**
+
+- "Add provider" is not a UI affordance: a provider without a registered adapter cannot work, so providers come from the seed catalogue and the registry. The page names any adapter missing a database row.
+- "Fetch from provider" lists the live catalogue rather than auto-inserting rows — the provider reports no cost or context data, and inserting models with zero costs would quietly corrupt the usage estimates.
+
+**Bugs found and fixed during the phase**
+
+- [ISSUE-013](ISSUES.md) — `lib/db/types.ts` drifted from the schema the moment a column was added, exactly as ISSUE-005 predicted. Caught by type-check.
+- `verify:gates` broke when `/admin` became a redirecting index. The assertion now distinguishes an admin being forwarded *deeper into* admin from a non-admin being bounced *out of* it — the sloppy fix (accept any 307) would have made the test useless.
+
+**To reach Verified**
+
+Open `/admin` and: rotate a key and Test Connection, toggle a provider off and confirm its models vanish from the chat selector, suspend a second user and confirm they cannot send, then check the actions appear in `audit_logs`.

@@ -171,10 +171,7 @@ async function main() {
     const plaintext = decryptSecret(stored);
     check(`${p.name}: decrypts to a real-looking key`, plaintext.startsWith('sk-'));
     check(`${p.name}: key_last4 matches the key`, p.key_last4 === keyLast4(plaintext));
-    check(
-      `${p.name}: only the last 4 are stored in the clear`,
-      (p.key_last4 ?? '').length <= 4,
-    );
+    check(`${p.name}: only the last 4 are stored in the clear`, (p.key_last4 ?? '').length <= 4);
   }
 
   // --- HTTP surface --------------------------------------------------------
@@ -190,7 +187,13 @@ async function main() {
   const normal = await makeUser(`admin-test-user-${stamp}@example.com`, 'user');
   const superuser = await makeUser(`admin-test-admin-${stamp}@example.com`, 'admin');
 
-  const ADMIN_ROUTES = ['/admin', '/admin/providers', '/admin/models', '/admin/users', '/admin/settings'];
+  const ADMIN_ROUTES = [
+    '/admin',
+    '/admin/providers',
+    '/admin/models',
+    '/admin/users',
+    '/admin/settings',
+  ];
 
   try {
     for (const route of ADMIN_ROUTES) {
@@ -257,7 +260,10 @@ async function main() {
       .insert({ user_id: normal.id, title: 'sneaky' });
     check('RLS blocks a suspended user from writing directly', !!rlsWrite);
 
-    const { data: stillReads } = await normal.client.from('conversations').select('id').eq('id', convo);
+    const { data: stillReads } = await normal.client
+      .from('conversations')
+      .select('id')
+      .eq('id', convo);
     check('a suspended user can still read their history', (stillReads ?? []).length === 1);
 
     await admin.from('profiles').update({ suspended: false }).eq('id', normal.id);
@@ -295,10 +301,7 @@ async function main() {
         'chat succeeded — it is still reading the env var',
       );
     } finally {
-      await admin
-        .from('providers')
-        .update({ encrypted_api_key: original })
-        .eq('name', target.name);
+      await admin.from('providers').update({ encrypted_api_key: original }).eq('name', target.name);
     }
 
     // --- disabling a provider hides its models -----------------------------
@@ -326,7 +329,9 @@ async function main() {
     console.log('\nTest users cleaned up.');
   }
 
-  console.log(failures === 0 ? '\nAll admin checks passed.' : `\n${failures} admin check(s) FAILED.`);
+  console.log(
+    failures === 0 ? '\nAll admin checks passed.' : `\n${failures} admin check(s) FAILED.`,
+  );
   process.exit(failures === 0 ? 0 : 1);
 }
 

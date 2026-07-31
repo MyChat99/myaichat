@@ -4,11 +4,12 @@ Pending action items and what comes after the eight planned phases.
 
 ## Immediate next steps
 
-1. **Generate an encryption key** — the one thing Phase 4 needs from you:
-   `echo "ENCRYPTION_MASTER_KEY=$(openssl rand -base64 32)" >> .env.local`
-2. **Start Phase 4** — read [PHASE-4-admin-panel.md](../phases/PHASE-4-admin-panel.md) in full, propose a plan, then implement.
+1. **Close out Phase 4** — a browser pass over `/admin`: rotate a key and Test Connection, toggle a provider off and watch its models leave the chat selector, suspend a user, then confirm the actions landed in `audit_logs`.
+2. **Start Phase 5** — [PHASE-5-theming.md](../phases/PHASE-5-theming.md). Needs nothing external; `user_preferences` has existed since Phase 1 and all colours already run through CSS custom properties.
 
-Phases 1–3 are Verified. Both providers stream live, models are selectable per conversation, and usage is logged per model with estimated cost.
+Phases 1–3 are Verified; Phase 4 is Done pending its browser pass.
+
+**Operational note:** `ENCRYPTION_MASTER_KEY` is now load-bearing. Every provider key in the database is encrypted with it — lose it and they must all be re-entered. The same value has to be set in Railway at Phase 8, and rotating it means re-encrypting every stored key.
 
 Worth doing soon, not blocking: install Docker to get a local Supabase stack, which also restores `supabase gen types` and removes the hand-maintained types file ([ISSUE-004](ISSUES.md), [ISSUE-005](ISSUES.md)).
 
