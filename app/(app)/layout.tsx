@@ -36,6 +36,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
           <nav className="flex items-center gap-3">
             <Link
+              href="/profile"
+              className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+            >
+              Profile
+            </Link>
+
+            <Link
               href="/settings"
               className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
             >
