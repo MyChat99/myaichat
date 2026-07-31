@@ -11,6 +11,7 @@
  * the whole script still runs in a credential-free CI job.
  *
  *   npm run security:audit
+ *   npm run security:audit -- --history    (adds a full-history scan)
  */
 import { execFileSync } from 'node:child_process';
 
@@ -66,6 +67,111 @@ const SECRET_PATTERNS: { name: string; pattern: string }[] = [
     pattern: 'ENCRYPTION_MASTER_KEY=[A-Za-z0-9+/]{40,}',
   },
 ];
+
+/**
+ * The same shapes, against EVERY commit rather than the current tree.
+ *
+ * A working tree can be clean while a key sits in a commit from three weeks
+ * ago — and making a repository public publishes the history, not the tip.
+ * This is the check that has to pass before visibility changes.
+ *
+ * Never prints a match. A finding reports the pattern name and the
+ * `<commit>:<path>` locations only: a tool that echoes the secret it just
+ * found has put it into your terminal scrollback, your shell history and
+ * whatever captured the CI log.
+ *
+ * Opt-in via `--history` because it walks the whole object graph; that is
+ * fine on 42 commits and slow on 4,000.
+ */
+function scanHistory() {
+  console.log('\nHistory (all commits)\n');
+
+  const revs = git(['rev-list', '--all']).trim().split('\n').filter(Boolean);
+  if (revs.length === 0) {
+    warn('no commits to scan');
+    return;
+  }
+
+  console.log(`  ..    scanning ${revs.length} commit(s)`);
+
+  for (const { name, pattern } of SECRET_PATTERNS) {
+    const hits = git(['grep', '-I', '-l', '-E', pattern, ...revs])
+      .split('\n')
+      .filter(Boolean)
+      // .env.example holds placeholders on purpose, in every commit that has it
+      .filter((line) => !line.includes('.env.example'))
+      .filter((line) => !line.includes('scripts/security-audit.ts'));
+
+    if (hits.length > 0) {
+      // Locations only — never the matched text.
+      fail(
+        `${name} appears in history`,
+        `${hits.length} location(s): ${hits.slice(0, 6).join(', ')}`,
+      );
+    }
+  }
+
+  // Personal data is not a credential, but it is published just the same.
+  const emails = git([
+    'grep',
+    '-I',
+    '-h',
+    '-E',
+    '-o',
+    '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}',
+    ...revs,
+  ])
+    .split('\n')
+    .map((line) => line.replace(/^[0-9a-f]{7,40}:/, '').trim())
+    .filter(Boolean)
+    .filter((e) => !/@(example|test|localhost)\.(com|org|net|invalid)$/i.test(e))
+    .filter((e) => !/noreply|users\.noreply\.github\.com|@myaichat\.|w3\.org|schemas?\./i.test(e));
+
+  // Domains, not addresses. Enough to spot "why is my employer's domain in
+  // here", without printing a list of harvestable addresses into a CI log.
+  const domains = [...new Set(emails.map((e) => e.split('@')[1]?.toLowerCase()))].filter(Boolean);
+
+  // Fixtures for the disposable-email blocklist legitimately contain these.
+  const FIXTURE_DOMAINS = new Set([
+    'mailinator.com',
+    'team.mailinator.com',
+    'notmailinator.com',
+    'guerrillamail.com',
+    'gmail.com',
+    'email.com',
+  ]);
+  const real = domains.filter((d) => !FIXTURE_DOMAINS.has(d!));
+
+  if (real.length > 0) {
+    warn(
+      `email domains in history: ${real.join(', ')}`,
+      'the commit author is expected here — anything else, decide before publishing',
+    );
+  } else {
+    ok('no email domains in history beyond test fixtures');
+  }
+
+  const envInHistory = git(['log', '--all', '--diff-filter=A', '--name-only', '--pretty=format:'])
+    .split('\n')
+    .filter((f) => /^\.env/.test(f.trim()) && !f.includes('.env.example'));
+
+  if (envInHistory.length > 0) {
+    fail('an .env file was committed at some point', [...new Set(envInHistory)].join(', '));
+  } else {
+    ok('no .env file was ever committed');
+  }
+
+  const homePaths = git(['grep', '-I', '-l', '-E', '/(Users|home)/[a-z][a-z0-9_-]{2,}/', ...revs])
+    .split('\n')
+    .filter(Boolean)
+    .filter((line) => !line.includes('docs/'));
+
+  if (homePaths.length > 0) {
+    warn('absolute home paths in history', `${homePaths.length} location(s)`);
+  } else {
+    ok('no absolute home paths in tracked source');
+  }
+}
 
 function scanForSecrets() {
   console.log('\nCommitted secrets\n');
@@ -200,6 +306,9 @@ async function main() {
   console.log('Security audit');
 
   scanForSecrets();
+
+  // `npm run security:audit -- --history` before making the repo public.
+  if (process.argv.includes('--history')) scanHistory();
   auditDependencies();
   await auditRls();
 

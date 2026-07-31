@@ -18,6 +18,14 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 
 ---
 
+### DEC-015 — CSP keeps `'unsafe-inline'` for scripts; the trade is accepted and closed
+
+**Date:** 2026-07-31 | **Phase:** 7/8 | **Status:** Active — **owner decision, not revisitable by an agent**
+**Decision:** `script-src` keeps `'unsafe-inline'` in production. The pre-paint theme resolver in `app/layout.tsx` stays an inline script.
+**Why:** The alternative is a nonce, and a nonce cannot be applied to that script without reintroducing the flash of wrong theme that Phase 5 exists to eliminate. The other route — moving theme resolution to a cookie read in `proxy.ts` — is real work on the one part of the stack where a mistake logs everybody out. Weighed against the actual exposure, it is not worth it: every rendered surface is React-escaped, Markdown is sanitised, and there is no path that injects attacker-controlled markup into a page.
+**Argument against, stated plainly:** `'unsafe-inline'` removes CSP's usefulness as a *second* line of defence against XSS. If a sanitiser bug ever shipped, the CSP would not catch it. That is the cost being accepted.
+**Consequences:** `verify:headers` reports the exception as a note rather than a failure, so it stays visible in every run without going red. `'unsafe-eval'` is a separate matter — allowed in development only (ISSUE-021), never in production, and asserted as such.
+
 ### DEC-014 — Signup password rules follow NIST, and apply to signup only
 
 **Date:** 2026-07-31 | **Phase:** 8 (Session 2) | **Status:** Active

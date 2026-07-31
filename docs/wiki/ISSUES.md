@@ -16,6 +16,44 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-022 — Pre-publish audit: repository is clean, with three identifiers to decide on
+
+**Status:** Open (decision, not a defect) | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-07-31
+**Problem:** Before making the repository public, the working tree and all 42 commits of history were scanned for credentials and personal information.
+
+**Clean — zero hits across every commit:**
+
+| Scanned for | Result |
+| --- | --- |
+| Anthropic / OpenAI / Supabase secret / Resend / AWS key shapes | none |
+| Private key blocks (`BEGIN … PRIVATE KEY`) | none |
+| JWT-shaped strings | none |
+| Postgres connection strings carrying a password | none |
+| `.env` files ever committed | none — only `.env.example`, which holds placeholders |
+| Absolute home paths (`/Users/…`) | none |
+| Email addresses outside `example.com` / `example.invalid` | none |
+
+**Three identifiers are present and are a judgement call, not a leak:**
+
+1. **Supabase project ref** `uorgo…zje` — in `package.json` (the `db:link` script) and two wiki files. It is already public: it forms the `NEXT_PUBLIC_SUPABASE_URL` that every browser request carries, so anyone using the deployed app can read it. Publishing the repo reveals nothing new. It does make the project trivially *addressable* by a stranger — which is safe because RLS covers all ten tables and the publishable key is designed to be public, and `verify:rls` proves it. **Recommendation: leave it.** Removing it would mean hiding a value the app broadcasts anyway.
+2. **Commit author** `Muhammad Bin Zeeshan <myaichatbot@proton.me>` — in every commit, unavoidable without rewriting history (which is forbidden and not worth it). This is the dedicated project address, not a personal one. **Recommendation: leave it.**
+3. **`Sharaka workspace`** in `docs/mockups/02-obsidian.html` — demo text I wrote, derived from your other email address. Publishing it links this repository to a second identity for no benefit. **Changed to a neutral workspace name.** One edit to revert if you want it there.
+
+**Resolution:** `npm run security:audit -- --history` now performs this scan on demand, so it is repeatable rather than a one-off. Run it before any future publish.
+
+### ISSUE-021 — Dev overlay showed a permanent "1 Issue" on every page
+
+**Status:** Resolved | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-07-31 | **Resolved:** 2026-07-31
+**Problem:** Reported as a 404-page problem, but it was not specific to the 404 — every page in development logged:
+
+> `eval() is not supported in this environment. If this page was served with a Content-Security-Policy header, make sure that 'unsafe-eval' is included.`
+
+React's **development** build uses `eval()` to reconstruct call stacks across the server/client boundary. Our `script-src` allows `'unsafe-inline'` but not `'unsafe-eval'`, so React's dev tooling was blocked. Nothing was broken — but a console that permanently contains an error is a console nobody reads, which is how the *next* real error gets missed.
+
+**Resolution:** `contentSecurityPolicy()` in `next.config.ts` now takes a `dev` flag and adds `'unsafe-eval'` **in development only**. React never uses `eval()` in production, so the shipped policy is byte-identical to before — confirmed by diffing the built output. `verify:headers` was strengthened at the same time: it now calls the builder explicitly for both modes rather than reading whatever policy the current process happens to produce. The previous check would have passed in production and silently stopped testing anything the moment it ran under `NODE_ENV=development`.
+
+**Also noticed while investigating:** anonymous requests to a non-existent path get a 307 to `/login`, not the themed 404 — the proxy gates first. That is correct (an anonymous visitor should not learn which paths exist) and the themed 404 is what a signed-in user sees.
+
 ### ISSUE-020 — Supabase CLI link state was lost; `db push` needs an explicit connection string
 
 **Status:** Resolved | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-07-31 | **Resolved:** 2026-07-31
@@ -32,7 +70,9 @@ The password is already in `.env.local` as `SUPABASE_DB_PASSWORD`. Migration `20
 
 ### ISSUE-019 — Two Dependabot PRs break the build (caught by CI on day one)
 
-**Status:** Open | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-07-31
+**Status:** Resolved | **Resolved:** 2026-07-31 — both PRs closed with the reason recorded on the PR itself. Dependabot reopens automatically when a compatible `eslint-config-next` ships, so nothing is lost by closing. Original detail below.
+
+**Status (original):** Open | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-07-31
 **Problem:** Dependabot opened six PRs within minutes of its config landing. CI failed two:
 - **#6 eslint 9.39.5 → 10.8.0** — `eslint-config-next@16.2.12` bundles `eslint-plugin-react@7.37.5`, which is incompatible with ESLint 10: `TypeError: contextOrFilename.getFilename is not a function`. Not fixable from our side; it needs an `eslint-config-next` release that supports ESLint 10.
 - **#5 typescript 5.9.3 → 7.0.2** — also fails.
@@ -43,28 +83,83 @@ The other four (#1 checkout, #2 setup-node, #3 production group, #4 @types/node)
 
 ### ISSUE-018 — Branch protection cannot be set: private repo needs GitHub Pro
 
-**Status:** Open | **Severity:** Medium | **Phase:** 8 | **Opened:** 2026-07-31
-**Problem:** `gh api -X PUT repos/MyChat99/myaichat/branches/main/protection` returns **403 "Upgrade to GitHub Pro or make this repository public to enable this feature."** Branch protection on private repositories is a paid feature. This is a plan limit, not an auth problem — `gh` is authenticated as MyChat99 and every other API call works.
-**Consequence:** CI runs on every push and PR, but nothing *enforces* a passing run before merge. A red build can still reach `main`, and `main` auto-deploys to Railway.
+**Status:** Open (waiting on you) | **Severity:** Medium | **Phase:** 8 | **Opened:** 2026-07-31
+**Problem:** `main` has nothing protecting it. Railway deploys from `main` directly, so a red build reports but does not block a deploy. Setting a ruleset via `gh api` returns **403 Upgrade to GitHub Pro** — branch protection on a *private* repository is a paid feature.
+**Decision made 2026-07-31:** you are making the repository **public** when you return, which makes branch protection free.
 
-**Three ways to fix, pick one:**
+---
 
-1. **Make the repository public** — free, and branch protection turns on immediately. Check first that nothing sensitive is in the history; `npm run security:audit` scans tracked files for credential shapes and currently reports clean.
-2. **Upgrade to GitHub Pro** (~$4/month) and then run:
-   ```bash
-   gh api -X PUT repos/MyChat99/myaichat/branches/main/protection \
-     -H "Accept: application/vnd.github+json" \
-     -f "required_status_checks[strict]=true" \
-     -f "required_status_checks[contexts][]=Lint, type-check, build" \
-     -f "required_status_checks[contexts][]=Tests (credential-free)" \
-     -F "enforce_admins=false" \
-     -F "required_pull_request_reviews[required_approving_review_count]=0" \
-     -F "restrictions=null"
-   ```
-   Or via the UI: **Settings → Branches → Add branch protection rule** → branch name `main` → tick *Require status checks to pass before merging* → select **Lint, type-check, build** and **Tests (credential-free)** → tick *Require branches to be up to date*.
-3. **Accept it for now** and rely on discipline: work on branches, open PRs, read CI before merging. Workable for a single maintainer; it stops working the moment anyone else can push.
+#### Do this when you get back, in order
 
-**Until one of these is done, treat a green CI badge as advisory rather than as a gate.**
+**Step 1 — confirm the repo is still clean.** History gets published too, not just the tip.
+
+```bash
+npm run security:audit -- --history
+```
+
+Expect `0 finding(s)`. The two warnings (dependency advisories per ISSUE-006, and `proton.me` as the commit-author domain) are known and fine. **If anything else appears, stop and read ISSUE-022 before continuing.**
+
+**Step 2 — make it public.** Do this yourself, in the browser, so the choice is deliberate:
+`Settings → General → Danger Zone → Change repository visibility → Make public`
+
+**Step 3 — apply branch protection.** One paste:
+
+```bash
+gh api --method PUT repos/MyChat99/myaichat/branches/main/protection \
+  --input - <<'JSON'
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": [
+      "Lint, type-check, build",
+      "Tests (credential-free)"
+    ]
+  },
+  "enforce_admins": false,
+  "required_pull_request_reviews": null,
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_conversation_resolution": true
+}
+JSON
+```
+
+Notes on the choices, so you can change them knowingly:
+
+| Field | Set to | Why |
+| --- | --- | --- |
+| `contexts` | the two blocking CI jobs | These are the **job names** from `ci.yml`, not the workflow name. The security job is excluded on purpose — it is advisory (ISSUE-006) and would block every merge. |
+| `strict: true` | on | A PR must be up to date with `main` before merging, so CI result reflects the merged state. |
+| `enforce_admins` | **false** | You are the only maintainer. `true` locks you out of your own hotfix at 2am with no second approver to help. Turn it on if anyone else joins. |
+| `required_pull_request_reviews` | `null` | Requiring a review with one maintainer means nothing can ever merge. |
+| `allow_force_pushes` / `allow_deletions` | false | The actual point of the exercise. |
+| `required_conversation_resolution` | true | Free, and stops review comments getting lost. |
+
+**Step 4 — verify it took.**
+
+```bash
+gh api repos/MyChat99/myaichat/branches/main/protection --jq \
+  '{checks: .required_status_checks.contexts, force: .allow_force_pushes.enabled, delete: .allow_deletions.enabled}'
+```
+
+Expect the two check names, and `false` for both force and delete.
+
+**Step 5 — prove it actually blocks.** A protection rule you have not tested is a rule you are assuming.
+
+```bash
+git commit --allow-empty -m "test: confirm branch protection rejects a direct push"
+git push origin main          # must be REJECTED
+git reset --hard HEAD~1
+```
+
+If that push succeeds, protection is not applied to the branch you think it is.
+
+**Step 6 — chain the deploy (optional, and a separate decision).** With CI blocking merges, you may then want Railway to deploy only on green. That means turning **off** Railway's own Auto Deploy, adding `RAILWAY_TOKEN` as a repository secret, and removing `if: false` from the deploy job in `.github/workflows/ci.yml`. The exact three steps are written in a comment in that file. Leave it as-is if you prefer Railway's simpler behaviour — protection alone already fixes the main risk.
+
+---
+
+**If you decide NOT to make it public after all:** the alternatives are GitHub Pro (~$4/month, same commands work unchanged) or accepting the risk. Accepting it is not unreasonable for a single-maintainer project — CI still runs and still reports on every push. What you lose is the enforcement, not the signal.
 
 ### ISSUE-017 — Resend not configured: email is rendered but never sent
 

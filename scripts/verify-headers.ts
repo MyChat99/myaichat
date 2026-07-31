@@ -15,7 +15,7 @@
  *
  *   npm run verify:headers
  */
-import nextConfig from '../next.config';
+import nextConfig, { contentSecurityPolicy } from '../next.config';
 
 let failures = 0;
 let checks = 0;
@@ -96,11 +96,28 @@ async function main() {
   check("base-uri 'self'", directives.get('base-uri') === "'self'");
   check("form-action 'self'", directives.get('form-action') === "'self'");
 
-  // The two rules that matter most and are easiest to lose by accident.
+  // ⚠️ Asserted against the PRODUCTION policy specifically, not against
+  // whatever this process happens to be running as. Development deliberately
+  // allows 'unsafe-eval' for React's dev-only call-stack reconstruction; if
+  // this check simply read the ambient policy it would pass in production and
+  // silently stop testing anything the moment it ran under NODE_ENV=development.
+  const prod = new Map(
+    contentSecurityPolicy(false)
+      .split(';')
+      .map((part) => {
+        const [name, ...rest] = part.trim().split(/\s+/);
+        return [name, rest.join(' ')];
+      }),
+  );
+
   check(
-    "script-src does not allow 'unsafe-eval'",
-    !(directives.get('script-src') ?? '').includes('unsafe-eval'),
-    directives.get('script-src'),
+    "production script-src does not allow 'unsafe-eval'",
+    !(prod.get('script-src') ?? '').includes('unsafe-eval'),
+    prod.get('script-src'),
+  );
+  check(
+    "development script-src DOES allow 'unsafe-eval' (React dev tooling)",
+    (contentSecurityPolicy(true).match(/script-src[^;]*/)?.[0] ?? '').includes('unsafe-eval'),
   );
   check(
     'script-src is not a wildcard',

@@ -398,9 +398,9 @@ Overnight work, additive only. Nothing in Phases 1–4 was modified.
 | `lint` / `type-check` / `build` | pass |
 | `verify:headers` | pass — 24/24 |
 | `verify:theme` / `appearance` / `gates` / `rls` / `providers` / `admin` | pass |
-| Palette opens on ⌘K, arrows and Enter work | **NEEDS HUMAN VERIFICATION** — needs a keyboard |
-| Animations feel right, and stop under reduced motion | **NEEDS HUMAN VERIFICATION** — needs eyes and an OS setting |
-| Error and 404 pages look correct | **NEEDS HUMAN VERIFICATION** — code paths exist, appearance unchecked |
+| Palette opens on ⌘K, arrows and Enter work | **Verified** 2026-07-31 by owner |
+| Animations feel right, and stop under reduced motion | **Verified** 2026-07-31 by owner |
+| Error and 404 pages look correct | **Verified** 2026-07-31 by owner |
 
 ### Priority 3 — Security hardening · Done & verified
 
@@ -435,7 +435,7 @@ Overnight work, additive only. Nothing in Phases 1–4 was modified.
 | Throttle blocks after 5 failures, clears on success | pass — asserted against stored rows |
 | `auth_attempts` unreadable with the publishable key | pass |
 | Over-budget user is refused by the chat route | pass — asserted via `checkDailyTokenBudget` on a real user with real usage |
-| The password prompt appears when rotating a key | **NEEDS HUMAN VERIFICATION** — the server gate is tested; the dialog is not |
+| The password prompt appears when rotating a key | **Verified** 2026-07-31 by owner — wrong password rejected, correct password accepted |
 
 ### Priority 4 — Frontend polish · Done, visually unverified
 
@@ -475,7 +475,7 @@ Overnight work, additive only. Nothing in Phases 1–4 was modified.
 | Icons render correctly | pass — generated PNG inspected directly |
 | OG card renders | **NEEDS HUMAN VERIFICATION** — route builds; the image itself is unseen |
 | Skeletons match the real layout | **NEEDS HUMAN VERIFICATION** |
-| Mobile layout at 360px | **NEEDS HUMAN VERIFICATION** — reasoned from the CSS, not measured in a browser |
+| Mobile layout at 360px | **Verified** 2026-07-31 by owner — header wraps, no horizontal scroll |
 | Windowing at 60+ messages | **NEEDS HUMAN VERIFICATION** — no conversation here is that long |
 
 ### Priority 5 — Test depth · Done
