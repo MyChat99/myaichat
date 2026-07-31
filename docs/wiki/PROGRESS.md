@@ -1441,3 +1441,68 @@ rather than paged over, since this deployment has single digits of users.
 | `verify:resilience` | pass — 47, up from 37 |
 | `verify:logging` | pass — 69, up from 57 |
 | `verify:all` | pass — 21 suites, clean before and after |
+
+## Away session 4B — Priority 2a · Analytics query plans · 2026-07-31
+
+### The honest problem with profiling this deployment
+
+There are **178 messages and 266 usage rows**. Every analytics query runs in
+under 1.2ms, and Postgres correctly sequential-scans tables that fit in two
+pages. **EXPLAIN against real data here cannot distinguish a good index strategy
+from a bad one** — claiming an index "improved" anything on that evidence would
+be fabrication.
+
+So the decision was made at a volume where the answer is not obvious:
+`benchmark_message_index()` builds a **temp table** of 200,000 synthetic rows,
+runs the dashboard's own count query with and without the candidate index, and
+returns both plans. Temp tables are per-session and vanish on disconnect, so it
+touches no real data.
+
+| | Execution time |
+| --- | --- |
+| before: no index | **106.8 ms** |
+| after: partial index on `(created_at) where role = 'user'` | **23.5 ms** |
+
+A 4.5× improvement, measured rather than assumed.
+
+### What was actually missing
+
+`messages` had indexes on `(conversation_id, created_at)` and
+`(conversation_id, seq)` — both excellent for reading one thread, and **useless
+for a query with no `conversation_id`**. The dashboard counts user messages
+globally by date, twice.
+
+The index is **partial on `role = 'user'`** because every caller filters on it.
+Indexing the assistant half would roughly double the write cost — and messages
+are written on the hot path of every chat turn — to speed up queries nobody runs.
+
+On the real table the planner cost for that query fell from **13.61 to 5.71**.
+Actual runtime is unchanged at 0.05ms, because 178 rows is nothing either way.
+That is stated rather than dressed up.
+
+### Everything else was already covered
+
+`usage_logs` has `created_at` and `(user_id, created_at)`, which cover the
+analytics range scan and the per-user drill-in. `audit_logs` has `created_at`
+and `action`. No further indexes were added, because no further access pattern
+lacked one.
+
+### The tooling is now permanent
+
+`explain_analytics()` returns plans for the seven real aggregations, and
+`verify:schema` asserts against them — **on planner cost, not runtime**. A
+timing assertion at 178 rows would pass whether or not the index existed, which
+is the definition of a useless test. Cost is what the planner computes from the
+index's existence, so it is what actually changes.
+
+Both functions take **no SQL parameter**. A flexible `explain(sql text)` would
+be more convenient and is a general-purpose SQL executor wearing a hat —
+PostgREST otherwise exposes only CRUD, so it would add capability that does not
+currently exist, for a profiling task.
+
+| Criterion | Result |
+| --- | --- |
+| Before/after measured at realistic volume | 106.8ms → 23.5ms |
+| `verify:schema` | pass — index coverage asserted on cost |
+| `verify:all` | pass — 21 suites |
+| `security:audit` | pass — 12 tables, RLS intact |

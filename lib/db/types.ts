@@ -303,6 +303,14 @@ export interface Database {
         Args: Record<never, never>;
         Returns: undefined;
       };
+      explain_analytics: {
+        Args: Record<never, never>;
+        Returns: { label: string; plan: string }[];
+      };
+      benchmark_message_index: {
+        Args: { row_count?: number };
+        Returns: { stage: string; plan: string }[];
+      };
       rls_status: {
         Args: Record<never, never>;
         Returns: { table_name: string; rls_enabled: boolean; policy_count: number }[];
