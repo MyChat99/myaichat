@@ -614,3 +614,33 @@ user's resource. Two assertions carry more weight than the rest:
 | Every API route has a rejection test | done — chat, presign, download, health |
 | Every admin page refuses a non-admin | pass — all 7 |
 | History-window regression is guarded | pass |
+
+## Away session — Priority 4 · Export and demo data · 2026-07-31
+
+- **Conversation export** — `GET /api/conversations/:id/export?format=md|json`,
+  with `.md` / `.json` links in the chat header. Plain anchors rather than
+  fetch-and-Blob: the browser already knows how to save a response carrying a
+  `content-disposition` header, and doing it by hand means holding the whole
+  export in memory first. Markdown writes "You" and the model's display name
+  rather than `user`/`assistant`, because the file is read by a person and
+  usually pasted somewhere else. Attachment **names** are listed but not linked
+  — the bytes sit behind a signed URL that expires, so a link would be dead
+  before anyone opened the file.
+- **`npm run seed -- --demo`** — 52 conversations, 164 messages and 82 usage
+  rows spread across 30 days, so the analytics ranges (7/30/90) actually differ
+  and the charts are not three flat lines. Weekday volume varies, because a
+  chart of uniform bars looks as fake as it is.
+  - **Flag-gated, and refuses to run twice.** It writes fabricated usage rows,
+    and a fabricated row is indistinguishable from a real one the moment it
+    lands — it will be counted in spend and in every future report. Everything
+    is tagged `[demo]` and `--clean-demo` removes exactly what it added.
+  - Timestamps are written explicitly and spaced. A bulk insert otherwise lands
+    every row on one transaction-time `now()`, which would flatten the charts
+    *and* manufacture the collision described in ISSUE-024.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:api` | pass — 61/61, now covering export refusals **and** a real download |
+| Export downloads rather than rendering | pass — asserted on `content-disposition` |
+| `seed --demo` is gated and idempotent | pass — plain `seed` writes none; a second `--demo` run skips |
+| Charts look right with demo data | **NEEDS HUMAN VERIFICATION** — data is in, appearance unchecked |

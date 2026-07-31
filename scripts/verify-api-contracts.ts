@@ -163,6 +163,12 @@ async function main() {
       expect: [401],
     });
 
+    await probe({
+      label: 'GET conversation export without a session is 401',
+      path: `/api/conversations/${conversationId}/export`,
+      expect: [401],
+    });
+
     // /api/health is public on purpose (Railway probes it before any session).
     const health = await fetch(`${BASE}/api/health`);
     check('GET /api/health is public by design', health.status === 200, `got ${health.status}`);
@@ -280,6 +286,20 @@ async function main() {
       expect: [400],
     });
 
+    await probe({
+      label: 'export: a non-UUID id is 400',
+      path: '/api/conversations/not-a-uuid/export',
+      cookie: ownerCookie,
+      expect: [400],
+    });
+
+    await probe({
+      label: 'export: an unknown format is 400',
+      path: `/api/conversations/${conversationId}/export?format=pdf`,
+      cookie: ownerCookie,
+      expect: [400],
+    });
+
     // ───────────────────────────────────────────────── wrong user
     section("Another user's resources");
 
@@ -304,6 +324,13 @@ async function main() {
       path: '/api/uploads/download?key=chat/../../etc/passwd',
       cookie: otherCookie,
       expect: [400, 404],
+    });
+
+    await probe({
+      label: "export: another user's conversation is 404",
+      path: `/api/conversations/${conversationId}/export`,
+      cookie: otherCookie,
+      expect: [404],
     });
 
     await probe({
@@ -351,6 +378,31 @@ async function main() {
       foreign.status === absent.status && foreignBody === absentBody,
       `${foreign.status} vs ${absent.status}`,
     );
+
+    // The one non-refusal in this file: a download that returns nothing is
+    // also a broken download, and the refusal tests above cannot see that.
+    section('Export — the owner CAN download');
+
+    for (const [format, type, ext] of [
+      ['md', 'text/markdown', 'md'],
+      ['json', 'application/json', 'json'],
+    ] as const) {
+      const response = await fetch(
+        `${BASE}/api/conversations/${conversationId}/export?format=${format}`,
+        { redirect: 'manual', headers: { cookie: ownerCookie } },
+      );
+      const disposition = response.headers.get('content-disposition') ?? '';
+      check(`export as .${ext} returns 200`, response.status === 200, `got ${response.status}`);
+      check(
+        `  .${ext} is served as ${type}`,
+        (response.headers.get('content-type') ?? '').includes(type),
+      );
+      check(
+        `  .${ext} downloads rather than rendering`,
+        disposition.startsWith('attachment;') && disposition.includes(`.${ext}`),
+        disposition || '(none)',
+      );
+    }
 
     // ───────────────────────────────────────────────── admin surfaces
     section('Admin surfaces, as a normal user');

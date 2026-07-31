@@ -255,7 +255,31 @@ export function ChatThread({
         onSelectModel={setModelId}
       />
 
-      <div className="border-border flex items-center justify-end border-b px-4 py-1.5">
+      <div className="border-border flex items-center justify-end gap-1 border-b px-4 py-1.5">
+        {activeId ? (
+          <>
+            {/* Plain anchors, not fetch + Blob: the browser already knows how
+                to save a response with a content-disposition header, and doing
+                it by hand means holding the whole export in memory first. */}
+            <a
+              href={`/api/conversations/${activeId}/export?format=md`}
+              download
+              className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md px-2 py-1 text-xs transition"
+              title="Download this conversation as Markdown"
+            >
+              .md
+            </a>
+            <a
+              href={`/api/conversations/${activeId}/export?format=json`}
+              download
+              className="text-muted-foreground hover:bg-accent hover:text-foreground mr-1 rounded-md px-2 py-1 text-xs transition"
+              title="Download this conversation as JSON"
+            >
+              .json
+            </a>
+          </>
+        ) : null}
+
         <ModelSelector
           models={models}
           selectedId={modelId}
