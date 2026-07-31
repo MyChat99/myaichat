@@ -58,6 +58,14 @@ export type LogFields = {
   inputTokens?: number;
   outputTokens?: number;
   attempts?: number;
+  /**
+   * Milliseconds our own code spent before the provider call started.
+   *
+   * Separate from `durationMs` on purpose: total duration is dominated by how
+   * long the model takes to write, which is not ours to fix. This is the part
+   * that is, and without it "the app feels slow" is unattributable.
+   */
+  prepMs?: number;
   /** Our own diagnostic string. Scrubbed regardless. */
   detail?: string;
 };
