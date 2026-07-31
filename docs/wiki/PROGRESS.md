@@ -1253,3 +1253,40 @@ the capture.
 | No ad-hoc `console.*` left in the chat route | pass |
 | `verify:all` | pass — 20 suites, clean before and after |
 | Log volume in production | **NEEDS HUMAN VERIFICATION** — one line per request is the intent, unmeasured under load |
+
+## Away session 4A — Priority 3a · Admin overview · 2026-07-31
+
+`/admin` used to redirect straight to `/admin/providers`. It now has a landing
+page: messages today, cost today, cost over 30 days, users, and live provider
+health — with a banner naming any provider that is down, because a number that
+matters is worse than useless when it needs hunting for.
+
+Three decisions worth recording:
+
+- **Provider health is cached for five minutes.** `validateKey()` performs a
+  *real* generation — deliberately, because a key with no credit lists models
+  perfectly happily and only fails when asked to write something (ISSUE-012).
+  That means every check costs money, so checking on each render would bill the
+  account for looking at a page. Cached in module scope rather than a table: it
+  resets on deploy and is per-instance, which is acceptable at fractions of a
+  cent per check and avoids a migration plus a fourth deny-all table for data
+  worthless five minutes after it is written.
+- **A provider failure is a result, never a thrown error.** The dashboard's job
+  is to report that a provider is down; a page that 500s because a provider is
+  down reports nothing.
+- **Active users counts distinct users, not usage rows.** One person sending
+  forty messages is one active user, and counting rows would make a single heavy
+  user look like a busy day.
+
+Counts use `head: true` with an exact count — the number without the rows. The
+temptation on a page like this is `select *` and count in JavaScript, which
+works beautifully on forty rows and collapses at fifty thousand.
+
+Costs render to four decimals below a cent, because two decimals would show
+every figure on this deployment as `$0.00`.
+
+| Criterion | Result |
+| --- | --- |
+| `lint` / `type-check` / `build` | pass |
+| `verify:authz` / `gates` / `api` | pass — the new page is gated like the rest |
+| The cards render correctly with real data | **NEEDS HUMAN VERIFICATION** |

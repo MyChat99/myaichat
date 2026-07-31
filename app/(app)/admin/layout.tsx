@@ -1,4 +1,12 @@
-import { BarChart3, KeyRound, ScrollText, Settings2, SlidersHorizontal, Users } from 'lucide-react';
+import {
+  BarChart3,
+  KeyRound,
+  LayoutDashboard,
+  ScrollText,
+  Settings2,
+  SlidersHorizontal,
+  Users,
+} from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -7,6 +15,7 @@ import { requireAdmin } from '@/lib/security/auth';
 export const metadata: Metadata = { title: 'Admin' };
 
 const NAV = [
+  { href: '/admin', label: 'Overview', icon: LayoutDashboard },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/admin/providers', label: 'Providers', icon: KeyRound },
   { href: '/admin/models', label: 'Models', icon: SlidersHorizontal },
