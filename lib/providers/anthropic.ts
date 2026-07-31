@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 
 import {
   ProviderError,
+  type ChatMessage,
   type ChatProvider,
   type ChatStreamEvent,
   type KeyValidation,
@@ -62,6 +63,40 @@ function normalise(err: unknown): ProviderError {
   return new ProviderError('unknown', 'Unexpected error talking to Anthropic.', true);
 }
 
+/**
+ * Anthropic takes images and PDFs as separate content blocks alongside text.
+ *
+ * Attachment blocks come FIRST: the model reads the file before the instruction
+ * about it, which is what Anthropic's own guidance recommends and which reads
+ * more sensibly when the text refers to "this image".
+ */
+function toContent(message: ChatMessage): Anthropic.MessageParam['content'] {
+  if (!message.attachments?.length) return message.content;
+
+  const blocks: Anthropic.ContentBlockParam[] = [];
+
+  for (const a of message.attachments) {
+    if (a.kind === 'image') {
+      blocks.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: a.mimeType as 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif',
+          data: a.base64,
+        },
+      });
+    } else {
+      blocks.push({
+        type: 'document',
+        source: { type: 'base64', media_type: 'application/pdf', data: a.base64 },
+      });
+    }
+  }
+
+  blocks.push({ type: 'text', text: message.content });
+  return blocks;
+}
+
 export const ANTHROPIC_PROVIDER_NAME = 'anthropic';
 
 export function createAnthropicProvider(apiKey: string): ChatProvider {
@@ -83,7 +118,7 @@ export function createAnthropicProvider(apiKey: string): ChatProvider {
             // `high` or below, which is the default.
             thinking: { type: 'disabled' },
             system,
-            messages: messages.map((m) => ({ role: m.role, content: m.content })),
+            messages: messages.map((m) => ({ role: m.role, content: toContent(m) })),
           },
           { signal },
         );

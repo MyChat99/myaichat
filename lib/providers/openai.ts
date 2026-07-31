@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 
 import {
   ProviderError,
+  type ChatMessage,
   type ChatProvider,
   type ChatStreamEvent,
   type KeyValidation,
@@ -68,6 +69,27 @@ function normalise(err: unknown): ProviderError {
   return new ProviderError('unknown', 'Unexpected error talking to OpenAI.', true);
 }
 
+/**
+ * OpenAI takes images as `image_url` parts carrying a data: URI — the same
+ * bytes Anthropic wants as a base64 block, in a different envelope. That
+ * difference is exactly what the abstraction exists to absorb.
+ *
+ * Chat Completions has no document part, so PDFs are not sent here; the chat
+ * route only offers documents to models flagged `supports_documents`.
+ */
+function toContent(message: ChatMessage): OpenAI.Chat.ChatCompletionUserMessageParam['content'] {
+  const images = message.attachments?.filter((a) => a.kind === 'image') ?? [];
+  if (images.length === 0) return message.content;
+
+  return [
+    ...images.map((a) => ({
+      type: 'image_url' as const,
+      image_url: { url: `data:${a.mimeType};base64,${a.base64}` },
+    })),
+    { type: 'text' as const, text: message.content },
+  ];
+}
+
 export const OPENAI_PROVIDER_NAME = 'openai';
 
 export function createOpenAIProvider(apiKey: string): ChatProvider {
@@ -92,7 +114,13 @@ export function createOpenAIProvider(apiKey: string): ChatProvider {
               // OpenAI takes the system prompt as the first message rather than
               // a separate field, which is the main shape difference here.
               ...(system ? [{ role: 'system' as const, content: system }] : []),
-              ...messages.map((m) => ({ role: m.role, content: m.content })),
+              // Split by role: OpenAI permits content PARTS only on user
+              // messages, so an assistant turn must stay a plain string.
+              ...messages.map((m) =>
+                m.role === 'user'
+                  ? { role: 'user' as const, content: toContent(m) }
+                  : { role: 'assistant' as const, content: m.content },
+              ),
             ],
           },
           { signal },

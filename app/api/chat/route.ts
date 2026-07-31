@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/db/admin';
 import { createClient } from '@/lib/db/server';
 import { defaultModel, getAdapter, resolveModel } from '@/lib/providers/registry';
 import { ProviderError, type ChatMessage } from '@/lib/providers/types';
+import { fetchObject, isStorageConfigured, keyBelongsToUser } from '@/lib/r2/storage';
 import { checkChatRateLimit } from '@/lib/security/rate-limit';
 
 /**
@@ -31,6 +32,19 @@ const bodySchema = z.object({
   message: z.string().trim().min(1).max(100_000).optional(),
   /** Drop this message and everything after it, then resend. Used by edit + regenerate. */
   truncateFromMessageId: z.string().uuid().optional(),
+  /** R2 object keys from /api/uploads/presign. Ownership is re-checked here. */
+  attachments: z
+    .array(
+      z.object({
+        key: z.string().min(1).max(512),
+        name: z.string().min(1).max(255),
+        mimeType: z.string().min(1).max(128),
+        sizeBytes: z.number().int().positive(),
+        kind: z.enum(['image', 'document', 'text']),
+      }),
+    )
+    .max(5)
+    .optional(),
 });
 
 function ndjson(event: unknown): Uint8Array {
@@ -77,7 +91,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
   }
 
-  const { conversationId, message, truncateFromMessageId } = body;
+  const { conversationId, message, truncateFromMessageId, attachments } = body;
 
   // Ownership check runs through the user's own client, so RLS enforces it.
   const { data: conversation } = await supabase
@@ -131,6 +145,38 @@ export async function POST(request: NextRequest) {
     await supabase.from('conversations').update({ model_id: model.id }).eq('id', conversationId);
   }
 
+  // Attachments: verify ownership, then check the model can actually read them.
+  // Refusing up front is far better than silently dropping the file and letting
+  // the model answer as though it had seen something.
+  if (attachments?.length) {
+    const foreign = attachments.find((a) => !keyBelongsToUser(a.key, user.id));
+    if (foreign) {
+      return NextResponse.json({ error: 'Attachment not found.' }, { status: 404 });
+    }
+
+    const wantsImage = attachments.some((a) => a.kind === 'image');
+    const wantsDocument = attachments.some((a) => a.kind === 'document');
+
+    if (wantsImage && !model.supportsVision) {
+      return NextResponse.json(
+        { error: `${model.displayName} cannot read images. Pick a vision-capable model.` },
+        { status: 422 },
+      );
+    }
+    if (wantsDocument && !model.supportsDocuments) {
+      return NextResponse.json(
+        { error: `${model.displayName} cannot read documents. Pick a document-capable model.` },
+        { status: 422 },
+      );
+    }
+    if (!isStorageConfigured()) {
+      return NextResponse.json(
+        { error: 'File uploads are not configured on this deployment.' },
+        { status: 503 },
+      );
+    }
+  }
+
   const admin = createAdminClient();
 
   // Regenerate / edit: drop the target message and everything after it.
@@ -152,9 +198,12 @@ export async function POST(request: NextRequest) {
   }
 
   if (message) {
-    const { error: insertError } = await supabase
-      .from('messages')
-      .insert({ conversation_id: conversationId, role: 'user', content: message });
+    const { error: insertError } = await supabase.from('messages').insert({
+      conversation_id: conversationId,
+      role: 'user',
+      content: message,
+      attachments: (attachments ?? []) as never,
+    });
 
     if (insertError) {
       return NextResponse.json({ error: 'Could not save your message.' }, { status: 500 });
@@ -163,14 +212,41 @@ export async function POST(request: NextRequest) {
 
   const { data: history } = await supabase
     .from('messages')
-    .select('role, content')
+    .select('role, content, attachments')
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
     .limit(MAX_HISTORY_MESSAGES);
 
   const messages: ChatMessage[] = (history ?? [])
-    .filter((m): m is { role: 'user' | 'assistant'; content: string } => m.role !== 'system')
-    .map((m) => ({ role: m.role, content: m.content }));
+    .filter((m) => m.role !== 'system')
+    .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+  /**
+   * Hydrate attachment bytes for the LAST user turn only.
+   *
+   * Deliberately not the whole history: re-sending every image on every turn
+   * would multiply token cost without adding information the model has not
+   * already seen described in its own earlier replies.
+   */
+  if (attachments?.length && messages.length > 0) {
+    const last = messages[messages.length - 1];
+    if (last.role === 'user') {
+      const hydrated = await Promise.all(
+        attachments
+          .filter((a) => a.kind !== 'text')
+          .map(async (a) => {
+            const object = await fetchObject(a.key);
+            return {
+              kind: a.kind as 'image' | 'document',
+              mimeType: object.mimeType || a.mimeType,
+              base64: object.base64,
+              name: a.name,
+            };
+          }),
+      );
+      if (hydrated.length) last.attachments = hydrated;
+    }
+  }
 
   if (messages.length === 0) {
     return NextResponse.json({ error: 'Nothing to send.' }, { status: 400 });

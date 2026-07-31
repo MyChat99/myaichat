@@ -71,6 +71,9 @@ export interface Database {
           input_cost_per_1k: number;
           output_cost_per_1k: number;
           enabled: boolean;
+          /** Added in migration 20260730120007. */
+          supports_vision: boolean;
+          supports_documents: boolean;
         };
         Insert: Partial<Timestamps> & {
           id?: string;
@@ -82,6 +85,8 @@ export interface Database {
           input_cost_per_1k?: number;
           output_cost_per_1k?: number;
           enabled?: boolean;
+          supports_vision?: boolean;
+          supports_documents?: boolean;
         };
         Update: Partial<Database['public']['Tables']['models']['Row']>;
         Relationships: [];

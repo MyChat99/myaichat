@@ -44,6 +44,8 @@ export type ResolvedModel = {
   inputCostPer1k: number;
   outputCostPer1k: number;
   providerName: string;
+  supportsVision: boolean;
+  supportsDocuments: boolean;
 };
 
 export function registeredProviderNames(): string[] {
@@ -114,7 +116,7 @@ export async function listAvailableModels(): Promise<ResolvedModel[]> {
   const { data, error } = await admin
     .from('models')
     .select(
-      'id, model_id, display_name, max_tokens, input_cost_per_1k, output_cost_per_1k, providers!inner(name, enabled)',
+      'id, model_id, display_name, max_tokens, input_cost_per_1k, output_cost_per_1k, supports_vision, supports_documents, providers!inner(name, enabled)',
     )
     .eq('enabled', true)
     .eq('providers.enabled', true)
@@ -134,6 +136,8 @@ export async function listAvailableModels(): Promise<ResolvedModel[]> {
       inputCostPer1k: Number(row.input_cost_per_1k),
       outputCostPer1k: Number(row.output_cost_per_1k),
       providerName: row.providers.name,
+      supportsVision: row.supports_vision,
+      supportsDocuments: row.supports_documents,
     }));
 }
 

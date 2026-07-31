@@ -8,9 +8,25 @@
 
 export type ChatRole = 'user' | 'assistant' | 'system';
 
+/**
+ * An attachment as the provider needs it: bytes, not a URL.
+ *
+ * Deliberately base64 rather than a link — the bucket is private, so a URL
+ * would be useless to the provider, and a presigned one would leak read access
+ * to a third party.
+ */
+export type ChatAttachment = {
+  kind: 'image' | 'document';
+  mimeType: string;
+  base64: string;
+  name: string;
+};
+
 export type ChatMessage = {
   role: Exclude<ChatRole, 'system'>;
   content: string;
+  /** Optional so every existing call site stays valid. */
+  attachments?: ChatAttachment[];
 };
 
 export type StreamChatParams = {

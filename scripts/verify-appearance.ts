@@ -155,7 +155,9 @@ async function main() {
   }
 
   console.log(
-    failures === 0 ? '\nAll appearance checks passed.' : `\n${failures} appearance check(s) FAILED.`,
+    failures === 0
+      ? '\nAll appearance checks passed.'
+      : `\n${failures} appearance check(s) FAILED.`,
   );
   process.exit(failures === 0 ? 0 : 1);
 }
