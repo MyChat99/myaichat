@@ -6,7 +6,11 @@
 >
 > ### State at pause
 >
-> **Superseded by away session 3 (2026-07-31)** — see the report at the end of
+> **Superseded by away session 4A (2026-07-31)** — 7 more PRs since; the report
+> at the end of [OVERNIGHT-REPORT.md](OVERNIGHT-REPORT.md) is current, and ends
+> with READY FOR SESSION 4B.
+>
+> **Previously superseded by away session 3 (2026-07-31)** — see the report at the end of
 > [OVERNIGHT-REPORT.md](OVERNIGHT-REPORT.md). Nine PRs merged since; the return
 > checklist there replaces the one below.
 >

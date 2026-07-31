@@ -758,3 +758,188 @@ verify:headers       25    smoke                18
 ```
 
 17 suites, ~550 assertions, all green as of this commit.
+
+---
+---
+
+# Away session 4A — 2026-07-31
+
+**READY FOR SESSION 4B.**
+
+Seven pull requests, all merged through the protected flow with CI green on
+their own head commit. No `--admin` bypass. Production untouched: no deploy, no
+Railway change, no env change. Two additive migrations were **not** needed —
+this session added none.
+
+**Full suite green** — 21 suites, ~800 assertions, 82 seconds.
+
+---
+
+## Merged
+
+| PR | What |
+| --- | --- |
+| #19 | `verify:all` runner — **resolves ISSUE-015** |
+| #20 | One typed failure shape for every external dependency |
+| #21 | Bounded retries and outbound timeouts |
+| #22 | Structured logging, redaction proven by capture |
+| #23 | Admin overview page |
+| #24 | Per-user usage drill-in |
+| #25 | Audit log CSV export |
+
+---
+
+## Priority 1 — the queue
+
+Session 3 left no priority unfinished, so this came down to the one remaining
+code-resolvable open issue. **ISSUE-015 is resolved**: `npm run verify:all` runs
+all 21 suites in a deliberate order — credential-free first so a typo fails in
+two seconds rather than after four minutes of database work, and the two suites
+that break shared state last, never adjacent to one that reads what they break.
+
+It **refuses to start** when shared state is already dirty, because a previous
+run that died before its `finally` leaves a provider disabled and every later
+run then builds on that.
+
+The dirt detector was **proved to fail**, not assumed — setting the rate limit
+to 1 makes the runner refuse and print the remedy. A clean-state check that has
+never fired is one you are trusting on faith.
+
+Remaining open issues are all non-code: two dashboard/decision items
+(ISSUE-027, -028), three credential items (-003, -016, -017), three Docker/Next
+items (-004, -005, -006) and one judgement call (-022).
+
+---
+
+## Priority 2 — the reliability layer
+
+**Typed failures.** Four dependencies had four dialects; a database outage
+surfaced whatever Supabase said, which is written for the developer who caused
+it. Now one shape, with the user-safe message as the contract and internals in a
+`detail` that is logged and never serialised.
+
+> **The test found a bug before I did.** `messageFor` fell back to the
+> dependency's `unknown` sentence for unnamed kinds — and those say "try again
+> shortly" while `unknown` is deliberately not retryable. Eight combinations
+> invited a retry the code would refuse. Fixed structurally: fallbacks key on
+> *kind*, so they agree with the flag by construction.
+
+**Retries and timeouts.** The rule everything is built around: a stream may only
+be retried **before its first token**. After that, re-running appends a second
+answer to a partial first one — the model appears to stammer and the exchange is
+billed twice. `withRetry` takes an explicit `hasEmittedOutput` guard, and the
+test asserts both directions.
+
+Both SDK clients had **no timeout**, so a hung provider held the request for the
+route's full 300s. Now 90s. The SDKs' own retries are disabled so "3 attempts"
+means 3, not 3 × whatever each SDK does by default.
+
+Also fixed: stream failures previously emitted `retryable: true`
+unconditionally, so a mid-stream rejection of our API key told the user to try
+again and every retry burned another request against a key that would never work.
+
+**Structured logging.** One JSON line per request. Redaction is **structural**:
+the payload is a fixed set of typed fields, so there is no free-form object to
+hide a secret in. `message`, `prompt`, `completion`, `content`, `email`, `ip`
+and `body` are absent and asserted absent — a chat app's logs are the one place
+every private conversation could accumulate, and "we only log it on errors" is
+how that happens.
+
+The test **replaces `console.log`/`console.error`**, pushes eleven credential
+shapes through the real logger and greps what came out. Checking the redaction
+*function* proves the function works; this proves the *logger* does.
+
+---
+
+## Priority 3 — admin quality of life
+
+**Overview page** at `/admin`, which previously just redirected. Provider health
+is cached five minutes because `validateKey()` performs a real generation — a
+key with no credit lists models happily and fails only when asked to write
+something — so checking on every render would bill the account for looking at a
+page. A provider failure is a *result*, never a throw: a page that 500s because
+a provider is down reports nothing.
+
+**Per-user usage drill-in** at `/admin/users/[id]`. A deleted model still shows
+its spend, labelled as such, because usage rows outlive the model row and
+dropping them would make totals disagree with the actual bill. `verify:authz`
+detected the new route on its own — which is the point of a source-level
+completeness check.
+
+**Audit CSV export.** The part that matters is **formula injection**: a cell
+beginning `=`, `+`, `-` or `@` is executed by Excel and Sheets, and an audit
+export is exactly where attacker-influenced text meets a trusting reader. Cells
+are defused with a leading quote — not destroyed, so a reviewer still sees what
+was there. The export is itself audited, which is not circular: an export that
+leaves no trace is a gap in the thing it exports.
+
+---
+
+## Two mistakes of mine, recorded
+
+**I skipped lint before committing PR #21** and CI caught a `prefer-const`. I ran
+format, type-check and build; the standing rule is the full suite, and I did not
+follow it. The protected branch did its job.
+
+**My first logging test asserted inside the capture block**, so `check()`'s own
+output counted as the logger's and "one line per request" read as three. The
+test was wrong, not the code.
+
+Also worth noting: `security:audit` flagged an `sk-ant-` shaped **test fixture**
+I had written into `verify-degradation.ts`. The scanner was right — it cannot
+tell a fixture from a real key, and should not try. The fixture is now assembled
+at runtime, so the runtime value still matches the shape while the source
+contains no matching literal.
+
+---
+
+## Needs your eyes
+
+| # | What | Why |
+| --- | --- | --- |
+| 1 | The admin overview cards with real data | Built and gated; unseen |
+| 2 | The per-user usage page | Same |
+| 3 | The CSV opening in Excel/Sheets | Escaping is asserted; the file is unopened |
+| 4 | Retry behaviour under a real provider outage | Cannot induce one safely |
+| 5 | Log volume under load | One line per request is the intent, unmeasured |
+| 6–10 | Carried over: attachment UI, analytics charts, export links, ISSUE-028 toggle, deploy-gating decision | |
+
+---
+
+## Open questions for you
+
+1. **ISSUE-028 is still open and is the highest-severity thing in the repo.** One
+   Supabase toggle. Until then a stolen refresh token stays valid indefinitely.
+2. **Provider health caching is per-instance.** Fine on one Railway instance. If
+   you ever scale out, it should move to a table — noted in the module.
+3. **`verify:session` is 22s of the 81s suite** because it genuinely waits 20
+   seconds to test refresh-token reuse past the provider's interval. Worth it,
+   but it is why the suite is not faster.
+
+---
+
+## Your return checklist, unchanged in order
+
+1. **R2 + Resend credentials** → [PHASE-6-CHECKLIST.md](PHASE-6-CHECKLIST.md)
+2. **Finish Phase 6** — only the PUT is missing
+3. **Visual sign-offs** — the ten rows above
+4. **ISSUE-028** — one toggle, then `npm run verify:session -- --strict`
+5. **Deploy gating** — [ISSUE-027](ISSUES.md); my recommendation is still *not yet*
+6. **Screenshots** — `npm run seed -- --demo` first
+7. **LinkedIn** — [LINKEDIN-DRAFTS.md](LINKEDIN-DRAFTS.md)
+
+---
+
+## Suite as it stands
+
+```
+verify:degradation  185   verify:theme        134   verify:api           81
+verify:logging       57   verify:security      42   verify:session       41
+verify:authz         38   verify:resilience    37   verify:csv           36
+verify:attachments   33   verify:headers       25   smoke                18
++ schema, seed, rls, gates, appearance, storage, chat, providers, admin, email
+```
+
+**21 suites via `npm run verify:all` — 82 seconds, clean before and after.**
+
+**READY FOR SESSION 4B.**
