@@ -404,6 +404,82 @@ async function main() {
       );
     }
 
+    // ───────────────────────────────────────────────── public-but-guarded
+    section('Public routes still refuse bad input');
+
+    /**
+     * `/auth/confirm` is on the public allow-list because the token in the URL
+     * IS the credential — a session cannot be required to reach it. Public does
+     * not mean it accepts anything, and this route was the one entry point with
+     * no rejection test at all.
+     */
+    for (const [label, query] of [
+      ['no token at all', ''],
+      ['a type but no token', '?type=email'],
+      ['a token but no type', '?token_hash=abc123'],
+      ['a forged token', '?token_hash=not-a-real-token&type=email'],
+      ['an unknown otp type', '?token_hash=abc&type=banana'],
+    ] as const) {
+      const response = await fetch(`${BASE}/auth/confirm${query}`, { redirect: 'manual' });
+      const location = response.headers.get('location') ?? '';
+      check(
+        `confirm: ${label} redirects to the login page`,
+        response.status >= 300 && response.status < 400 && location.includes('/login'),
+        `status ${response.status}, location ${location || '(none)'}`,
+      );
+      check(
+        `  ${label} does NOT establish a session`,
+        !(response.headers.get('set-cookie') ?? '').includes('auth-token'),
+        'a cookie was set for an invalid token',
+      );
+    }
+
+    // The open-redirect guard: `next` is attacker-supplied in an emailed link.
+    const openRedirect = await fetch(
+      `${BASE}/auth/confirm?token_hash=x&type=email&next=https://evil.example.com`,
+      { redirect: 'manual' },
+    );
+    const target = openRedirect.headers.get('location') ?? '';
+    check(
+      'confirm: an absolute `next` cannot redirect off-site',
+      !target.includes('evil.example.com'),
+      target,
+    );
+
+    const protocolRelative = await fetch(
+      `${BASE}/auth/confirm?token_hash=x&type=email&next=//evil.example.com`,
+      { redirect: 'manual' },
+    );
+    check(
+      'confirm: a protocol-relative `next` cannot either',
+      !(protocolRelative.headers.get('location') ?? '').includes('evil.example.com'),
+      protocolRelative.headers.get('location') ?? '',
+    );
+
+    // ───────────────────────────────────────────────── rate limits
+    section('Endpoint rate limits refuse over HTTP');
+
+    // The limit module is unit-tested in verify:storage; this proves the route
+    // actually calls it and answers 429 rather than merely being able to.
+    let sawLimit = false;
+    for (let i = 0; i < 14; i++) {
+      const response = await fetch(`${BASE}/api/conversations/${conversationId}/export`, {
+        redirect: 'manual',
+        headers: { cookie: ownerCookie },
+      });
+      if (response.status === 429) {
+        sawLimit = true;
+        check('export answers 429 once the limit is hit', true);
+        check(
+          '  and sends a retry-after header',
+          Boolean(response.headers.get('retry-after')),
+          'no retry-after — a client cannot know when to come back',
+        );
+        break;
+      }
+    }
+    check('the export rate limit engages over HTTP', sawLimit, 'never refused in 14 requests');
+
     // ───────────────────────────────────────────────── admin surfaces
     section('Admin surfaces, as a normal user');
 

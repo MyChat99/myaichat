@@ -1036,3 +1036,39 @@ is testable without a mail transport, which is the part worth testing.
 | `security:audit` | pass — 12 tables, `known_logins` deny-all by design |
 | Full suite | pass — nothing regressed |
 | The email renders correctly in a client | **NEEDS HUMAN VERIFICATION** — blocked on Resend (ISSUE-017) |
+
+## Away session 3 — Priority 4 · Coverage gaps and CONTRIBUTING · 2026-07-31
+
+**One route had no rejection test at all: `/auth/confirm`.** It sits on the
+public allow-list because the token in the URL *is* the credential — a session
+cannot be required to reach it — and that exemption had quietly meant no
+coverage. Public does not mean it accepts anything.
+
+Now asserted: no token, a type without a token, a token without a type, a forged
+token and an unknown OTP type all redirect to the login page **and set no
+session cookie**. The cookie half matters more than the redirect: a route that
+redirects while establishing a session would look correct in a browser.
+
+Plus the open-redirect guard, which is the real risk on a route whose URL
+arrives by email — both an absolute and a protocol-relative `next` are proven
+unable to send a user off-site.
+
+**The endpoint rate limits are now asserted over HTTP**, not only as unit tests.
+`verify:storage` proves the limit module decides correctly; this proves the
+route actually calls it, answers 429, and sends a `retry-after` — a limit a
+client cannot see the timing of is a limit it will hammer.
+
+`verify:api` is now **80 checks**, up from 65.
+
+**`CONTRIBUTING.md`** — written against how the repo actually works rather than
+a template. It leads with the thing that will surprise a contributor (`main`
+rejects direct pushes, including the maintainer's), explains why two CI jobs
+block and two only report, warns which suites mutate shared state, and states
+the house rule that matters: *assert stored state, not response shape*. Every
+npm script it names was checked to exist.
+
+| Criterion | Result |
+| --- | --- |
+| Every route has a rejection test | pass — `/auth/confirm` was the last gap |
+| `verify:api` | pass — 80/80 |
+| Scripts named in CONTRIBUTING exist | pass — checked programmatically |

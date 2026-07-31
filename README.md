@@ -312,17 +312,12 @@ docs/mockups/    six self-contained interface concepts
 
 ## Contributing
 
-Issues and pull requests are welcome. Two things to know first:
+Issues and pull requests welcome — [CONTRIBUTING.md](CONTRIBUTING.md) has the
+setup, the branch/PR flow and the house rules.
 
-1. **`lib/db/types.ts` is hand-maintained** — `supabase gen types` needs Docker,
-   which this project deliberately avoids ([DEC-004](docs/wiki/DECISIONS.md)).
-   Change a migration, update that file in the same commit, or type-check breaks.
-2. **Adding a provider should touch one file plus one registry line.** If your
-   change needs an edit to `app/api/chat/route.ts`, the abstraction is leaking —
-   `npm run verify:providers` will fail the build on it.
-
-Conventional commits (`feat:`, `fix:`, `chore:`). CI runs lint, type-check,
-build and the credential-free suites on every pull request.
+The one thing worth knowing up front: **`main` rejects direct pushes**,
+including the maintainer's. Every change goes through a pull request with CI
+green. A `GH006` on `git push origin main` is the rule working, not a fault.
 
 ## Security
 
