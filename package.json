@@ -24,7 +24,8 @@
     "verify:theme": "tsx scripts/verify-theme.ts",
     "verify:appearance": "tsx scripts/verify-appearance.ts",
     "verify:storage": "tsx --conditions=react-server scripts/verify-storage.ts",
-    "verify:email": "tsx scripts/verify-email.ts"
+    "verify:email": "tsx scripts/verify-email.ts",
+    "security:audit": "tsx scripts/security-audit.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

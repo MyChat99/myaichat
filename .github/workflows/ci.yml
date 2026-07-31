@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# A newer push to the same branch makes an in-flight run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Lint, type-check, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Formatting
+        run: npm run format:check
+
+      # No secrets are provided on purpose. lib/env.ts parses lazily
+      # (ISSUE-014), so a build must succeed with an empty environment — and
+      # this job is what keeps that true. A build that needs runtime config is
+      # a build that breaks on every fresh deploy.
+      - name: Build
+        run: npm run build
+
+  tests:
+    name: Tests (credential-free)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # ⚠️ Only the suites that need NO database and NO network run here.
+      #
+      # The others (verify:rls, verify:admin, verify:chat, …) are deliberately
+      # excluded: verify:admin MUTATES shared state — it disables a provider
+      # and breaks a stored key, restoring both in `finally`. There is one
+      # Supabase project behind local, CI and production, so a CI run that died
+      # mid-suite would disable a provider for real users (ISSUE-015).
+      #
+      # To enable them, create a SEPARATE Supabase project for CI, add its
+      # credentials as repository secrets, and add a job that runs them against
+      # that project only. Never point this at production.
+      - name: Theme contrast (WCAG AA)
+        run: npm run verify:theme
+
+      - name: Email templates
+        run: npm run verify:email
+
+  security:
+    name: Security audit (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Advisory: reports without gating a merge. The dependency tree carries
+    # known transitive advisories that cannot be fixed without downgrading
+    # Next itself (ISSUE-006), so failing on them would block every PR
+    # permanently and train everyone to ignore the check.
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Audit
+        run: npm run security:audit
+
+  # ---------------------------------------------------------------- deploy
+  #
+  # DISABLED ON PURPOSE.
+  #
+  # Railway is already connected directly to this repository and deploys on
+  # every push to main by itself. Enabling this job would produce TWO
+  # deployments per merge, racing each other.
+  #
+  # To move deployment into CI (so it runs only after the gates above pass):
+  #   1. In Railway → Settings → disable "Auto Deploy" on the GitHub trigger.
+  #   2. Add a RAILWAY_TOKEN repository secret (Railway → Account → Tokens).
+  #   3. Delete the `if: false` line below.
+  #
+  # Until step 1 is done, leaving this disabled is the correct state.
+  deploy:
+    name: Deploy to Railway (disabled)
+    if: false
+    needs: [quality, tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy
+        run: npx --yes @railway/cli up --service myaichat
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

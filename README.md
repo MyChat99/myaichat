@@ -106,6 +106,85 @@ vendor differences the abstraction absorbs: [lib/providers/README.md](lib/provid
 `npm run verify:providers` enforces this with `git grep` — no vendor SDK import and no
 provider name may appear outside `lib/providers`.
 
+## Architecture
+
+```mermaid
+flowchart TB
+    Browser["Browser<br/>publishable key only"]
+
+    subgraph Next["Next.js (Railway)"]
+        Proxy["proxy.ts<br/>refreshes session · redirects pages<br/>API routes exempt"]
+        Pages["Server Components<br/>requireUser / requireAdmin"]
+        Chat["/api/chat<br/>Zod · rate limit · token budget"]
+        Registry["lib/providers/registry<br/>resolves model → adapter"]
+        Crypto["lib/security/crypto<br/>AES-256-GCM"]
+    end
+
+    subgraph Data["Supabase (Postgres)"]
+        RLS["Row-level security<br/>every table"]
+        Keys[("providers.encrypted_api_key<br/>ciphertext at rest")]
+    end
+
+    Anthropic["Anthropic API"]
+    OpenAI["OpenAI API"]
+
+    Browser --> Proxy --> Pages
+    Browser -- "POST NDJSON stream" --> Chat
+    Pages --> RLS
+    Chat --> RLS
+    Chat --> Registry
+    Registry -- "reads ciphertext" --> Keys
+    Registry -- "decrypts in memory" --> Crypto
+    Registry --> Anthropic
+    Registry --> OpenAI
+
+    style Keys fill:#fde68a,stroke:#b45309,color:#1f2933
+    style Crypto fill:#fde68a,stroke:#b45309,color:#1f2933
+```
+
+**The key path is the part worth understanding.** A provider key is stored only
+as ciphertext. `registry.ts` reads it, decrypts it with the master key from the
+environment, and hands the plaintext to an adapter instance — which lives for one
+request. No key ever crosses into a client bundle, and every module on that path
+imports `server-only`, so an accidental client import fails the build rather than
+leaking.
+
+## Deployment
+
+Live at `myaichat-production.up.railway.app`, deploying from `main`.
+
+**Environment variables** — set these in Railway (Variables → Raw Editor):
+
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+ENCRYPTION_MASTER_KEY
+NEXT_PUBLIC_APP_URL
+```
+
+Provider API keys are **not** among them — those live encrypted in the database
+after Phase 4.
+
+> `ENCRYPTION_MASTER_KEY` must match the value used to encrypt the stored keys,
+> character for character. A different value means production cannot decrypt them.
+
+**Health check:** `/api/health` returns 200 only when the database is reachable
+*and* the encryption key is present. It deliberately checks dependencies rather
+than returning a bare "ok" — a process that is up but cannot reach its database
+is not healthy, and a check that says otherwise makes a broken deploy look
+successful.
+
+**Migrations** are promoted with `npm run db:push`, which applies any pending
+files in `supabase/migrations/` to the linked project. There is currently one
+Supabase project for local and production (ISSUE-015).
+
+**CI** runs lint, type-check, formatting, build and the credential-free test
+suites on every PR. The Railway deploy job in `.github/workflows/ci.yml` is
+disabled on purpose — Railway deploys from GitHub directly, and enabling both
+would produce two racing deployments per merge. The comment in that file explains
+how to switch.
+
 ## Project layout
 
 ```
