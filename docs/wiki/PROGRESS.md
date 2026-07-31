@@ -911,3 +911,47 @@ occurred". A privileged action added later without re-auth fails this.
 | `verify:admin` | pass — 13 new completeness assertions |
 | Full suite | pass — nothing regressed |
 | The dialog appears and rejects a wrong password | **NEEDS HUMAN VERIFICATION** — server gate tested, screen unseen |
+
+## Away session 3 — Priority 2d · Per-endpoint rate limits · 2026-07-31
+
+The upload routes were rate-limited by **counting their own `audit_logs` rows**.
+That coupled two unrelated things: an audit trail is a permanent record, a rate
+limit is a rolling window. Pruning one damaged the other, and changing what got
+audited silently changed the limit. Downloads had **no limit at all**, because
+nothing audited them and there was therefore nothing to count.
+
+New `api_usage` table (migration `20260731150001`, deny-all RLS) and
+`lib/security/endpoint-limit.ts`:
+
+| Endpoint | Per minute | Per hour | Why this shape |
+| --- | --- | --- | --- |
+| `uploads.presign` | 20 | 120 | Each call mints a **writable credential** valid for five minutes. The size limit is per-URL, so the only thing bounding total bytes is how many URLs you can get |
+| `uploads.download` | 60 | 600 | Signs a read and bills R2 egress; a gallery legitimately fetches many at once |
+| `conversations.export` | 10 | 60 | Reads and serialises a whole conversation — cheap once, not in a loop |
+
+**Two windows per endpoint, deliberately.** A single hourly cap permits emptying
+the whole budget in three seconds; a single per-minute cap permits that burst
+every minute all day. `verify:storage` asserts `perMinute < perHour` for every
+entry, so a future endpoint cannot be added with only one of them.
+
+Attempts are recorded **before** the work, not after. The alternative rewards
+failure: a client making a thousand erroring requests would be charged for none
+of them, which is exactly the shape of an abusive client.
+
+### A flaw found in an existing check while doing this
+
+`verify:admin` verified admin gating by reading **`git show HEAD:`** — the last
+commit, not the working tree. It therefore validated the past: a missing gate
+passed locally and only failed after it had already merged, which is the
+opposite of what a pre-commit check is for. It also matched `requireAdmin()`
+literally, so the four actions using the *stricter*
+`requireAdminWithPassword()` were counted as ungated for being more careful.
+
+Both fixed. This is why the check failed for the first time in this session
+despite the change landing in the previous one.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:storage` | pass — 13 new limit assertions |
+| `security:audit` | pass — 11 tables, `api_usage` deny-all by design |
+| Full suite | pass — nothing regressed |

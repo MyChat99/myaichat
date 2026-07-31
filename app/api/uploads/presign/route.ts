@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createAdminClient } from '@/lib/db/admin';
 import { createClient } from '@/lib/db/server';
 import { ALLOWED_MIME, buildObjectKey, isStorageConfigured, presignUpload } from '@/lib/r2/storage';
+import { checkEndpointLimit, limitMessage } from '@/lib/security/endpoint-limit';
 
 /**
  * Issues a short-lived presigned upload URL.
@@ -17,8 +18,6 @@ import { ALLOWED_MIME, buildObjectKey, isStorageConfigured, presignUpload } from
 export const runtime = 'nodejs';
 
 const MAX_FALLBACK_MB = 20;
-/** Uploads are cheap but not free; this bounds abuse without annoying real use. */
-const MAX_UPLOADS_PER_HOUR = 60;
 
 const bodySchema = z.object({
   filename: z.string().trim().min(1).max(255),
@@ -66,20 +65,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
   }
 
-  // Rate limit before doing any work that costs money or storage.
-  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  /**
+   * Rate limit before doing any work that costs money or storage.
+   *
+   * Counted in `api_usage`, not by tallying this route's own `audit_logs`
+   * rows. An audit trail is a permanent record and a rate limit is a rolling
+   * window: pruning one damaged the other, and changing what gets audited
+   * silently changed the limit.
+   */
   const admin = createAdminClient();
-  const { count } = await admin
-    .from('audit_logs')
-    .select('*', { count: 'exact', head: true })
-    .eq('actor_id', user.id)
-    .eq('action', 'upload.presigned')
-    .gte('created_at', since);
-
-  if ((count ?? 0) >= MAX_UPLOADS_PER_HOUR) {
+  const limited = await checkEndpointLimit(user.id, 'uploads.presign');
+  if (!limited.allowed) {
     return NextResponse.json(
-      { error: `Upload limit of ${MAX_UPLOADS_PER_HOUR} per hour reached.` },
-      { status: 429, headers: { 'retry-after': '3600' } },
+      { error: limitMessage(limited), retryable: true },
+      { status: 429, headers: { 'retry-after': String(limited.retryAfterSeconds) } },
     );
   }
 

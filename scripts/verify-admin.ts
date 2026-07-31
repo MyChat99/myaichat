@@ -223,11 +223,17 @@ async function main() {
 
     // Every admin mutation must gate + audit. A route-level check alone would
     // miss a server action that forgot requireAdmin.
-    const actionsSrc = execFileSync('git', ['show', 'HEAD:app/(app)/admin/actions.ts'], {
-      encoding: 'utf8',
-    }).toString();
+    //
+    // Reads the WORKING TREE, not `git show HEAD:`. Reading HEAD validated the
+    // last commit rather than the change about to be made — so a missing gate
+    // passed locally and only failed after it had already been merged, which is
+    // the opposite of what a pre-commit check is for.
+    const actionsSrc = readFileSync('app/(app)/admin/actions.ts', 'utf8');
     const exportedFns = actionsSrc.match(/export async function (\w+)/g) ?? [];
-    const gateCount = (actionsSrc.match(/requireAdmin\(\)/g) ?? []).length;
+    // `requireAdminWithPassword()` is a STRICTER gate — it calls requireAdmin()
+    // and then re-verifies the password — so it counts. Matching only the bare
+    // form flagged the privileged actions as ungated for being more careful.
+    const gateCount = (actionsSrc.match(/requireAdmin(WithPassword)?\(/g) ?? []).length;
     check(
       'every exported admin action calls requireAdmin()',
       gateCount >= exportedFns.length,

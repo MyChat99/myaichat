@@ -231,6 +231,85 @@ async function main() {
     console.log('\nTest user cleaned up.');
   }
 
+  // ─────────────────────────────────────────── per-endpoint rate limits
+  console.log('\nEndpoint rate limits\n');
+
+  const makeProbe = async (email: string) => {
+    const { data, error } = await admin.auth.admin.createUser({
+      email,
+      password: 'endpoint-probe-passphrase-3',
+      email_confirm: true,
+    });
+    if (error || !data.user) throw error ?? new Error('could not create probe user');
+    return data.user.id;
+  };
+
+  {
+    const { ENDPOINT_LIMITS, checkEndpointLimit, limitMessage } =
+      await import('../lib/security/endpoint-limit');
+
+    check('presign is limited', Boolean(ENDPOINT_LIMITS['uploads.presign']));
+    check('download is limited', Boolean(ENDPOINT_LIMITS['uploads.download']));
+    check('export is limited', Boolean(ENDPOINT_LIMITS['conversations.export']));
+
+    // Presign mints a writable credential; download only signs a read. If the
+    // two are ever equal, someone has copy-pasted a limit rather than chosen one.
+    check(
+      'presign is stricter than download',
+      ENDPOINT_LIMITS['uploads.presign']!.perMinute <
+        ENDPOINT_LIMITS['uploads.download']!.perMinute,
+    );
+
+    // A per-hour cap alone permits emptying the budget in one burst; a
+    // per-minute cap alone permits that burst every minute. Both are required.
+    for (const [name, limit] of Object.entries(ENDPOINT_LIMITS)) {
+      check(`${name} bounds a burst AND a sustained rate`, limit.perMinute < limit.perHour);
+    }
+
+    const probeUser = await makeProbe(`endpoint-probe-${Date.now()}@example.invalid`);
+    try {
+      const limit = ENDPOINT_LIMITS['conversations.export']!;
+      let refusal: Awaited<ReturnType<typeof checkEndpointLimit>> | null = null;
+
+      // One past the minute limit, so the refusal is the minute window.
+      for (let i = 0; i <= limit.perMinute; i++) {
+        const verdict = await checkEndpointLimit(probeUser, 'conversations.export');
+        if (!verdict.allowed) {
+          refusal = verdict;
+          break;
+        }
+      }
+
+      check(`refuses after ${limit.perMinute} calls in a minute`, refusal !== null);
+      check('names the window that tripped', refusal?.window === 'minute', String(refusal?.window));
+      check(
+        'reports a retry-after inside the window',
+        (refusal?.retryAfterSeconds ?? 0) > 0 && (refusal?.retryAfterSeconds ?? 999) <= 60,
+      );
+
+      const message = refusal ? limitMessage(refusal) : '';
+      check(
+        'the message says the limit and the wait',
+        /limit is \d+ per minute/.test(message) && /Try again in/.test(message),
+        message,
+      );
+
+      // An unlisted endpoint is unlimited by omission, not by accident — and
+      // that must be visibly true rather than assumed.
+      const unlisted = await checkEndpointLimit(probeUser, 'nothing.configured');
+      check('an unconfigured endpoint is not limited', unlisted.allowed);
+
+      // Limits are per user: one user exhausting a window must not refuse another.
+      const other = await makeProbe(`endpoint-other-${Date.now()}@example.invalid`);
+      const otherVerdict = await checkEndpointLimit(other, 'conversations.export');
+      check('limits are per user, not global', otherVerdict.allowed);
+      await admin.auth.admin.deleteUser(other).catch(() => {});
+    } finally {
+      // api_usage rows cascade with the user.
+      await admin.auth.admin.deleteUser(probeUser).catch(() => {});
+    }
+  }
+
   console.log(failures === 0 ? '\nAll storage checks passed.' : `\n${failures} check(s) FAILED.`);
   process.exit(failures === 0 ? 0 : 1);
 }
