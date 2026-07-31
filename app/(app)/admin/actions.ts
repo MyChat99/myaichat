@@ -230,8 +230,20 @@ export async function upsertModel(input: unknown, existingId?: string) {
   revalidatePath('/', 'layout');
 }
 
-export async function deleteModel(id: string) {
-  const admin = await requireAdmin();
+/**
+ * Deleting a model breaks every conversation pinned to it and removes the row
+ * that usage_logs reference for cost attribution. Re-authenticated because it is
+ * destructive and not obviously reversible.
+ */
+export async function deleteModel(id: string, password: string): Promise<KeyActionResult> {
+  let admin;
+  try {
+    admin = await requireAdminWithPassword(password, await headers());
+  } catch (err) {
+    if (err instanceof ReauthError) return { ok: false, error: err.message };
+    throw err;
+  }
+
   const parsedId = uuid.parse(id);
 
   const db = createAdminClient();
@@ -250,6 +262,7 @@ export async function deleteModel(id: string) {
 
   revalidatePath('/admin/models');
   revalidatePath('/', 'layout');
+  return { ok: true };
 }
 
 /** Live model list from the provider, for the "Fetch from provider" button. */
@@ -270,15 +283,32 @@ export async function fetchProviderModels(name: string) {
 
 // ---------------------------------------------------------------- users
 
-export async function setUserRole(userId: string, role: 'user' | 'admin') {
-  const admin = await requireAdmin();
+/**
+ * Promoting a user is the widest privilege escalation this app can perform in a
+ * single click — the new admin can then read every provider key's last4, change
+ * models, suspend anyone, and promote further accounts. Re-authenticated for the
+ * same reason key rotation is: a session alone should not be able to do it.
+ */
+export async function setUserRole(
+  userId: string,
+  role: 'user' | 'admin',
+  password: string,
+): Promise<KeyActionResult> {
+  let admin;
+  try {
+    admin = await requireAdminWithPassword(password, await headers());
+  } catch (err) {
+    if (err instanceof ReauthError) return { ok: false, error: err.message };
+    throw err;
+  }
+
   const parsedId = uuid.parse(userId);
   const parsedRole = z.enum(['user', 'admin']).parse(role);
 
   // Refuse to strip your own admin rights — that can lock everyone out of
   // /admin with no way back except the seed script.
   if (parsedId === admin.id && parsedRole !== 'admin') {
-    throw new Error('You cannot remove your own admin role.');
+    return { ok: false, error: 'You cannot remove your own admin role.' };
   }
 
   const db = createAdminClient();
@@ -294,6 +324,7 @@ export async function setUserRole(userId: string, role: 'user' | 'admin') {
   });
 
   revalidatePath('/admin/users');
+  return { ok: true };
 }
 
 export async function setUserSuspended(userId: string, suspended: boolean) {

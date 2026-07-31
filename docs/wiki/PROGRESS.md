@@ -872,3 +872,42 @@ any error — a database hiccup must not sign out the whole application.
 | Idle expiry is inert by default | pass — asserted, and the seed writes 0 |
 | Refresh-token reuse detection | **NEEDS YOUR DASHBOARD** — ISSUE-028 |
 | The logout redirect renders correctly | **NEEDS HUMAN VERIFICATION** — the policy is tested; the screen is not |
+
+## Away session 3 — Priority 2c · Re-auth on privileged actions · 2026-07-31
+
+Password confirmation extended from provider keys to the two remaining actions
+that a stolen session should not be able to perform alone:
+
+- **`setUserRole`** — the widest escalation available in one click. A new admin
+  can read every provider key's last4, change models, suspend accounts, and
+  promote further users.
+- **`deleteModel`** — destructive and not obviously reversible: conversations
+  pinned to that model fall back to the default, and its usage rows lose cost
+  attribution.
+
+Both now route through `requireAdminWithPassword()`, which verifies on a
+throwaway client (so a confirmation cannot silently re-issue session cookies)
+and is throttled under its own counter (so the field is not a password oracle).
+
+**`components/admin/confirm-password.tsx`** is the shared prompt. The
+provider-key form keeps its own inline fields — it works, and rewriting working
+code to share a component is not a good enough reason. This exists because the
+*third* bespoke copy was the point to stop.
+
+One React detail worth recording: the dialog's state lives in an inner component
+that **mounts fresh per request**, rather than an effect that clears the password
+when the request changes. The effect version is `setState` inside an effect body
+— a cascading render, and correctly refused by the rules-of-hooks lint.
+
+**Completeness check, not just a behaviour check.** `verify:admin` now asserts
+that every privileged action takes a password parameter, calls
+`requireAdminWithPassword`, and *returns* the failure rather than throwing —
+Next replaces thrown Server Action errors with a generic message in production,
+so a thrown "that password is not correct" reaches the user as "an error
+occurred". A privileged action added later without re-auth fails this.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:admin` | pass — 13 new completeness assertions |
+| Full suite | pass — nothing regressed |
+| The dialog appears and rejects a wrong password | **NEEDS HUMAN VERIFICATION** — server gate tested, screen unseen |

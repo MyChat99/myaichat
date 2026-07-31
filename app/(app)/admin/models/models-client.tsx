@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
 import { deleteModel, fetchProviderModels, upsertModel } from '@/app/(app)/admin/actions';
+import { ConfirmPasswordDialog, useConfirmPassword } from '@/components/admin/confirm-password';
 import { ProviderLogo } from '@/components/chat/provider-logo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -191,6 +192,7 @@ export function ModelsManager({
   providers: ProviderOption[];
   models: AdminModel[];
 }) {
+  const confirmPassword = useConfirmPassword();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -220,105 +222,112 @@ export function ModelsManager({
   }
 
   return (
-    <div className="space-y-6">
-      {draft ? (
-        <ModelForm
-          draft={draft}
-          providers={providers}
-          onCancel={() => setDraft(null)}
-          onSaved={() => setDraft(null)}
-        />
-      ) : (
-        <Button
-          type="button"
-          size="sm"
-          disabled={providers.length === 0}
-          onClick={() => setDraft(emptyDraft(providers[0]?.id ?? ''))}
-        >
-          <Plus className="mr-1 size-4" />
-          Add model
-        </Button>
-      )}
+    <>
+      <div className="space-y-6">
+        {draft ? (
+          <ModelForm
+            draft={draft}
+            providers={providers}
+            onCancel={() => setDraft(null)}
+            onSaved={() => setDraft(null)}
+          />
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            disabled={providers.length === 0}
+            onClick={() => setDraft(emptyDraft(providers[0]?.id ?? ''))}
+          >
+            <Plus className="mr-1 size-4" />
+            Add model
+          </Button>
+        )}
 
-      {byProvider.map(({ provider, models: providerModels }) => (
-        <section key={provider.id} className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-sm font-medium">
-              <ProviderLogo provider={provider.name} />
-              {provider.name}
-              {!provider.enabled ? (
-                <span className="text-muted-foreground text-xs">(disabled)</span>
-              ) : null}
-            </h2>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={pending}
-              onClick={() => fetchModels(provider)}
-            >
-              <Download className="mr-1 size-3.5" />
-              Fetch from provider
-            </Button>
-          </div>
-
-          {providerModels.length === 0 ? (
-            <p className="text-muted-foreground text-xs">No models.</p>
-          ) : (
-            <div className="divide-border overflow-hidden rounded-lg border">
-              {providerModels.map((model) => (
-                <div
-                  key={model.id}
-                  className="flex items-center justify-between gap-3 border-b p-3 last:border-b-0"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{model.displayName}</p>
-                    <p className="text-muted-foreground truncate font-mono text-xs">
-                      {model.modelId} · {model.maxTokens} max · ${model.inputCostPer1k}/$
-                      {model.outputCostPer1k} per 1K
-                    </p>
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="text-muted-foreground text-xs">
-                      {model.enabled ? 'Enabled' : 'Disabled'}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDraft({ ...model })}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-8"
-                      aria-label={`Delete ${model.displayName}`}
-                      disabled={pending}
-                      onClick={() => {
-                        if (!confirm(`Delete ${model.displayName}?`)) return;
-                        startTransition(async () => {
-                          try {
-                            await deleteModel(model.id);
-                            toast.success('Model deleted.');
-                          } catch {
-                            toast.error('Could not delete the model.');
-                          }
-                        });
-                      }}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+        {byProvider.map(({ provider, models: providerModels }) => (
+          <section key={provider.id} className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="flex items-center gap-2 text-sm font-medium">
+                <ProviderLogo provider={provider.name} />
+                {provider.name}
+                {!provider.enabled ? (
+                  <span className="text-muted-foreground text-xs">(disabled)</span>
+                ) : null}
+              </h2>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={pending}
+                onClick={() => fetchModels(provider)}
+              >
+                <Download className="mr-1 size-3.5" />
+                Fetch from provider
+              </Button>
             </div>
-          )}
-        </section>
-      ))}
-    </div>
+
+            {providerModels.length === 0 ? (
+              <p className="text-muted-foreground text-xs">No models.</p>
+            ) : (
+              <div className="divide-border overflow-hidden rounded-lg border">
+                {providerModels.map((model) => (
+                  <div
+                    key={model.id}
+                    className="flex items-center justify-between gap-3 border-b p-3 last:border-b-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{model.displayName}</p>
+                      <p className="text-muted-foreground truncate font-mono text-xs">
+                        {model.modelId} · {model.maxTokens} max · ${model.inputCostPer1k}/$
+                        {model.outputCostPer1k} per 1K
+                      </p>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="text-muted-foreground text-xs">
+                        {model.enabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDraft({ ...model })}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                        aria-label={`Delete ${model.displayName}`}
+                        disabled={pending}
+                        onClick={() => {
+                          confirmPassword.ask({
+                            title: `Delete ${model.displayName}?`,
+                            detail:
+                              'Conversations pinned to this model fall back to the default, and its usage rows lose their cost attribution.',
+                            confirmLabel: 'Delete model',
+                            destructive: true,
+                            onConfirm: async (password) => {
+                              const result = await deleteModel(model.id, password);
+                              if (!result.ok) return result.error;
+                              toast.success('Model deleted.');
+                              return null;
+                            },
+                          });
+                        }}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        ))}
+      </div>
+      <ConfirmPasswordDialog request={confirmPassword.request} onClose={confirmPassword.close} />
+    </>
   );
 }
