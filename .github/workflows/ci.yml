@@ -104,6 +104,9 @@ jobs:
       - name: Structured logging
         run: npm run verify:logging
 
+      - name: CSV export and injection
+        run: npm run verify:csv
+
       # The idle-policy and marker-integrity halves are pure functions and run
       # here; the refresh-token measurement needs credentials and skips itself.
       - name: Session policy

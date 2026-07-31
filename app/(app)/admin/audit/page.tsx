@@ -1,3 +1,4 @@
+import { Download } from 'lucide-react';
 import Link from 'next/link';
 
 import { createAdminClient } from '@/lib/db/admin';
@@ -49,12 +50,25 @@ export default async function AuditPage({
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold">Audit log</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Every admin mutation, written server-side with the secret key so entries cannot be forged
-          from a browser. {total.toLocaleString()} entries.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">Audit log</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Every admin mutation, written server-side with the secret key so entries cannot be
+            forged from a browser. {total.toLocaleString()} entries.
+          </p>
+        </div>
+
+        {/* A plain anchor: the browser already knows how to save a response with
+            a content-disposition header, and the export itself is audited. */}
+        <a
+          href="/api/admin/audit/export?days=90"
+          download
+          className="border-border hover:bg-accent inline-flex shrink-0 items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition"
+        >
+          <Download className="size-3.5" aria-hidden />
+          Export CSV
+        </a>
       </header>
 
       <div className="flex flex-wrap gap-2">
