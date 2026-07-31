@@ -4,10 +4,11 @@ Pending action items and what comes after the eight planned phases.
 
 ## Immediate next steps
 
-1. **Close out Phase 3** — one browser click: open the model selector, switch provider mid-conversation, confirm the next reply comes from the new model.
-2. **Start Phase 4** — read [PHASE-4-admin-panel.md](../phases/PHASE-4-admin-panel.md) in full, propose a plan, then implement. It needs `ENCRYPTION_MASTER_KEY` in `.env.local` (`openssl rand -base64 32`) for AES-256-GCM provider key storage. `validateKey()` already exists on every adapter, so the "Test Connection" button is wiring, not new logic.
+1. **Generate an encryption key** — the one thing Phase 4 needs from you:
+   `echo "ENCRYPTION_MASTER_KEY=$(openssl rand -base64 32)" >> .env.local`
+2. **Start Phase 4** — read [PHASE-4-admin-panel.md](../phases/PHASE-4-admin-panel.md) in full, propose a plan, then implement.
 
-Phases 1 and 2 are Verified; Phase 3 is Done pending that click. Both providers stream live, and models are selectable per conversation.
+Phases 1–3 are Verified. Both providers stream live, models are selectable per conversation, and usage is logged per model with estimated cost.
 
 Worth doing soon, not blocking: install Docker to get a local Supabase stack, which also restores `supabase gen types` and removes the hand-maintained types file ([ISSUE-004](ISSUES.md), [ISSUE-005](ISSUES.md)).
 
