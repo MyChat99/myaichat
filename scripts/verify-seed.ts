@@ -14,6 +14,7 @@ const admin = createClient<Database>(SUPABASE_URL(), SECRET_KEY(), {
 });
 
 const EXPECTED_SETTINGS = [
+  'session_idle_timeout_minutes',
   'daily_token_budget_per_user',
   'global_system_prompt',
   'rate_limit_messages_per_hour',

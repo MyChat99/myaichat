@@ -14,6 +14,7 @@ type Settings = {
   rate_limit_messages_per_hour: number;
   max_upload_size_mb: number;
   daily_token_budget_per_user: number;
+  session_idle_timeout_minutes: number;
   signups_enabled: boolean;
   default_model_id: string | null;
 };
@@ -97,6 +98,24 @@ export function SettingsForm({
             onChange={(e) => setForm({ ...form, max_upload_size_mb: Number(e.target.value) })}
           />
           <p className="text-muted-foreground text-xs">Takes effect with uploads in Phase 6.</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="idleTimeout">Sign out after inactivity (minutes)</Label>
+          <Input
+            id="idleTimeout"
+            type="number"
+            min={0}
+            step={5}
+            value={form.session_idle_timeout_minutes}
+            onChange={(e) =>
+              setForm({ ...form, session_idle_timeout_minutes: Number(e.target.value) })
+            }
+          />
+          <p className="text-muted-foreground text-xs">
+            <strong>0 disables it.</strong> Protects an unlocked or shared machine — it is not a
+            defence against someone who has already copied the browser&apos;s cookies.
+          </p>
         </div>
 
         <div className="space-y-1.5 sm:col-span-2">
