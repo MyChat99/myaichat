@@ -1555,3 +1555,51 @@ completed turn now, carrying `prepMs`, token counts and the model.
 | Before/after measured, cold samples excluded | 590ms → 504ms |
 | Refusal ordering preserved | pass — asserted in source and over HTTP |
 | `verify:all` | pass — 21 suites |
+
+## Away session 4B — Priority 2c · Bundle · 2026-07-31
+
+**The premise did not hold, and that is the finding.** The task expected admin
+charts to be a lazy-loading win. Measured against the real build:
+
+| Page | Client JS | Heavy libraries present |
+| --- | --- | --- |
+| `/login` | 746 KB | none |
+| `/profile` | 752 KB | none |
+| `/settings` | 761 KB | none |
+| `/` (chat) | 1211 KB | react-markdown + syntax highlighting |
+
+Recharts is **already route-scoped** by Next — grepping the chunks `/login`
+actually loads finds no trace of it, nor of framer-motion, lucide or markdown.
+Lucide is **already tree-shaken**. There was nothing to move.
+
+### The one real candidate, deliberately not taken
+
+The chat route carries ~450KB of markdown and highlighting that its **empty
+state** does not need. Lazy-loading it was rejected: a conversation page with
+existing messages needs it immediately, so deferring risks a visible flash on
+exactly the page that matters most. That is a visual change, on a screen no
+check here can inspect, and the brief said no visual changes.
+
+Manufacturing a change to have something to show would have been the wrong
+instinct. The measurement is the deliverable.
+
+### What was built instead
+
+`npm run verify:bundle` — 7 checks that lock in the state that measured well:
+
+- **Heavy libraries stay in one component each.** Route splitting only holds
+  while `recharts` lives solely in `analytics-client.tsx` and `react-markdown`
+  solely in `markdown.tsx`. The day someone imports a chart into a shared
+  component, every page pays 384KB — and nothing would fail. Now it does.
+- **Total client JS under 3MB, no chunk over 600KB.** A ceiling with headroom,
+  to catch a step change rather than police ordinary growth.
+- **No namespace import of lucide-react**, which would defeat tree-shaking and
+  pull ~1,500 icons.
+
+Runs in the `quality` job after the build, since it reads build output.
+
+| Criterion | Result |
+| --- | --- |
+| Measured per-page JS against a real build | done — table above |
+| `verify:bundle` | pass — 7 checks, in CI |
+| Lazy-loading applied | **no** — no win available without a visual change |

@@ -59,6 +59,7 @@ const SUITES: Suite[] = [
   { script: 'verify:resilience', needs: 'nothing' },
   { script: 'verify:logging', needs: 'nothing' },
   { script: 'verify:csv', needs: 'nothing' },
+  { script: 'verify:bundle', needs: 'nothing' },
   { script: 'verify:headers', needs: 'nothing' },
   { script: 'verify:attachments', needs: 'nothing' },
   { script: 'verify:theme', needs: 'nothing' },
