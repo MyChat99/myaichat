@@ -4,18 +4,26 @@ Pending action items and what comes after the eight planned phases.
 
 ## Immediate next steps
 
-See [OVERNIGHT-REPORT.md](OVERNIGHT-REPORT.md) for the full picture. In short:
+Current state and the resume point live at the top of [PROGRESS.md](PROGRESS.md).
+In priority order:
 
-1. **Add R2 and Resend credentials** ([ISSUE-016](ISSUES.md), [ISSUE-017](ISSUES.md)) — this unblocks the rest of Phase 6.
-2. **Visual checks** for Phase 5 (no flash, cross-fade) and Phase 7 (Lighthouse, keyboard walkthrough).
-3. **Finish Phase 7's visual tasks** — animations, command palette, performance and accessibility passes.
-4. **Phase 8** — CI/CD. Pushes to `main` still deploy with nothing gating them.
+1. **Add R2 and Resend credentials** ([ISSUE-016](ISSUES.md), [ISSUE-017](ISSUES.md), [ISSUE-003](ISSUES.md)) — the only thing blocking a phase. Everything up to the integration point is built and tested; [PHASE-6-CHECKLIST.md](PHASE-6-CHECKLIST.md) is the exact sequence and needs no code change.
+2. **Visual sign-offs** — the attachment UI, the analytics charts with demo data, and the export links. All built, none seen by a human.
+3. **Screenshots** for the README (`npm run seed -- --demo` first) and then the LinkedIn post.
+4. **Decide on deploy gating** ([ISSUE-027](ISSUES.md)) — prepared, not applied, with a recommendation to leave it alone for now.
+5. **Phase 7 leftovers** — the performance pass and accessibility audit still need a browser and Lighthouse, so they stay unmeasurable headlessly.
 
-Phases 1–4 Verified and deployed. Phase 5 Done pending a visual check. Phases 6 and 7 Partial.
+Phases 1–5 complete, 6 blocked on credentials, 7 partial, 8 done. `main` is
+protected: every change goes through a pull request with CI green.
 
-**Operational note:** `ENCRYPTION_MASTER_KEY` is now load-bearing. Every provider key in the database is encrypted with it — lose it and they must all be re-entered. The same value has to be set in Railway at Phase 8, and rotating it means re-encrypting every stored key.
+**Operational note:** `ENCRYPTION_MASTER_KEY` is load-bearing. Every provider key
+in the database is encrypted with it — lose it and they must all be re-entered.
+The same value is set in Railway, and rotating it means re-encrypting every
+stored key.
 
-Worth doing soon, not blocking: install Docker to get a local Supabase stack, which also restores `supabase gen types` and removes the hand-maintained types file ([ISSUE-004](ISSUES.md), [ISSUE-005](ISSUES.md)).
+Worth doing, not blocking: install Docker for a local Supabase stack, which also
+restores `supabase gen types` and retires the hand-maintained types file
+([ISSUE-004](ISSUES.md), [ISSUE-005](ISSUES.md)).
 
 ## Planned phases
 
