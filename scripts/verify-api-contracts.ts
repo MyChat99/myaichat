@@ -491,6 +491,9 @@ async function main() {
       '/admin/settings',
       '/admin/analytics',
       '/admin/audit',
+      // The nested drill-in: a route added under an already-gated subtree is
+      // exactly the one where a missing gate goes unnoticed.
+      `/admin/users/${ownerId}`,
     ]) {
       const response = await fetch(`${BASE}${path}`, {
         redirect: 'manual',
