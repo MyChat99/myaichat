@@ -4,10 +4,14 @@ Pending action items and what comes after the eight planned phases.
 
 ## Immediate next steps
 
-1. **Eyeball Phase 5** — `/settings`: switch themes and modes, confirm no flash on reload (set the OS to dark with mode on System) and that the cross-fade is smooth. Those two are the only unautomatable criteria.
-2. **Phases 6 and 7** — see the overnight report.
+See [OVERNIGHT-REPORT.md](OVERNIGHT-REPORT.md) for the full picture. In short:
 
-Phases 1–4 are Verified and deployed. Phase 5 is Done pending the visual check.
+1. **Add R2 and Resend credentials** ([ISSUE-016](ISSUES.md), [ISSUE-017](ISSUES.md)) — this unblocks the rest of Phase 6.
+2. **Visual checks** for Phase 5 (no flash, cross-fade) and Phase 7 (Lighthouse, keyboard walkthrough).
+3. **Finish Phase 7's visual tasks** — animations, command palette, performance and accessibility passes.
+4. **Phase 8** — CI/CD. Pushes to `main` still deploy with nothing gating them.
+
+Phases 1–4 Verified and deployed. Phase 5 Done pending a visual check. Phases 6 and 7 Partial.
 
 **Operational note:** `ENCRYPTION_MASTER_KEY` is now load-bearing. Every provider key in the database is encrypted with it — lose it and they must all be re-entered. The same value has to be set in Railway at Phase 8, and rotating it means re-encrypting every stored key.
 

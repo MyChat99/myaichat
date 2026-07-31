@@ -15,7 +15,7 @@ Single source of truth for build status. Update immediately after any phase work
 | 4   | [Admin panel — keys, models, users](../phases/PHASE-4-admin-panel.md)              | Verified    | 2026-07-30 | 2026-07-30 |
 | 5   | [Theming & appearance](../phases/PHASE-5-theming.md)                               | Done        | 2026-07-31 | —          |
 | 6   | [R2 uploads + Resend emails](../phases/PHASE-6-storage-email.md)                   | Partial     | 2026-07-31 | —          |
-| 7   | [Analytics, audit UI, polish](../phases/PHASE-7-analytics-polish.md)               | Not Started | —          | —          |
+| 7   | [Analytics, audit UI, polish](../phases/PHASE-7-analytics-polish.md)               | Partial     | 2026-07-31 | —          |
 | 8   | [CI/CD + Railway deployment](../phases/PHASE-8-cicd-deploy.md)                     | Not Started | —          | —          |
 
 ## Deployed
@@ -287,3 +287,38 @@ integration point is built and tested.
 
 - **Composer attachment UX** (task 2): the upload helper and API exist, but the attach button, drag-and-drop and chip previews are NOT wired into the chat composer. Deliberate — building an attachment UI that cannot upload anything would be unverifiable, and I would rather leave it clearly missing than half-present. This is the first thing to finish once R2 credentials exist.
 - **Supabase auth emails routed through Resend** (task 7): a dashboard SMTP change, not code. See ISSUE-017.
+
+---
+
+## Phase 7 — Analytics, audit UI, polish · Partial · 2026-07-31
+
+Three of eight tasks done to completion. The rest were **deliberately not
+started** rather than half-built — see below.
+
+**Built and verified**
+
+- **Analytics** (`/admin/analytics`): messages per day, tokens by model, cost by provider, active users; 7/30/90-day ranges. Aggregated server-side — sending 10k raw rows to the browser to group them is precisely what makes such dashboards collapse as data grows. A 50,000-row ceiling bounds memory and the page *says so* when hit rather than silently showing a subset.
+- **Audit log** (`/admin/audit`): filterable by action, paginated, actor emails resolved in one round trip.
+- **Security headers** (task 6): CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy — all confirmed present over HTTP.
+
+| Criterion | Result |
+| --- | --- |
+| `lint` / `type-check` / `build` | pass |
+| Dashboards render real data | pass — charts read live `usage_logs` |
+| …and stay fast with 10k+ rows | **NEEDS HUMAN VERIFICATION** — the aggregation is server-side and bounded, but there are only ~40 usage rows in this database, so the claim is architectural rather than measured |
+| Keyboard-only operation end to end | **NOT VERIFIED** — needs a human at a keyboard |
+| Lighthouse ≥90 perf / ≥95 a11y | **NOT MEASURED** — needs a browser |
+
+**Not started (deliberately)**
+
+- Task 3 (Framer Motion animation pass), task 4 (command palette + shortcuts modal), task 5 (error boundaries — toasts already exist from Phase 2), task 7 (performance pass), task 8 (accessibility audit).
+- These are the diffuse, visual tasks. Their acceptance criteria are Lighthouse scores and a keyboard walkthrough, neither of which I can measure headlessly — so building them tonight would have produced code I could not verify and you could not trust. `prefers-reduced-motion` and the theme cross-fade landed in Phase 5, so the accessibility floor for motion is already in place.
+
+**Note on CSP**
+
+`script-src` includes `'unsafe-inline'`. This is not laziness: the pre-paint theme
+resolver in `app/layout.tsx` is an inline script, and a nonce cannot be applied to
+it without reintroducing the flash Phase 5 exists to eliminate. The trade is
+documented at the top of `next.config.ts`. Removing it would require moving theme
+resolution to a cookie read in `proxy.ts` — possible, and worth doing if CSP
+strictness ever matters more than the flash.
