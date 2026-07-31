@@ -136,6 +136,8 @@ export interface Database {
           font_size: FontSize;
           bubble_style: BubbleStyle;
           default_model_id: string | null;
+          /** Added in migration 20260730120006. */
+          preset_theme: string;
         };
         Insert: Partial<Timestamps> & {
           user_id: string;
@@ -144,6 +146,7 @@ export interface Database {
           font_size?: FontSize;
           bubble_style?: BubbleStyle;
           default_model_id?: string | null;
+          preset_theme?: string;
         };
         Update: Partial<Database['public']['Tables']['user_preferences']['Row']>;
         Relationships: [];
