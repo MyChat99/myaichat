@@ -16,6 +16,58 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-025 — A verification suite invented a system setting and broke another suite
+
+**Status:** Resolved | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-07-31 | **Resolved:** 2026-07-31
+**Problem:** `verify:seed` failed with an unexpected `daily_token_budget_per_user` in `system_settings`.
+
+Two mistakes compounding:
+
+1. The daily token budget was added in session 2 but **never added to the seed's `DEFAULT_SETTINGS`**, so a setting the chat route reads on every request did not exist on a fresh install.
+2. `verify:security` restores that setting in `finally` by upserting the value it read — and when the row did not exist, it read `undefined`, defaulted to `0`, and **created** it. The suite left behind a row it had invented, which then failed a different suite from a distance.
+
+**How it went unnoticed:** the end-of-session-2 verification run did not include `verify:seed`. Running a subset and reporting "all suites pass" is how a regression survives a green run — the failure was already present before this session started, and this session found it only because the full suite was run.
+
+**Resolution:** the setting is seeded explicitly (`0` = unlimited, the documented default), the expected set in `verify:seed` follows, and `verify:security` now records whether the row existed and **deletes** it on cleanup if it did not. A test that cannot restore the exact prior state should not run against shared data.
+### ISSUE-024 — Truncation deletes by timestamp, so a collision over-deletes
+
+**Status:** Open (logged, not fixed) | **Severity:** Low | **Phase:** 2 | **Opened:** 2026-07-31
+**Problem:** Regenerate and edit-and-resubmit drop the pivot message and everything after it:
+
+```ts
+.delete().eq('conversation_id', id).gte('created_at', pivot.created_at)
+```
+
+`created_at` defaults to `now()`, which in Postgres is **transaction time** — several rows inserted in one statement share an identical value. If a user message and its assistant reply ever land on the same timestamp, regenerating from the assistant reply deletes the user's question too.
+
+**Why it is not fixed here:** it has never been observed, and the correct fix is a monotonic sequence column on `messages` — a migration plus a change to every read path that assumes `created_at` ordering. That is structural, and the standing instruction is to log structural work rather than refactor. Two viable fixes when it is picked up:
+
+1. Add `messages.seq bigserial`, order and truncate on that. Correct, and a migration.
+2. Delete by `created_at > pivot` **plus** `id != pivot.id` for the equal case. Cheaper, still wrong if three rows collide.
+
+**Mitigating:** the demo-seed script writes explicit spaced timestamps precisely so it cannot manufacture this, and `verify:api` does the same.
+
+### ISSUE-023 — The model was sent the OLDEST 40 messages, not the newest
+
+**Status:** Resolved | **Severity:** High | **Phase:** 2 | **Opened:** 2026-07-31 | **Resolved:** 2026-07-31
+**Found by:** adversarial self-review, not by a test or a user report.
+
+**Problem:** `/api/chat` built its history like this:
+
+```ts
+.order('created_at', { ascending: true }).limit(MAX_HISTORY_MESSAGES)
+```
+
+`ORDER BY created_at ASC LIMIT 40` returns the **oldest** forty rows. So once a conversation passed forty messages, the model received the beginning of the thread and **never saw the question that had just been asked** — including the message inserted moments earlier in the same request.
+
+**Why it survived this long:** nothing errors. No exception, no failed insert, no bad status code. The assistant answers fluently, about something from forty messages ago. The only symptom is a model that seems to lose the thread on long conversations — which reads as a model limitation rather than a bug in our code, and would have been reported that way. The longest conversation in this database is 31 messages, so it had not triggered in practice yet.
+
+**Resolution:** newest-first with the limit, then reversed back to chronological — which is what "keep the last N" has to be in SQL.
+
+Title derivation was fixed in the same change. It read `messages[0]`, which was the thread's first message *only because* history happened to be ordered oldest-first. Fixing the ordering would have silently started retitling long threads from whichever message fell at the window edge. The first message is now fetched explicitly — one extra query, on a path that runs once per conversation.
+
+**Guarded by:** `npm run verify:api`, which inserts 45 messages with explicit spaced timestamps and asserts the window **ends with the newest** and **excludes the oldest**. A test asserting only "40 rows returned" would have passed the broken version.
+
 ### ISSUE-022 — Pre-publish audit: repository is clean, with three identifiers to decide on
 
 **Status:** Open (decision, not a defect) | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-07-31
@@ -81,85 +133,92 @@ The password is already in `.env.local` as `SUPABASE_DB_PASSWORD`. Migration `20
 The other four (#1 checkout, #2 setup-node, #3 production group, #4 @types/node) are green and safe to merge.
 **Worth noting:** this is CI justifying itself on its first day. Both would have looked like routine version bumps.
 
-### ISSUE-018 — Branch protection cannot be set: private repo needs GitHub Pro
+### ISSUE-018 — Branch protection on `main`
 
-**Status:** Open (waiting on you) | **Severity:** Medium | **Phase:** 8 | **Opened:** 2026-07-31
-**Problem:** `main` has nothing protecting it. Railway deploys from `main` directly, so a red build reports but does not block a deploy. Setting a ruleset via `gh api` returns **403 Upgrade to GitHub Pro** — branch protection on a *private* repository is a paid feature.
-**Decision made 2026-07-31:** you are making the repository **public** when you return, which makes branch protection free.
+**Status:** Resolved | **Severity:** Medium | **Phase:** 8 | **Opened:** 2026-07-31 | **Resolved:** 2026-07-31
 
----
+**Problem:** `main` had nothing protecting it. Railway deploys from `main`
+directly, so a red build reported but did not block a deploy, and any push —
+including an accidental one — went straight to production. Setting a ruleset had
+returned **403 Upgrade to GitHub Pro**, because branch protection on a *private*
+repository is a paid feature.
 
-#### Do this when you get back, in order
+**Resolution:** the repository was made public on 2026-07-31, which makes branch
+protection free. It is now applied and **verified as enforcing**, not merely
+configured.
 
-**Step 1 — confirm the repo is still clean.** History gets published too, not just the tip.
+### What is set
 
-```bash
-npm run security:audit -- --history
+| Rule | Value |
+| --- | --- |
+| Required status checks | `Lint, type-check, build` · `Tests (credential-free)` |
+| Branch must be up to date before merge | yes (`strict`) |
+| Pull request required | yes |
+| Approvals required | **0** |
+| Administrators bound by these rules | **yes** |
+| Force pushes | blocked |
+| Branch deletion | blocked |
+| Conversation resolution before merge | required |
+
+The security-audit job is deliberately **not** a required check. It is advisory —
+the dependency tree carries transitive advisories that cannot be cleared without
+downgrading Next itself (ISSUE-006), so requiring it would block every merge
+permanently and teach everyone to ignore the one check that reports real
+findings.
+
+### Proof that it enforces
+
+Configuration is not enforcement. A direct push to `main` was attempted and
+rejected:
+
+```
+$ git commit --allow-empty -m "test: confirm branch protection rejects a direct push"
+$ git push origin main
+
+remote: error: GH006: Protected branch update failed for refs/heads/main.
+remote:
+remote: - Changes must be made through a pull request.
+remote: - 2 of 2 required status checks are expected.
+remote:
+ ! [remote rejected] main -> main (protected branch hook declined)
 ```
 
-Expect `0 finding(s)`. The two warnings (dependency advisories per ISSUE-006, and `proton.me` as the commit-author domain) are known and fine. **If anything else appears, stop and read ISSUE-022 before continuing.**
+Both rules fired, and the account attempting it is a repository administrator —
+which is the point of `enforce_admins`. The test commit was discarded locally
+(`git reset --hard HEAD~1`); it never reached the remote.
 
-**Step 2 — make it public.** Do this yourself, in the browser, so the choice is deliberate:
-`Settings → General → Danger Zone → Change repository visibility → Make public`
+The **opposite** direction was proven too: this very change was merged through a
+pull request with CI green, so the legitimate path works. A rule that blocks the
+intended workflow as well as the unintended one is worse than no rule.
 
-**Step 3 — apply branch protection.** One paste:
-
-```bash
-gh api --method PUT repos/MyChat99/myaichat/branches/main/protection \
-  --input - <<'JSON'
-{
-  "required_status_checks": {
-    "strict": true,
-    "contexts": [
-      "Lint, type-check, build",
-      "Tests (credential-free)"
-    ]
-  },
-  "enforce_admins": false,
-  "required_pull_request_reviews": null,
-  "restrictions": null,
-  "allow_force_pushes": false,
-  "allow_deletions": false,
-  "required_conversation_resolution": true
-}
-JSON
-```
-
-Notes on the choices, so you can change them knowingly:
-
-| Field | Set to | Why |
-| --- | --- | --- |
-| `contexts` | the two blocking CI jobs | These are the **job names** from `ci.yml`, not the workflow name. The security job is excluded on purpose — it is advisory (ISSUE-006) and would block every merge. |
-| `strict: true` | on | A PR must be up to date with `main` before merging, so CI result reflects the merged state. |
-| `enforce_admins` | **false** | You are the only maintainer. `true` locks you out of your own hotfix at 2am with no second approver to help. Turn it on if anyone else joins. |
-| `required_pull_request_reviews` | `null` | Requiring a review with one maintainer means nothing can ever merge. |
-| `allow_force_pushes` / `allow_deletions` | false | The actual point of the exercise. |
-| `required_conversation_resolution` | true | Free, and stops review comments getting lost. |
-
-**Step 4 — verify it took.**
+### Re-checking it later
 
 ```bash
-gh api repos/MyChat99/myaichat/branches/main/protection --jq \
-  '{checks: .required_status_checks.contexts, force: .allow_force_pushes.enabled, delete: .allow_deletions.enabled}'
+gh api repos/MyChat99/myaichat/branches/main/protection --jq '{
+  checks: .required_status_checks.contexts,
+  pr_required: (.required_pull_request_reviews != null),
+  admins_bound: .enforce_admins.enabled,
+  force: .allow_force_pushes.enabled
+}'
 ```
 
-Expect the two check names, and `false` for both force and delete.
+### If you ever need to bypass it
 
-**Step 5 — prove it actually blocks.** A protection rule you have not tested is a rule you are assuming.
+You are bound by these rules now, including for a hotfix. That is deliberate.
+The escape hatch is one command, and using it should feel like a decision:
 
 ```bash
-git commit --allow-empty -m "test: confirm branch protection rejects a direct push"
-git push origin main          # must be REJECTED
-git reset --hard HEAD~1
+gh api --method DELETE repos/MyChat99/myaichat/branches/main/protection
+# ... push the fix ...
+# then re-apply from the JSON block in DEC-016
 ```
 
-If that push succeeds, protection is not applied to the branch you think it is.
-
-**Step 6 — chain the deploy (optional, and a separate decision).** With CI blocking merges, you may then want Railway to deploy only on green. That means turning **off** Railway's own Auto Deploy, adding `RAILWAY_TOKEN` as a repository secret, and removing `if: false` from the deploy job in `.github/workflows/ci.yml`. The exact three steps are written in a comment in that file. Leave it as-is if you prefer Railway's simpler behaviour — protection alone already fixes the main risk.
-
----
-
-**If you decide NOT to make it public after all:** the alternatives are GitHub Pro (~$4/month, same commands work unchanged) or accepting the risk. Accepting it is not unreasonable for a single-maintainer project — CI still runs and still reports on every push. What you lose is the enforcement, not the signal.
+**Still open, and a separate decision:** CI and the Railway deploy are not
+chained. Railway watches `main` on its own, so it deploys whatever merges —
+which is now always CI-green, but the deploy itself is not gated. Turning off
+Railway's Auto Deploy and enabling the workflow's disabled deploy job is written
+up in a comment in `.github/workflows/ci.yml`. Protection alone already fixes
+the main risk.
 
 ### ISSUE-017 — Resend not configured: email is rendered but never sent
 
@@ -243,19 +302,29 @@ CORS on the bucket must allow `PUT` from your app origin, or browser uploads fai
 
 ### ISSUE-010 — Phase 2 blocked: no Anthropic API key
 
-**Status:** Open | **Severity:** High | **Phase:** 2 | **Opened:** 2026-07-30 | **Resolved:** —
+**Status:** Resolved | **Severity:** High | **Phase:** 2 | **Opened:** 2026-07-30 | **Resolved:** 2026-07-30 (recorded 2026-07-31)
+**Resolution:** A key was provided on 2026-07-30 and Phase 2 shipped the same day; `verify:chat` has been streaming real completions through it ever since. **This entry stayed marked Open for a day after it was fixed** — caught during the pause audit, not by anything automatic. An issue log that lags reality is worse than no log, because the next person plans around a blocker that no longer exists.
 **Problem:** [PHASE-2-chat-streaming.md](../phases/PHASE-2-chat-streaming.md) specifies Anthropic as the single provider for Phase 2. No Anthropic key exists. An OpenAI key is available but was deliberately deferred to Phase 3 rather than swapping the provider order — see [DEC-007](DECISIONS.md).
 **Resolution:** Get a key from console.anthropic.com, add `ANTHROPIC_API_KEY` to `.env.local`, then Phase 2 can start. Nothing else blocks it — Phase 1 is Verified.
 
-### ISSUE-003 — R2, Resend, and Railway credentials not yet provisioned
+### ISSUE-003 — R2 and Resend credentials not yet provisioned
 
-**Status:** Open | **Severity:** Medium | **Phase:** 6, 8 | **Opened:** 2026-07-30 | **Resolved:** —
-**Problem:** No accounts or keys yet for Cloudflare R2 and Resend (Phase 6) or Railway (Phase 8). Each blocks its phase at the point of integration. Split out of ISSUE-002, which covered Supabase as well.
+**Status:** Open | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-07-30 | **Resolved:** —
+**Rescoped 2026-07-31:** Railway is done — provisioned, deployed and live since 2026-07-30 — so this now covers **R2 and Resend only**. Phase 8 dropped from the scope.
+**Problem:** No accounts or keys yet for Cloudflare R2 or Resend. Both block Phase 6 at the point of integration; everything up to that point is built and tested. See [PHASE-6-CHECKLIST.md](PHASE-6-CHECKLIST.md) for the exact sequence once they exist.
 **Resolution:** Provision per phase as needed. Track every new variable in `.env.example`; real values go in Railway, never in the repo.
 
 ### ISSUE-001 — Commit author email may not match GitHub account
 
-**Status:** Open | **Severity:** Low | **Phase:** 0 | **Opened:** 2026-07-30 | **Resolved:** —
+**Status:** Resolved | **Severity:** Low | **Phase:** 0 | **Opened:** 2026-07-30 | **Resolved:** 2026-07-31
+**Resolution:** Confirmed empirically now that the repository is public — the API reports every commit linked to the profile, so the address is verified on the account and contributions are attributed:
+
+```bash
+gh api repos/MyChat99/myaichat/commits --jq '.[0:3][] | {sha: .sha[0:7], linked_login: (.author.login // "NOT LINKED")}'
+# → all three: "linked_login": "MyChat99"
+```
+
+Original concern below.
 **Problem:** Git commits are authored as `myaichatbot@proton.me`, but the GitHub account is `MyChat99`. If that address is not verified on the account, commits will not link to the profile and contributions will not be attributed.
 **Resolution:** Add and verify the address at github.com/settings/emails, or change `git config --global user.email` to the account's verified address. Cosmetic only — does not affect pushes.
 

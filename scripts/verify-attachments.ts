@@ -84,7 +84,11 @@ const typeReason = rejectionReason(file('a.exe', 'application/x-msdownload', 10)
 check('a type rejection lists the accepted formats', /PNG|PDF/.test(typeReason), typeReason);
 
 const sizeReason = rejectionReason(file('a.png', 'image/png', 40 * MB), LIMIT) ?? '';
-check('a size rejection states both actual and limit', /40\.0MB/.test(sizeReason) && /20MB/.test(sizeReason), sizeReason);
+check(
+  'a size rejection states both actual and limit',
+  /40\.0MB/.test(sizeReason) && /20MB/.test(sizeReason),
+  sizeReason,
+);
 
 // Type is checked before size: "we don't take .mov" beats "that's too big" for
 // a 200MB video, because shrinking it would not have helped.
@@ -97,7 +101,11 @@ check(
   Object.keys(SERVER_TABLE).every((m) => ACCEPT_ATTRIBUTE.includes(m)),
 );
 check('the per-message cap matches the chat route (.max(5))', MAX_ATTACHMENTS_PER_MESSAGE === 5);
-check('the accepted list is human-readable', /^[A-Z0-9, ]+$/.test(describeAccepted()), describeAccepted());
+check(
+  'the accepted list is human-readable',
+  /^[A-Z0-9, ]+$/.test(describeAccepted()),
+  describeAccepted(),
+);
 
 // No SVG, ever. It is an image to a user and a script host to a browser, and
 // serving one from our own origin would be stored XSS.
