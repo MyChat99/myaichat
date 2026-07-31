@@ -24,15 +24,14 @@ const CHAT_MODEL_PATTERN = /^(gpt-[45]|o[1-9])/;
 const NON_CHAT_PATTERN =
   /transcribe|tts|audio|realtime|embedding|moderation|image|search-api|codex/;
 
-let client: OpenAI | null = null;
-
-function getClient(): OpenAI {
-  if (!client) {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new ProviderError('auth', 'OpenAI is not configured.', false);
-    client = new OpenAI({ apiKey });
-  }
-  return client;
+/**
+ * Built per API key rather than as a singleton: since Phase 4 the key comes
+ * from the encrypted `providers.encrypted_api_key` column, so it can be
+ * rotated at runtime and differs per provider row.
+ */
+function makeClient(apiKey: string): OpenAI {
+  if (!apiKey) throw new ProviderError('auth', 'OpenAI is not configured.', false);
+  return new OpenAI({ apiKey });
 }
 
 function normalise(err: unknown): ProviderError {
@@ -69,95 +68,101 @@ function normalise(err: unknown): ProviderError {
   return new ProviderError('unknown', 'Unexpected error talking to OpenAI.', true);
 }
 
-export const openaiProvider: ChatProvider = {
-  name: 'openai',
+export const OPENAI_PROVIDER_NAME = 'openai';
 
-  async *streamChat(params: StreamChatParams): AsyncGenerator<ChatStreamEvent> {
-    const { model, messages, maxTokens, signal, system } = params;
+export function createOpenAIProvider(apiKey: string): ChatProvider {
+  const client = makeClient(apiKey);
 
-    try {
-      const stream = await getClient().chat.completions.create(
-        {
-          model,
-          // GPT-5-series rejects `max_tokens`; the parameter was renamed.
-          max_completion_tokens: maxTokens,
-          // Usage is omitted from streamed responses unless explicitly requested.
-          stream_options: { include_usage: true },
-          stream: true,
-          messages: [
-            // OpenAI takes the system prompt as the first message rather than
-            // a separate field, which is the main shape difference here.
-            ...(system ? [{ role: 'system' as const, content: system }] : []),
-            ...messages.map((m) => ({ role: m.role, content: m.content })),
-          ],
-        },
-        { signal },
-      );
+  return {
+    name: OPENAI_PROVIDER_NAME,
 
-      let inputTokens = 0;
-      let outputTokens = 0;
-      let stopReason: string | null = null;
+    async *streamChat(params: StreamChatParams): AsyncGenerator<ChatStreamEvent> {
+      const { model, messages, maxTokens, signal, system } = params;
 
-      for await (const chunk of stream) {
-        const delta = chunk.choices[0]?.delta?.content;
-        if (delta) yield { type: 'text', text: delta };
+      try {
+        const stream = await client.chat.completions.create(
+          {
+            model,
+            // GPT-5-series rejects `max_tokens`; the parameter was renamed.
+            max_completion_tokens: maxTokens,
+            // Usage is omitted from streamed responses unless explicitly requested.
+            stream_options: { include_usage: true },
+            stream: true,
+            messages: [
+              // OpenAI takes the system prompt as the first message rather than
+              // a separate field, which is the main shape difference here.
+              ...(system ? [{ role: 'system' as const, content: system }] : []),
+              ...messages.map((m) => ({ role: m.role, content: m.content })),
+            ],
+          },
+          { signal },
+        );
 
-        const finish = chunk.choices[0]?.finish_reason;
-        if (finish) stopReason = finish;
+        let inputTokens = 0;
+        let outputTokens = 0;
+        let stopReason: string | null = null;
 
-        // Arrives in a final chunk that carries no choices.
-        if (chunk.usage) {
-          inputTokens = chunk.usage.prompt_tokens;
-          outputTokens = chunk.usage.completion_tokens;
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta?.content;
+          if (delta) yield { type: 'text', text: delta };
+
+          const finish = chunk.choices[0]?.finish_reason;
+          if (finish) stopReason = finish;
+
+          // Arrives in a final chunk that carries no choices.
+          if (chunk.usage) {
+            inputTokens = chunk.usage.prompt_tokens;
+            outputTokens = chunk.usage.completion_tokens;
+          }
         }
+
+        yield { type: 'done', inputTokens, outputTokens, stopReason };
+      } catch (err) {
+        if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) return;
+
+        const normalised = normalise(err);
+        console.error('[openai] stream failed:', normalised.kind, err);
+        yield {
+          type: 'error',
+          kind: normalised.kind,
+          message: normalised.message,
+          retryable: normalised.retryable,
+        };
       }
+    },
 
-      yield { type: 'done', inputTokens, outputTokens, stopReason };
-    } catch (err) {
-      if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) return;
+    async listModels(): Promise<ProviderModel[]> {
+      try {
+        const page = await client.models.list();
+        return page.data
+          .filter((m) => CHAT_MODEL_PATTERN.test(m.id) && !NON_CHAT_PATTERN.test(m.id))
+          .map((m) => ({ id: m.id, displayName: m.id }))
+          .sort((a, b) => a.id.localeCompare(b.id));
+      } catch (err) {
+        throw normalise(err);
+      }
+    },
 
-      const normalised = normalise(err);
-      console.error('[openai] stream failed:', normalised.kind, err);
-      yield {
-        type: 'error',
-        kind: normalised.kind,
-        message: normalised.message,
-        retryable: normalised.retryable,
-      };
-    }
-  },
-
-  async listModels(): Promise<ProviderModel[]> {
-    try {
-      const page = await getClient().models.list();
-      return page.data
-        .filter((m) => CHAT_MODEL_PATTERN.test(m.id) && !NON_CHAT_PATTERN.test(m.id))
-        .map((m) => ({ id: m.id, displayName: m.id }))
-        .sort((a, b) => a.id.localeCompare(b.id));
-    } catch (err) {
-      throw normalise(err);
-    }
-  },
-
-  async validateKey(): Promise<KeyValidation> {
-    const started = Date.now();
-    try {
-      // Deliberately a generation, not a models.list(): an unfunded key lists
-      // models happily and fails only when asked to do work. Phase 3 was
-      // briefly blocked by exactly that, so the check has to spend a token.
-      //
-      // 16 tokens, not 1: unlike Anthropic, OpenAI raises invalid_request_error
-      // rather than truncating when the budget can't fit a complete message —
-      // a 1-token probe fails on a perfectly healthy key.
-      await getClient().chat.completions.create({
-        model: 'gpt-5.4-nano',
-        max_completion_tokens: 16,
-        messages: [{ role: 'user', content: 'hi' }],
-      });
-      return { valid: true, latencyMs: Date.now() - started };
-    } catch (err) {
-      const normalised = normalise(err);
-      return { valid: false, reason: normalised.message, latencyMs: Date.now() - started };
-    }
-  },
-};
+    async validateKey(): Promise<KeyValidation> {
+      const started = Date.now();
+      try {
+        // Deliberately a generation, not a models.list(): an unfunded key lists
+        // models happily and fails only when asked to do work. Phase 3 was
+        // briefly blocked by exactly that, so the check has to spend a token.
+        //
+        // 16 tokens, not 1: unlike Anthropic, OpenAI raises invalid_request_error
+        // rather than truncating when the budget can't fit a complete message —
+        // a 1-token probe fails on a perfectly healthy key.
+        await client.chat.completions.create({
+          model: 'gpt-5.4-nano',
+          max_completion_tokens: 16,
+          messages: [{ role: 'user', content: 'hi' }],
+        });
+        return { valid: true, latencyMs: Date.now() - started };
+      } catch (err) {
+        const normalised = normalise(err);
+        return { valid: false, reason: normalised.message, latencyMs: Date.now() - started };
+      }
+    },
+  };
+}

@@ -18,7 +18,9 @@
     "verify:gates": "tsx scripts/verify-auth-gates.ts",
     "verify:seed": "tsx scripts/verify-seed.ts",
     "verify:chat": "tsx scripts/verify-chat.ts",
-    "verify:providers": "tsx --conditions=react-server scripts/verify-providers.ts"
+    "verify:providers": "tsx --conditions=react-server scripts/verify-providers.ts",
+    "keys:encrypt": "tsx --conditions=react-server scripts/encrypt-keys.ts",
+    "verify:admin": "tsx --conditions=react-server scripts/verify-admin.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

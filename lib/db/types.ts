@@ -27,12 +27,15 @@ export interface Database {
           display_name: string | null;
           avatar_url: string | null;
           role: UserRole;
+          /** Added in migration 20260730120005. */
+          suspended: boolean;
         };
         Insert: Partial<Timestamps> & {
           id: string;
           display_name?: string | null;
           avatar_url?: string | null;
           role?: UserRole;
+          suspended?: boolean;
         };
         Update: Partial<Database['public']['Tables']['profiles']['Row']>;
         Relationships: [];

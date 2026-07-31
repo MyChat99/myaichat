@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { createAdminClient } from '@/lib/db/admin';
 import { createClient } from '@/lib/db/server';
 import { defaultModel, getAdapter, resolveModel } from '@/lib/providers/registry';
-import type { ChatMessage } from '@/lib/providers/types';
+import { ProviderError, type ChatMessage } from '@/lib/providers/types';
 import { checkChatRateLimit } from '@/lib/security/rate-limit';
 
 /**
@@ -90,6 +90,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Conversation not found.' }, { status: 404 });
   }
 
+  // Suspension is enforced by RLS as well (migration 20260730120005), so a
+  // bypass of this check still cannot write. This is here to return a clear
+  // 403 rather than an opaque insert failure.
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('suspended')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (profile?.suspended) {
+    return NextResponse.json(
+      { error: 'Your account is suspended. Contact an administrator.' },
+      { status: 403 },
+    );
+  }
+
   const rate = await checkChatRateLimit(user.id);
   if (!rate.allowed) {
     return NextResponse.json(
@@ -167,7 +183,16 @@ export async function POST(request: NextRequest) {
       .eq('id', conversationId);
   }
 
-  const adapter = getAdapter(model.providerName);
+  // Resolves the encrypted key and builds a configured adapter. Throws a
+  // ProviderError when the provider is disabled or has no usable key.
+  let adapter;
+  try {
+    adapter = await getAdapter(model.providerName);
+  } catch (err) {
+    const message =
+      err instanceof ProviderError ? err.message : 'That model is currently unavailable.';
+    return NextResponse.json({ error: message }, { status: 503 });
+  }
 
   // Aborts when the client disconnects or presses Stop — this is what makes the
   // stop button halt generation upstream rather than just hiding output.

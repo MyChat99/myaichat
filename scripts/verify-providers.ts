@@ -163,7 +163,7 @@ async function main() {
   // --- adapters ------------------------------------------------------------
   const { getAdapter } = await import('../lib/providers/registry');
   for (const provider of providers) {
-    const adapter = getAdapter(provider);
+    const adapter = await getAdapter(provider);
     check(
       `${provider}: adapter implements the full interface`,
       typeof adapter.streamChat === 'function' &&
@@ -173,7 +173,7 @@ async function main() {
   }
 
   for (const provider of providers) {
-    const adapter = getAdapter(provider);
+    const adapter = await getAdapter(provider);
     const validation = await adapter.validateKey();
     check(
       `${provider}: validateKey() confirms the key can generate`,

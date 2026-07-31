@@ -62,6 +62,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </nav>
         </header>
 
+        {user.suspended ? (
+          <p
+            role="alert"
+            className="border-destructive/40 bg-destructive/10 text-destructive border-b px-4 py-2 text-sm"
+          >
+            Your account is suspended. You can read your history but cannot send new messages.
+          </p>
+        ) : null}
+
         <main className="flex min-h-0 flex-1 flex-col">{children}</main>
       </div>
     </div>

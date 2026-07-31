@@ -11,6 +11,7 @@ export type SessionUser = {
   displayName: string | null;
   avatarUrl: string | null;
   role: UserRole;
+  suspended: boolean;
 };
 
 /**
@@ -30,7 +31,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('display_name, avatar_url, role')
+    .select('display_name, avatar_url, role, suspended')
     .eq('id', user.id)
     .single();
 
@@ -41,6 +42,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     avatarUrl: profile?.avatar_url ?? null,
     // Default to the least privilege if the profile row is somehow missing.
     role: profile?.role ?? 'user',
+    suspended: profile?.suspended ?? false,
   };
 }
 
