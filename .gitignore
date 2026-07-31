@@ -38,3 +38,4 @@ venv/
 
 # macOS
 .DS_Store
+audit-report.md
