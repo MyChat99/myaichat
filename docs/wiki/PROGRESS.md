@@ -401,3 +401,38 @@ Overnight work, additive only. Nothing in Phases 1–4 was modified.
 | Palette opens on ⌘K, arrows and Enter work | **NEEDS HUMAN VERIFICATION** — needs a keyboard |
 | Animations feel right, and stop under reduced motion | **NEEDS HUMAN VERIFICATION** — needs eyes and an OS setting |
 | Error and 404 pages look correct | **NEEDS HUMAN VERIFICATION** — code paths exist, appearance unchecked |
+
+### Priority 3 — Security hardening · Done & verified
+
+- **Login throttling** — new `auth_attempts` table (migration `20260731130001`),
+  five failures per account or thirty per IP in fifteen minutes. Two counters,
+  because a per-account limit never trips under password spraying and a per-IP
+  limit alone punishes shared networks. Stored identifiers are HMACed so the
+  table is not an email list. See DEC-013.
+- **Signup hardening** — 10-character minimum, a common/repetitive/email-derived
+  password blocklist, and a disposable-domain blocklist. Composition rules were
+  deliberately not added; see DEC-014, including why the *login* path keeps the
+  old 8-character minimum (raising it there locks existing users out of their
+  own accounts at form validation).
+- **Re-authentication for provider key changes** — `setProviderKey` and
+  `deleteProviderKey` now require the admin's password, verified server-side on
+  a throwaway client and throttled under its own counter. See DEC-012.
+- **Per-user daily token budget** — `system_settings.daily_token_budget_per_user`
+  (0 = unlimited, the default), enforced in `/api/chat` from `usage_logs` since
+  00:00 UTC, and editable in `/admin/settings`. It sits beside the hourly message
+  limit rather than replacing it: one is a pace limit, the other a spend ceiling,
+  and sixty messages an hour of very large context is a bill the message counter
+  never sees.
+- **`npm run verify:security`** — 35 checks across all four. Excluded from CI for
+  the ISSUE-015 reason: it temporarily writes a system setting and restores it in
+  `finally`, and there is one Supabase project behind local and production.
+
+| Criterion | Result |
+| --- | --- |
+| `lint` / `type-check` / `build` | pass |
+| `verify:security` | pass — 35/35 |
+| `security:audit` | pass — all **10** public tables have RLS |
+| Throttle blocks after 5 failures, clears on success | pass — asserted against stored rows |
+| `auth_attempts` unreadable with the publishable key | pass |
+| Over-budget user is refused by the chat route | pass — asserted via `checkDailyTokenBudget` on a real user with real usage |
+| The password prompt appears when rotating a key | **NEEDS HUMAN VERIFICATION** — the server gate is tested; the dialog is not |

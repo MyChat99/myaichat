@@ -17,6 +17,7 @@
     "verify:schema": "tsx scripts/verify-schema.ts",
     "verify:gates": "tsx scripts/verify-auth-gates.ts",
     "verify:headers": "tsx scripts/verify-headers.ts",
+    "verify:security": "tsx --conditions=react-server scripts/verify-security.ts",
     "verify:seed": "tsx scripts/verify-seed.ts",
     "verify:chat": "tsx scripts/verify-chat.ts",
     "verify:providers": "tsx --conditions=react-server scripts/verify-providers.ts",

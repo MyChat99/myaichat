@@ -14,6 +14,11 @@
  */
 import { execFileSync } from 'node:child_process';
 
+// Loads .env.local when present. Without this the RLS section skipped itself on
+// a developer machine that HAD credentials — a check that quietly does nothing
+// locally and is expected to do nothing in CI is a check that never runs.
+import './_env';
+
 let findings = 0;
 let warnings = 0;
 
@@ -168,9 +173,16 @@ async function auditRls() {
     return;
   }
 
+  // Tables that are meant to have zero policies: RLS on with nothing granted is
+  // deny-all, which is exactly right for state only the service role may touch.
+  // Anything NOT on this list with no policies is almost certainly an oversight.
+  const INTENTIONALLY_DENY_ALL = new Set(['auth_attempts']);
+
   for (const row of rows) {
     if (!row.rls_enabled) {
       fail(`table "${row.table_name}" has RLS DISABLED`);
+    } else if (INTENTIONALLY_DENY_ALL.has(row.table_name)) {
+      ok(`table "${row.table_name}" is deny-all by design (service role only)`);
     } else if (Number(row.policy_count) === 0) {
       // RLS on with no policies denies everything, which is safe but almost
       // certainly a mistake — the table becomes unreadable to the app.

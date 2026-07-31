@@ -18,6 +18,30 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 
 ---
 
+### DEC-014 — Signup password rules follow NIST, and apply to signup only
+
+**Date:** 2026-07-31 | **Phase:** 8 (Session 2) | **Status:** Active
+**Decision:** Signup requires 10+ characters and rejects a blocklist of common, repetitive and email-derived passwords. It does **not** require mixed case, digits or symbols. The login path keeps the original 8-character minimum.
+**Why:** NIST SP 800-63B dropped composition rules because they reliably produce `Password1!` — a stricter-*feeling* rule that concentrates users into a small, well-known region of the keyspace. Length plus a blocklist of what attackers actually try is the current guidance.
+**The split matters more than the rules.** Raising the minimum on the *login* schema would reject every existing account whose password is 8 or 9 characters, at form validation, before the password is ever checked — the user would be locked out of their own account with no path to fix it. Existing users move to the new rules through a password reset, not a wall.
+**Tradeoff:** Two schemas to keep straight instead of one, and the blocklist is a hand-written ~50 entries rather than a breach corpus. A k-anonymity range query against Have I Been Pwned would be strictly better and is the upgrade path — it was not taken tonight because it puts a third-party HTTP call in the signup path.
+
+### DEC-013 — Login throttling stores attempts in Postgres, not memory
+
+**Date:** 2026-07-31 | **Phase:** 8 (Session 2) | **Status:** Active
+**Decision:** Failed password attempts are counted in a new `auth_attempts` table (deny-all RLS, service-role only), keyed by an HMAC of the email and separately by an HMAC of the client IP. Five failures per account or thirty per IP in fifteen minutes blocks further attempts.
+**Why:** A module-level `Map` is the obvious implementation and is worth almost nothing: it resets on every deploy and is not shared between instances, so the lockout lasts exactly as long as an attacker is unwilling to wait for a restart. Two counters rather than one because they catch different attacks — a per-account counter never trips under password spraying (one attempt per account), and a per-IP counter alone punishes shared networks.
+**Identifiers are hashed** so the table cannot be harvested as a list of registered email addresses if it is ever exposed.
+**Tradeoff:** One indexed query per login attempt, and the IP counter is only as trustworthy as `x-forwarded-for` — spoofable without a trusted proxy in front. That is why the IP limit is the loose one and the per-account limit carries the weight.
+
+### DEC-012 — Provider key changes require the password again, enforced server-side
+
+**Date:** 2026-07-31 | **Phase:** 8 (Session 2) | **Status:** Active
+**Decision:** `setProviderKey` and `deleteProviderKey` call `requireAdminWithPassword()`, which re-verifies the admin's password on a throwaway Supabase client (`persistSession: false`) and is itself throttled under a separate `reauth` counter.
+**Why:** A stolen session cookie or an unlocked laptop gives an attacker everything the session can do, including replacing the provider key with their own and billing the real account. Re-asking for the password is the one control that a session alone cannot satisfy. It runs in the Server Action, not the dialog — a check enforced only in the component that calls the action is not enforced at all, since the action is a POST endpoint.
+**Two details:** the check uses a throwaway client because calling `signInWithPassword` on the request-bound client would silently re-issue the session cookies as a side effect of a confirmation; and it is throttled because an unthrottled "confirm your password" field is a password oracle that already knows which account it is asking about.
+**Tradeoff:** Two extra fields in the admin UI, and re-auth failures must be *returned* rather than thrown — Next replaces thrown Server Action errors with a generic message in production, which would render "that password is not correct" as "an error occurred".
+
 ### DEC-013 — Admin mutations are Server Actions, not route handlers
 
 **Date:** 2026-07-30 | **Phase:** 4 | **Status:** Active

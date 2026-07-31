@@ -3,12 +3,15 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+import { headers } from 'next/headers';
+
 import { createAdminClient } from '@/lib/db/admin';
 import { getAdapter, isRegisteredProvider } from '@/lib/providers/registry';
 import { ProviderError } from '@/lib/providers/types';
 import { auditLog, redactMetadata } from '@/lib/security/audit';
 import { requireAdmin } from '@/lib/security/auth';
 import { encryptSecret, keyLast4 } from '@/lib/security/crypto';
+import { ReauthError, requireAdminWithPassword } from '@/lib/security/reauth';
 
 /**
  * Admin mutations.
@@ -22,13 +25,39 @@ import { encryptSecret, keyLast4 } from '@/lib/security/crypto';
  * users' rows; the `requireAdmin()` gate is what authorises it.
  */
 
+/**
+ * Re-auth failures are RETURNED, not thrown. In production Next replaces a
+ * thrown Server Action error with a generic message, so "that password is not
+ * correct" would reach the user as "an error occurred" — unusable for a prompt
+ * whose whole job is to tell you that you mistyped. Genuine server faults still
+ * throw, because there the generic message is the right one.
+ */
+export type KeyActionResult = { ok: true } | { ok: false; error: string };
+
 const uuid = z.string().uuid();
 const providerName = z.string().trim().min(1).max(64);
 
 // ---------------------------------------------------------------- providers
 
-export async function setProviderKey(name: string, apiKey: string) {
-  const admin = await requireAdmin();
+/**
+ * Writing or replacing a provider key is the highest-value action in this app —
+ * the key it overwrites is the one that bills a real account — so it is the one
+ * place that asks for the password again rather than trusting the session. See
+ * lib/security/reauth.ts for why the check is server-side and throttled.
+ */
+export async function setProviderKey(
+  name: string,
+  apiKey: string,
+  password: string,
+): Promise<KeyActionResult> {
+  let admin;
+  try {
+    admin = await requireAdminWithPassword(password, await headers());
+  } catch (err) {
+    if (err instanceof ReauthError) return { ok: false, error: err.message };
+    throw err;
+  }
+
   const parsedName = providerName.parse(name);
   const parsedKey = z.string().trim().min(8).max(500).parse(apiKey);
 
@@ -57,10 +86,19 @@ export async function setProviderKey(name: string, apiKey: string) {
   });
 
   revalidatePath('/admin/providers');
+  return { ok: true };
 }
 
-export async function deleteProviderKey(name: string) {
-  const admin = await requireAdmin();
+/** Deleting a key also disables the provider for every user, so it re-authenticates too. */
+export async function deleteProviderKey(name: string, password: string): Promise<KeyActionResult> {
+  let admin;
+  try {
+    admin = await requireAdminWithPassword(password, await headers());
+  } catch (err) {
+    if (err instanceof ReauthError) return { ok: false, error: err.message };
+    throw err;
+  }
+
   const parsedName = providerName.parse(name);
 
   const db = createAdminClient();
@@ -80,6 +118,7 @@ export async function deleteProviderKey(name: string) {
 
   revalidatePath('/admin/providers');
   revalidatePath('/', 'layout');
+  return { ok: true };
 }
 
 export async function toggleProvider(name: string, enabled: boolean) {
@@ -286,6 +325,8 @@ const settingsInput = z.object({
   global_system_prompt: z.string().max(10_000),
   rate_limit_messages_per_hour: z.coerce.number().int().min(1).max(10_000),
   max_upload_size_mb: z.coerce.number().int().min(1).max(1024),
+  // 0 = unlimited. Enforced in the chat route (lib/security/token-budget.ts).
+  daily_token_budget_per_user: z.coerce.number().int().min(0).max(100_000_000),
   signups_enabled: z.boolean(),
   default_model_id: z.string().uuid().nullable().optional(),
 });

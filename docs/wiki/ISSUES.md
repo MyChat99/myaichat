@@ -16,6 +16,18 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-020 — Supabase CLI link state was lost; `db push` needs an explicit connection string
+
+**Status:** Resolved | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-07-31 | **Resolved:** 2026-07-31
+**Problem:** `npm run db:push` failed with `LegacyProjectNotLinkedError`, and re-linking failed with `LegacyPlatformAuthRequiredError` — the CLI's link state (`supabase/.temp`) is machine-local and not in the repo, and re-linking needs a Supabase **personal access token** that only exists after an interactive `supabase login`.
+**Resolution:** Migrations can be applied without any access token by passing the database URL directly:
+
+```
+npx supabase db push --db-url "postgresql://postgres:$SUPABASE_DB_PASSWORD@db.<project-ref>.supabase.co:5432/postgres"
+```
+
+The password is already in `.env.local` as `SUPABASE_DB_PASSWORD`. Migration `20260731130001_auth_attempts.sql` was applied this way and confirmed by `npm run security:audit`, which reads the pg catalog and now reports **10** tables with RLS enabled. The `failed to cache migrations catalog: failed to run docker` warning it prints is cosmetic — it is the type-generation cache, which needs Docker (ISSUE-004), not the migration itself.
+
 ## Open
 
 ### ISSUE-019 — Two Dependabot PRs break the build (caught by CI on day one)

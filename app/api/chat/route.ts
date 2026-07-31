@@ -7,6 +7,7 @@ import { defaultModel, getAdapter, resolveModel } from '@/lib/providers/registry
 import { ProviderError, type ChatMessage } from '@/lib/providers/types';
 import { fetchObject, isStorageConfigured, keyBelongsToUser } from '@/lib/r2/storage';
 import { checkChatRateLimit } from '@/lib/security/rate-limit';
+import { checkDailyTokenBudget } from '@/lib/security/token-budget';
 
 /**
  * Streaming chat endpoint — provider-agnostic.
@@ -125,6 +126,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: `Hourly limit of ${rate.limit} messages reached.`, retryable: true },
       { status: 429, headers: { 'retry-after': String(rate.retryAfterSeconds) } },
+    );
+  }
+
+  // Spend ceiling, separate from the message counter above: sixty messages an
+  // hour of very large context is a bill that a message count never sees.
+  const budget = await checkDailyTokenBudget(user.id);
+  if (!budget.allowed) {
+    return NextResponse.json(
+      {
+        error: `Daily token budget of ${budget.limit.toLocaleString()} reached (used ${budget.used.toLocaleString()}). Resets at 00:00 UTC.`,
+        retryable: false,
+      },
+      { status: 429 },
     );
   }
 
