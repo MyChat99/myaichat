@@ -31,6 +31,10 @@ const DEFAULT_SETTINGS: {
   { key: 'rate_limit_messages_per_hour', value: 60 },
   { key: 'max_upload_size_mb', value: 20 },
   { key: 'signups_enabled', value: true },
+  // 0 = unlimited. Seeded explicitly rather than left absent: the chat route
+  // reads it on every request, and a setting the app depends on should exist
+  // because the seed created it, not because a test happened to leave it behind.
+  { key: 'daily_token_budget_per_user', value: 0 },
 ];
 
 /**

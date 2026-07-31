@@ -187,6 +187,10 @@ async function verifyTokenBudget() {
     .eq('key', KEY)
     .maybeSingle();
   const originalValue = (original?.value as number | undefined) ?? 0;
+  // Restoring an absent row by upserting a default CREATES it — which is how
+  // this suite silently added a setting the seed did not know about, and broke
+  // verify:seed from a distance.
+  const existedBefore = original !== null;
 
   // A user id that owns no usage rows, so "used" is a known 0.
   const emptyUser = '00000000-0000-4000-8000-0000000000ff';

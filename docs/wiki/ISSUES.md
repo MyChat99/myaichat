@@ -16,6 +16,19 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-025 — A verification suite invented a system setting and broke another suite
+
+**Status:** Resolved | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-07-31 | **Resolved:** 2026-07-31
+**Problem:** `verify:seed` failed with an unexpected `daily_token_budget_per_user` in `system_settings`.
+
+Two mistakes compounding:
+
+1. The daily token budget was added in session 2 but **never added to the seed's `DEFAULT_SETTINGS`**, so a setting the chat route reads on every request did not exist on a fresh install.
+2. `verify:security` restores that setting in `finally` by upserting the value it read — and when the row did not exist, it read `undefined`, defaulted to `0`, and **created** it. The suite left behind a row it had invented, which then failed a different suite from a distance.
+
+**How it went unnoticed:** the end-of-session-2 verification run did not include `verify:seed`. Running a subset and reporting "all suites pass" is how a regression survives a green run — the failure was already present before this session started, and this session found it only because the full suite was run.
+
+**Resolution:** the setting is seeded explicitly (`0` = unlimited, the documented default), the expected set in `verify:seed` follows, and `verify:security` now records whether the row existed and **deletes** it on cleanup if it did not. A test that cannot restore the exact prior state should not run against shared data.
 ### ISSUE-024 — Truncation deletes by timestamp, so a collision over-deletes
 
 **Status:** Open (logged, not fixed) | **Severity:** Low | **Phase:** 2 | **Opened:** 2026-07-31

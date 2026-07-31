@@ -392,3 +392,176 @@ Then, by hand:
 
 If any of the automated commands fail, the failure line names the check and what
 it expected; nothing needs archaeology.
+
+---
+---
+
+# Away session — 2026-07-31
+
+A few hours, autonomous. Everything is committed and pushed to `main`.
+**Production untouched**: no deploy, no Railway change, no repository visibility
+change. One additive migration was applied in a previous session; none tonight.
+
+**Full suite green** — 17 suites, ~460 assertions, all passing, including the
+one that was quietly broken before I started.
+
+---
+
+## Headline
+
+| Priority | Status | One line |
+| --- | --- | --- |
+| Housekeeping | **Done** | 5 manual checks marked verified · both Dependabot PRs closed · CSP decision logged · dev-overlay issue fixed |
+| 1 — Public-release prep | **Done** | History audit clean · MIT licence · README rewritten · branch protection is one paste |
+| 2 — Phase 6 dry-run | **Done** | Attachment UI complete and wired · checklist written |
+| 3 — Deep self-review | **Done** | **One high-severity bug found and fixed** · 61 refusal tests |
+| 4 — If time remained | **Done** | Conversation export · flag-gated demo data |
+
+---
+
+## The three things that matter most
+
+### 1. A real bug, found by reading rather than by testing (ISSUE-023)
+
+`/api/chat` was sending the model the **oldest** forty messages, not the newest:
+
+```ts
+.order('created_at', { ascending: true }).limit(40)   // returns the OLDEST 40
+```
+
+Past forty messages, the model never saw the question just asked — including the
+one inserted moments earlier in the same request. It answered fluently about
+something forty turns old.
+
+**Nothing errored.** No exception, no failed insert, no bad status code. The only
+symptom is an assistant that seems to lose the thread on long conversations,
+which reads as a model limitation rather than our bug and would have been
+reported that way — probably as "the model gets worse the longer I talk to it".
+Your longest thread is 31 messages, so it had not bitten yet.
+
+Fixed, and guarded by a test that asserts the window **ends with the newest**
+message and **excludes the oldest**. A test asserting only "40 rows returned"
+would have passed the broken version, which is exactly why it lasted.
+
+### 2. I had been reporting a green suite while one check was red (ISSUE-025)
+
+`verify:seed` was failing before this session began. I did not catch it at the
+end of session 2 because that run covered ten suites, not all of them — and I
+reported "all pass".
+
+Two causes: the daily token budget was never added to the seed's defaults, so a
+setting the chat route reads every request did not exist on a fresh install; and
+`verify:security` **created** that row while "restoring" it, leaving behind
+something it had invented, which then failed a different suite from a distance.
+
+Both fixed. The correction that matters is procedural: a subset run is not a
+suite run, and I should not describe one as the other.
+
+### 3. The repository is clean for publication
+
+All 42 commits scanned, not just the working tree — making a repo public
+publishes the history.
+
+| Scanned | Result |
+| --- | --- |
+| Anthropic / OpenAI / Supabase / Resend / AWS key shapes | **none** |
+| Private key blocks, JWTs, Postgres DSNs with passwords | **none** |
+| `.env` ever committed | **none** — only `.env.example`, placeholders |
+| Absolute home paths | **none** |
+| Email domains | one — `proton.me`, your commit-author address |
+
+Three identifiers are present and are judgement calls, written up in ISSUE-022.
+Short version: the Supabase project ref is already public (it is in every
+browser request), your commit author address is unavoidable without rewriting
+history, and I changed one demo string in a mockup that linked this repo to your
+*other* email address. One edit to revert if you want it back.
+
+`npm run security:audit -- --history` now does this on demand. It reports
+locations only, never content — a tool that echoes the secret it just found has
+put it in your scrollback and your CI log.
+
+---
+
+## Needs your eyes
+
+| # | What | Why I cannot close it |
+| --- | --- | --- |
+| 1 | The attachment UI — picker, drag, paste, remove | No R2 credentials, so no upload completes |
+| 2 | Analytics charts with the new demo data | Data is in; appearance unchecked |
+| 3 | The `.md` / `.json` export links in the chat header | Route is tested; the buttons are not clicked |
+| 4 | Screenshots for the README | Four placeholders are waiting in `docs/screenshots/` |
+
+---
+
+## What I did NOT do, deliberately
+
+- **Did not change repository visibility.** Yours to do, as instructed.
+- **Did not touch the CSP `unsafe-inline`.** Your decision, now logged as
+  DEC-015 with the argument against it stated plainly. Separately, `unsafe-eval`
+  is now allowed **in development only** — that was the dev overlay's "1 Issue",
+  and it was on every page, not just the 404. The production policy is
+  byte-identical to before.
+- **Did not fix ISSUE-024.** Truncation deletes by `created_at >=`, and `now()`
+  is transaction time, so colliding timestamps would over-delete. The correct
+  fix is a sequence column, a migration, and changes to every read path that
+  assumes `created_at` ordering. Structural, so logged rather than done.
+- **Did not close Dependabot PRs #1–#4.** You asked for the two that fail CI;
+  those are closed with the reason on the PR. The other four are open and
+  passing — #2 and #1 want `actions/checkout` and `setup-node` at v7, which I
+  bumped to v5 last session. Your call.
+
+---
+
+## Exactly what to do when you're back
+
+**1. Make the repo public.**
+
+```bash
+npm run security:audit -- --history     # expect 0 findings
+```
+Then: `Settings → General → Danger Zone → Change visibility → Make public`.
+
+**2. Apply branch protection.** One paste, already written out with the CI job
+names verified against `ci.yml`:
+
+> **[docs/wiki/ISSUES.md → ISSUE-018](ISSUES.md)** — steps 1 to 6, including a
+> step that *proves* the rule blocks a direct push. An untested protection rule
+> is an assumption.
+
+**3. Add R2 and Resend credentials.**
+
+> **[docs/wiki/PHASE-6-CHECKLIST.md](PHASE-6-CHECKLIST.md)** — every env var
+> name, the bucket settings only you can verify (**public access off**, CORS
+> including the `content-type` header), and the Resend trap that makes your own
+> test emails arrive while every real user's silently do not.
+
+**4. Finish Phase 6.** The UI is built and wired; only the PUT is missing.
+Attach a PNG, send it, confirm it lands in the bucket, then tick the human
+checks in Part A5 of that file.
+
+**5. Screenshots for LinkedIn.**
+
+```bash
+npm run seed -- --demo     # already run once; --clean-demo to reset
+```
+Capture in a non-default theme — the default looks like every other chat app,
+and the theming work is the part that does not.
+
+---
+
+## Suite as it stands
+
+```bash
+npm run lint && npm run type-check && npm run build
+
+npm run verify:authz         # 37   no route or action shipped ungated
+npm run verify:attachments   # 33   composer rejection rules
+npm run verify:headers       # 25   header + CSP config, both modes
+npm run verify:theme         # 134  WCAG AA, every theme
+npm run verify:api           # 61   every route refuses bad input / wrong user
+npm run verify:security      # 42   throttling, passwords, limits, budget
+npm run smoke                # 18   a running deployment
+# plus schema, rls, seed, storage, gates, appearance, providers, admin, email
+```
+
+17 suites. All green as of this commit.
