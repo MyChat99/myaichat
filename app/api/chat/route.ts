@@ -6,6 +6,7 @@ import { createClient } from '@/lib/db/server';
 import { defaultModel, getAdapter, resolveModel } from '@/lib/providers/registry';
 import { ProviderError, type ChatMessage } from '@/lib/providers/types';
 import { fetchObject, isStorageConfigured, keyBelongsToUser } from '@/lib/r2/storage';
+import { AppError, fromProviderKind, toAppError } from '@/lib/errors/app-error';
 import { checkChatRateLimit } from '@/lib/security/rate-limit';
 import { checkDailyTokenBudget } from '@/lib/security/token-budget';
 
@@ -328,9 +329,16 @@ export async function POST(request: NextRequest) {
   try {
     adapter = await getAdapter(model.providerName);
   } catch (err) {
-    const message =
-      err instanceof ProviderError ? err.message : 'That model is currently unavailable.';
-    return NextResponse.json({ error: message }, { status: 503 });
+    // Through the shared taxonomy so the client gets `kind` and `retryable`
+    // rather than only a sentence — the UI decides whether to offer a retry
+    // button from the flag, and a bare 503 gives it nothing to decide with.
+    const failure =
+      err instanceof ProviderError
+        ? new AppError('provider', fromProviderKind(err.kind), err.message, String(err.message))
+        : toAppError(err, 'provider');
+
+    console.error('[api/chat] adapter unavailable:', failure.kind, failure.detail);
+    return NextResponse.json(failure.toBody(), { status: failure.status });
   }
 
   // Aborts when the client disconnects or presses Stop — this is what makes the
@@ -363,9 +371,27 @@ export async function POST(request: NextRequest) {
           }
         }
       } catch (err) {
-        console.error('[api/chat] stream error:', err);
+        /**
+         * Classified rather than blanket-retryable.
+         *
+         * This previously emitted `retryable: true` for everything, so a
+         * mid-stream rejection of our API key told the user to try again — and
+         * every retry burned another request against a key that was never going
+         * to work. The flag now comes from the failure.
+         */
+        const failure =
+          err instanceof ProviderError
+            ? new AppError('provider', fromProviderKind(err.kind), err.message, String(err.message))
+            : toAppError(err, 'provider');
+
+        console.error('[api/chat] stream error:', failure.kind, failure.detail);
         controller.enqueue(
-          ndjson({ type: 'error', kind: 'unknown', message: 'Streaming failed.', retryable: true }),
+          ndjson({
+            type: 'error',
+            kind: failure.kind,
+            message: failure.message,
+            retryable: failure.retryable,
+          }),
         );
       }
 

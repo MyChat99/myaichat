@@ -92,6 +92,10 @@ jobs:
       - name: Composer attachment rules
         run: npm run verify:attachments
 
+      # The mapper half is pure; the live half skips itself without a server.
+      - name: Graceful degradation
+        run: npm run verify:degradation
+
       # The idle-policy and marker-integrity halves are pure functions and run
       # here; the refresh-token measurement needs credentials and skips itself.
       - name: Session policy
