@@ -120,6 +120,32 @@ function main() {
   );
   check('globals.css imports the stylesheet', globals.includes("@import './riso.css'"));
 
+  /**
+   * The reduced-motion escape hatch, checked because its absence is silent and
+   * severe.
+   *
+   * globals.css collapses every animation to 0.01ms under reduced motion, but
+   * it cannot undo an animation's STARTING state: `riso-register` begins at
+   * `opacity: 0` with `both`, so collapsing the duration leaves the second
+   * plate at zero — the wordmark would simply lose an ink for anyone who asked
+   * for less motion. It has to be held at the finished frame explicitly.
+   *
+   * Verified in a real browser too (animation-name `none`, computed opacity 1);
+   * this check exists so deleting the block fails the build rather than
+   * silently hiding half the masthead.
+   */
+  const reducedBlock = css
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .match(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\n\}/);
+  check('a reduced-motion block exists', reducedBlock !== null);
+  check(
+    'the wordmark plate is held visible under reduced motion',
+    !!reducedBlock &&
+      /opacity:\s*1/.test(reducedBlock[0]) &&
+      /animation:\s*none/.test(reducedBlock[0]),
+    'the second ink would stay at opacity 0',
+  );
+
   console.log('\nContrast of the colours riso.css introduces\n');
 
   /**
