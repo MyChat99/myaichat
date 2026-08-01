@@ -64,14 +64,33 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
   );
   const [pending, startTransition] = useTransition();
 
+  /**
+   * Whether the OS is asking for dark, tracked in state rather than read
+   * during render.
+   *
+   * Reading `window.matchMedia` inline is a server/client branch: the server
+   * has no window and renders the light ink, the client has one and renders
+   * the dark ink, and React throws a hydration mismatch for the difference.
+   * That is exactly the first bullet in its own error message, and it was a
+   * real error in the dev overlay on this page.
+   *
+   * Starting at `false` matches what the server rendered, so hydration agrees;
+   * the effect then corrects it on the first commit. The listener keeps it
+   * honest if the OS setting changes while the panel is open.
+   */
+  const [systemDark, setSystemDark] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => setSystemDark(query.matches);
+    apply();
+    query.addEventListener('change', apply);
+    return () => query.removeEventListener('change', apply);
+  }, []);
+
   // Which mode the preview is currently showing, so a theme-following accent
   // can be reported honestly — it is two different colours, and which one you
   // get depends on this.
-  const previewingDark =
-    draft.theme === 'dark' ||
-    (draft.theme === 'system' &&
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const previewingDark = draft.theme === 'dark' || (draft.theme === 'system' && systemDark);
 
   const draftTheme = getTheme(draft.presetTheme);
   const accentHex =

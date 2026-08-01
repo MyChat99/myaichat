@@ -3,7 +3,7 @@
 import { Menu, MessageSquarePlus, Pin, PinOff, Search, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useMemo, useState, useTransition } from 'react';
+import { Fragment, useMemo, useState, useTransition } from 'react';
 
 import {
   createConversation,
@@ -19,9 +19,49 @@ export type SidebarConversation = {
   title: string;
   pinned: boolean;
   updated_at: string;
+  /** Null when the conversation's model has since been removed. */
+  modelName?: string | null;
+  /**
+   * Which press set it, as a slot number rather than a name.
+   *
+   * The stamp's square is filled for one press and hollow for the next — the
+   * mockup's way of telling them apart at a glance. The slot is resolved from
+   * the provider registry on the server, so this component never learns a
+   * vendor's name; `verify:providers` fails the build if one appears here, and
+   * it caught exactly that when this was first written as a comparison against
+   * a literal vendor name.
+   */
+  pressSlot?: number | null;
+  messageCount?: number;
+  /** Section heading, computed server-side. See `groupFor` in the app layout. */
+  group?: string;
 };
 
-export function Sidebar({ conversations }: { conversations: SidebarConversation[] }) {
+export type SidebarIssue = { number: number; date: string };
+
+/**
+ * `riso` selects the printed treatment's COPY, not its styling.
+ *
+ * Styling is still pure CSS. This exists because the previous approach
+ * rendered both the plain and the printed wording and hid one with a
+ * stylesheet — so the instant that stylesheet did not apply, the page read
+ * "New chat Start a page" and "myaichatmyaichat". A theme that degrades into
+ * duplicated words is worse than one that degrades into plain words.
+ *
+ * Resolved on the server from the stored preference, so the first paint is
+ * already right. The cost is that switching theme in the appearance panel
+ * updates colours instantly but swaps this wording on save, when the route
+ * re-renders — a fair trade for copy that cannot double.
+ */
+export function Sidebar({
+  conversations,
+  issue,
+  riso = false,
+}: {
+  conversations: SidebarConversation[];
+  issue?: SidebarIssue;
+  riso?: boolean;
+}) {
   const params = useParams<{ id?: string }>();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -40,6 +80,26 @@ export function Sidebar({ conversations }: { conversations: SidebarConversation[
       return b.updated_at.localeCompare(a.updated_at);
     });
   }, [conversations, query]);
+
+  /**
+   * Section headings, derived from the already-sorted list.
+   *
+   * A heading is emitted when the group changes rather than by bucketing into
+   * separate arrays, so the sort order stays the single source of truth and a
+   * pinned conversation cannot end up under a heading it does not belong to —
+   * pinned items sort to the top and simply carry their own heading with them.
+   */
+  const headings = useMemo(() => {
+    const at = new Map<string, string>();
+    let previous: string | undefined;
+    for (const c of filtered) {
+      if (c.group && c.group !== previous) {
+        at.set(c.id, c.group);
+        previous = c.group;
+      }
+    }
+    return at;
+  }, [filtered]);
 
   return (
     <>
@@ -68,11 +128,37 @@ export function Sidebar({ conversations }: { conversations: SidebarConversation[
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex items-center gap-2 p-3">
+        {/* Riso prints a masthead here; every other theme keeps its wordmark
+            in the page header. The doubled word is the second ink plate, laid
+            over the first — it only reads as a duplicate if the stylesheet
+            that positions it is missing, which is why it is not rendered at
+            all unless Riso is active. */}
+        {riso ? (
+          <div data-riso="masthead">
+            <div data-riso="wordmark">
+              myaichat
+              <span aria-hidden="true">myaichat</span>
+            </div>
+            {issue ? (
+              <div data-riso="issue">
+                No. {issue.number} · {issue.date}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="flex items-center gap-2 p-3" data-riso="actions">
           <form action={createConversation} className="flex-1">
-            <Button type="submit" className="w-full justify-start" variant="outline" size="sm">
+            <Button
+              type="submit"
+              className="w-full justify-start"
+              variant="outline"
+              size="sm"
+              data-riso="draft"
+            >
               <MessageSquarePlus className="mr-2 size-4" />
-              New chat
+              {riso ? 'Start a page' : 'New chat'}
+              {riso ? <small data-riso="shortcut">⌘K</small> : null}
             </Button>
           </form>
           <Button
@@ -107,81 +193,113 @@ export function Sidebar({ conversations }: { conversations: SidebarConversation[
             <ul className="space-y-0.5">
               {filtered.map((c) => {
                 const active = params?.id === c.id;
+                const heading = headings.get(c.id);
                 return (
-                  <li key={c.id} className="group relative">
-                    {editingId === c.id ? (
-                      <form
-                        action={() => {
-                          startTransition(async () => {
-                            await renameConversation(c.id, draft);
-                            setEditingId(null);
-                          });
-                        }}
-                        className="p-1"
-                      >
-                        <Input
-                          autoFocus
-                          value={draft}
-                          onChange={(e) => setDraft(e.target.value)}
-                          onBlur={() => setEditingId(null)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Escape') setEditingId(null);
+                  /* The section rule is a SIBLING of the card, not a child of
+                     it — nested inside, it sat within the card's border and
+                     read as part of the first conversation. */
+                  <Fragment key={c.id}>
+                    {riso && heading ? (
+                      <li data-riso="divider" role="presentation">
+                        {heading}
+                      </li>
+                    ) : null}
+                    <li
+                      className="group relative"
+                      data-riso="slip"
+                      data-active={active ? 'true' : 'false'}
+                    >
+                      {editingId === c.id ? (
+                        <form
+                          action={() => {
+                            startTransition(async () => {
+                              await renameConversation(c.id, draft);
+                              setEditingId(null);
+                            });
                           }}
-                          aria-label="Conversation title"
-                          className="h-8 text-sm"
-                        />
-                      </form>
-                    ) : (
-                      <>
-                        <Link
-                          href={`/c/${c.id}`}
-                          onClick={() => setOpen(false)}
-                          onDoubleClick={() => {
-                            setDraft(c.title);
-                            setEditingId(c.id);
-                          }}
-                          className={`block truncate rounded-md py-2 pr-16 pl-2 text-sm transition ${
-                            active ? 'bg-accent font-medium' : 'hover:bg-accent/60'
-                          }`}
-                          title={c.title}
+                          className="p-1"
                         >
-                          {c.pinned ? <Pin className="mr-1 inline size-3" /> : null}
-                          {c.title}
-                        </Link>
-
-                        <div className="absolute top-1/2 right-1 flex -translate-y-1/2 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="size-7"
-                            aria-label={c.pinned ? 'Unpin conversation' : 'Pin conversation'}
-                            onClick={() => startTransition(() => void togglePin(c.id, !c.pinned))}
-                          >
-                            {c.pinned ? (
-                              <PinOff className="size-3.5" />
-                            ) : (
-                              <Pin className="size-3.5" />
-                            )}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="size-7"
-                            aria-label="Delete conversation"
-                            onClick={() => {
-                              if (confirm(`Delete "${c.title}"? This cannot be undone.`)) {
-                                startTransition(() => void deleteConversation(c.id));
-                              }
+                          <Input
+                            autoFocus
+                            value={draft}
+                            onChange={(e) => setDraft(e.target.value)}
+                            onBlur={() => setEditingId(null)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') setEditingId(null);
                             }}
+                            aria-label="Conversation title"
+                            className="h-8 text-sm"
+                          />
+                        </form>
+                      ) : (
+                        <>
+                          <Link
+                            href={`/c/${c.id}`}
+                            onClick={() => setOpen(false)}
+                            onDoubleClick={() => {
+                              setDraft(c.title);
+                              setEditingId(c.id);
+                            }}
+                            className={`block truncate rounded-md py-2 pr-16 pl-2 text-sm transition ${
+                              active ? 'bg-accent font-medium' : 'hover:bg-accent/60'
+                            }`}
+                            title={c.title}
                           >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </div>
-                      </>
-                    )}
-                  </li>
+                            {c.pinned ? <Pin className="mr-1 inline size-3" /> : null}
+                            {c.title}
+                          </Link>
+
+                          {/* The slip's stamp line: which press set it, and how
+                              long it ran. Riso-only — every other theme keeps
+                              the single-line list it was designed around. */}
+                          {riso ? (
+                            <div data-riso="stamp">
+                              <span
+                                data-riso="square"
+                                data-filled={(c.pressSlot ?? 0) % 2 === 0 ? 'true' : 'false'}
+                              />
+                              {c.modelName ?? 'No model'}
+                              {' · '}
+                              {c.messageCount
+                                ? `${c.messageCount} note${c.messageCount === 1 ? '' : 's'}`
+                                : 'blank'}
+                            </div>
+                          ) : null}
+
+                          <div className="absolute top-1/2 right-1 flex -translate-y-1/2 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-7"
+                              aria-label={c.pinned ? 'Unpin conversation' : 'Pin conversation'}
+                              onClick={() => startTransition(() => void togglePin(c.id, !c.pinned))}
+                            >
+                              {c.pinned ? (
+                                <PinOff className="size-3.5" />
+                              ) : (
+                                <Pin className="size-3.5" />
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-7"
+                              aria-label="Delete conversation"
+                              onClick={() => {
+                                if (confirm(`Delete "${c.title}"? This cannot be undone.`)) {
+                                  startTransition(() => void deleteConversation(c.id));
+                                }
+                              }}
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </li>
+                  </Fragment>
                 );
               })}
             </ul>

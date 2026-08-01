@@ -16,6 +16,51 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-031 — Untagged demo usage rows predate the fix and cannot be identified
+
+**Status:** Open — needs your decision | **Severity:** Low | **Phase:** 7 | **Opened:** 2026-08-01
+**Problem:** `--demo` wrote fabricated `usage_logs` rows with nothing marking them, and `--clean-demo` could not remove them ([ISSUE-030](#issue-030)). That is fixed going forward — new demo rows carry `source = 'demo'` — but the rows written **before** the fix are still there and are indistinguishable from real usage by the same argument that caused the bug.
+**Measured 2026-08-01:** 366 rows in `usage_logs`, none tagged, no exact duplicates (each seed run randomises token counts, so re-runs do not collide). For scale: this project has ~178 real messages, and each demo run wrote ~82 rows.
+**Why I did not clean them:** there is a defensible discriminator — the project's first commit is 2026-07-30, so any row dated before that is necessarily fabricated — but acting on it means deleting analytics data on my own inference. That is your call, not mine.
+**If you want them gone:** `delete from usage_logs where created_at < '2026-07-30' and source is null;` — check the count with a `select` first.
+
+### ISSUE-030 — `--clean-demo` could not remove what `--demo` wrote
+
+**Status:** Resolved | **Severity:** Medium | **Phase:** 7 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01
+**Problem:** Two duplicate bugs in the demo seeder, both visible in screenshots — the thing the seeder exists for.
+1. **Duplicate titles.** A fixed 30-day × 2-per-weekday loop indexed into the template pool modulo its length: 52 conversations drawn from **6 templates**, so every title appeared about nine times. Measured before the fix: 52 conversations, **5 unique titles**.
+2. **Duplicate usage rows.** `usage_logs` had no column marking a fabricated row, so cleanup deleted the conversations and left every usage row behind — and the "already present?" guard only looked at conversations. So `--clean-demo` then `--demo` passed the guard and wrote a second full set. Spend and per-model totals counted both, permanently.
+**Resolution:** A new nullable `usage_logs.source` column (migration `20260801120000`); demo rows set it, cleanup deletes on it, and the guard checks both tables. The loop is now driven by the pool, so each template is used exactly once and no title can repeat — the pool size *is* the amount of data. Pool expanded from 6 to 24 threads.
+**Proven:** 366 → 395 → 366 across `--demo` / `--clean-demo`, and 24 conversations with 24 unique titles. Pre-existing untagged rows are [ISSUE-031](#issue-031).
+
+### ISSUE-034 — Riso copy doubled wherever the stylesheet did not apply
+
+**Status:** Resolved | **Severity:** High | **Phase:** 5 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01
+**Problem:** Riso rendered BOTH the plain and the printed wording and hid one with CSS. Any moment `riso.css` did not apply — a dev server that had not picked up a newly `@import`ed file is enough — every label doubled: `myaichatmyaichat`, `New chat Start a page`, `How can I help?A quiet place to think out loud`, `ComposeEnter to send`. Reported by the owner; invisible to all 1,085 assertions and to my own screenshots, because in my environment the stylesheet applied.
+**Resolution:** Copy is resolved on the server from the stored preference, so only one variant is ever in the document. `[data-riso-only]` / `[data-riso-hide]` deleted; `verify:riso` fails the build if either returns, and `npm run shoot` fails if both variants render.
+**Lesson:** the failure mode of a design should be considered, not just its success. Hiding content with CSS makes the stylesheet load-bearing for correctness, not just appearance.
+
+### ISSUE-033 — Every message was server-rendered invisible
+
+**Status:** Resolved | **Severity:** Medium | **Phase:** 2 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01
+**Problem:** `MessageEntrance` set `initial={{ opacity: 0 }}` whenever `useMotionSafe()` was true — and `useReducedMotion()` cannot know the preference on the server, so it returned false there. Every message in every conversation was therefore server-rendered at `opacity: 0` and only became visible once JavaScript faded it in; without JS it stayed invisible. In a reduced-motion browser the client disagreed, producing a hydration mismatch on every conversation page.
+**Resolution:** the entrance applies only to messages mounted after hydration, tracked with `useSyncExternalStore` (separate server snapshot). Conversations are now visible without JavaScript and hydration agrees.
+
+### ISSUE-032 — A `typeof window` branch in the appearance panel broke hydration
+
+**Status:** Resolved | **Severity:** Medium | **Phase:** 5 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01
+**Problem:** Introduced by me in PR #37. The "match theme" accent swatch needs to know whether the OS is asking for dark, and read `window.matchMedia` **during render**: the server has no window and rendered the light ink, the browser has one and rendered the dark ink, and React threw *"Hydration failed because the server rendered text didn't match the client"* on `/settings`. The error message's own first bullet is `A server/client branch \`if (typeof window !== 'undefined')\``.
+**How it was found:** by opening the page in a real browser. The dev overlay had been showing "1 Issue" on `/settings` and no automated suite noticed — 1,000+ assertions, none of which load a page in something that hydrates.
+**Resolution:** the media query moves into state initialised to `false` (matching the server) and corrected in an effect, with a listener for changes while the panel is open.
+**Worth keeping:** this class of bug is invisible to every suite in this repo. A headless-browser check is the gap ([ROADMAP](ROADMAP.md)).
+
+### ISSUE-029 — App shell grew past the viewport, so the header and sidebar scrolled away
+
+**Status:** Resolved | **Severity:** Medium | **Phase:** 5 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01
+**Problem:** The `(app)` shell was `min-h-full flex-1 overflow-hidden`. It is meant to be a fixed frame with its own scrollers inside it, but `min-h-full` let it grow to fit its content instead of bounding them, so on any page taller than the window the **document** scrolled: the header and the entire sidebar scrolled up out of view, leaving content beside empty space. Measured on `/settings` at 1440×900 — `document.scrollHeight` 1159 against a 900px viewport.
+**The non-obvious half:** the first fix, `h-dvh`, did nothing. `flex-1` sets `flex-basis: 0%`, and in a column flex container the basis IS the height — it silently overrode the explicit height. Both had to go.
+**Resolution:** `flex h-dvh overflow-hidden`, no `flex-1`. `dvh` rather than `vh` so the mobile URL bar does not sit over the composer. Verified in a real browser across `/`, `/settings`, `/profile` and `/admin`: no page scroll, no horizontal scroll.
+
 ### ISSUE-028 — Refresh-token reuse: refused, but not detected
 
 **Status:** Resolved (with a residual gap, recorded below) | **Severity:** ~~High~~ **Low** | **Phase:** 1 | **Opened:** 2026-07-31 | **Resolved:** 2026-07-31

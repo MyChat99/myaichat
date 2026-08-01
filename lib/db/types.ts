@@ -89,7 +89,15 @@ export interface Database {
           supports_documents?: boolean;
         };
         Update: Partial<Database['public']['Tables']['models']['Row']>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'models_provider_id_fkey';
+            columns: ['provider_id'];
+            isOneToOne: false;
+            referencedRelation: 'providers';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       conversations: {
         Row: Timestamps & {
@@ -107,7 +115,24 @@ export interface Database {
           pinned?: boolean;
         };
         Update: Partial<Database['public']['Tables']['conversations']['Row']>;
-        Relationships: [];
+        /**
+         * Declared so `select('…, models(display_name)')` type-checks.
+         *
+         * Every other table here still has `Relationships: []`, which is what
+         * a hand-written types file drifts into — an empty list is accepted by
+         * the compiler and silently makes every embed an error at the call
+         * site. Filled in as embeds are actually used, rather than inventing
+         * shapes nothing exercises. See ISSUE-005.
+         */
+        Relationships: [
+          {
+            foreignKeyName: 'conversations_model_id_fkey';
+            columns: ['model_id'];
+            isOneToOne: false;
+            referencedRelation: 'models';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       messages: {
         Row: {
@@ -135,7 +160,15 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Database['public']['Tables']['messages']['Row']>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'messages_conversation_id_fkey';
+            columns: ['conversation_id'];
+            isOneToOne: false;
+            referencedRelation: 'conversations';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       user_preferences: {
         Row: Timestamps & {
@@ -169,6 +202,12 @@ export interface Database {
           output_tokens: number;
           estimated_cost: number;
           created_at: string;
+          /**
+           * NULL for real usage. Only a seeder sets this — see migration
+           * 20260801120000, which exists so `--clean-demo` can remove exactly
+           * the rows `--demo` wrote.
+           */
+          source: string | null;
         };
         Insert: {
           id?: string;
@@ -178,6 +217,7 @@ export interface Database {
           output_tokens?: number;
           estimated_cost?: number;
           created_at?: string;
+          source?: string | null;
         };
         Update: Partial<Database['public']['Tables']['usage_logs']['Row']>;
         Relationships: [];

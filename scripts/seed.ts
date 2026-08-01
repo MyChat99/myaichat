@@ -168,6 +168,9 @@ async function findUserByEmail(email: string) {
 
 const DEMO_TAG = '[demo]';
 
+/** Written to `usage_logs.source`. Real usage leaves that column NULL. */
+const DEMO_SOURCE = 'demo';
+
 const DEMO_THREADS: { title: string; turns: [string, string][] }[] = [
   {
     title: 'Explain closures with a worked example',
@@ -206,6 +209,10 @@ const DEMO_THREADS: { title: string; turns: [string, string][] }[] = [
         'Review my RLS policy for the profiles table.',
         'The WITH CHECK subquery selects from the same table the policy is on, which recurses — Postgres raises 42P17 and every update fails. Move the check into a BEFORE UPDATE trigger, or a SECURITY DEFINER helper.',
       ],
+      [
+        'So the helper has to be SECURITY DEFINER?',
+        'Yes — it needs to read the table the policy guards without re-entering the policy. Mark it STABLE too, so the planner can call it once per statement rather than once per row.',
+      ],
     ],
   },
   {
@@ -214,6 +221,10 @@ const DEMO_THREADS: { title: string; turns: [string, string][] }[] = [
       [
         'Write a SQL query to find duplicate rows in usage_logs.',
         'Group by the columns that should be unique together and keep the groups with a count above one — then decide whether the duplicates are a write bug or a legitimate repeat.',
+      ],
+      [
+        'How do I stop them being written in the first place?',
+        'A unique constraint on whatever combination should not repeat. Finding duplicates is a report; preventing them is a schema change, and only the second one holds.',
       ],
     ],
   },
@@ -224,6 +235,257 @@ const DEMO_THREADS: { title: string; turns: [string, string][] }[] = [
         'Summarise the tradeoffs of optimistic UI updates.',
         'You trade correctness-at-a-glance for latency-at-a-glance. The interface is right almost always and briefly wrong sometimes, and the cost is entirely in how you handle the sometimes.',
       ],
+      [
+        'What is the worst case in a chat interface?',
+        'Showing a message as sent that never landed. Keep the optimistic row visually distinct until the server confirms it, and make the failure path put the text back in the composer rather than discarding it.',
+      ],
+    ],
+  },
+  {
+    title: 'Why my index is being ignored',
+    turns: [
+      [
+        'I added an index and the query plan still says sequential scan.',
+        'On a small table that is correct behaviour, not a broken index. Postgres compares estimated costs, and reading 178 rows sequentially is cheaper than walking a B-tree and then fetching the heap. Benchmark against a table the size you expect, not the one you have.',
+      ],
+      [
+        'How do I test the index then?',
+        "Generate a table at the size you expect into a temporary table, run EXPLAIN ANALYZE there, and keep the numbers. That turns 'this should help' into a measurement you can put in the commit message.",
+      ],
+    ],
+  },
+  {
+    title: 'AES-GCM: where does the IV go?',
+    turns: [
+      [
+        'Storing an AES-256-GCM encrypted value — do I need to keep the IV separately?',
+        'Store it alongside; it is not secret, it only has to be unique per key. The usual shape is a single field of version.iv.tag.ciphertext so one string carries everything needed to decrypt and nothing can be paired with the wrong IV.',
+      ],
+      [
+        'What actually breaks if an IV repeats?',
+        'With GCM, catastrophically more than confidentiality — a repeated IV under the same key leaks the authentication subkey, so an attacker can forge messages, not merely read them.',
+      ],
+    ],
+  },
+  {
+    title: 'Streaming without Server-Sent Events',
+    turns: [
+      [
+        'Can I use EventSource for a chat endpoint that needs a POST body?',
+        'No — EventSource issues a GET and cannot carry a body. Either put the payload in a query string, which caps out and lands conversation text in access logs, or stream a POST response yourself and read the body as chunks. NDJSON over fetch is the usual answer.',
+      ],
+      [
+        'What does the client side look like?',
+        'Read `response.body` as a stream, decode chunks, and split on newlines. Buffer the remainder — a chunk boundary lands mid-line often enough that ignoring it works in development and fails in production.',
+      ],
+    ],
+  },
+  {
+    title: 'Debouncing a search box properly',
+    turns: [
+      [
+        'My debounced search still fires on every keystroke.',
+        'The timer is almost certainly being recreated each render, so it never lives long enough to be cleared. Keep it in a ref, or move the debounce outside the component entirely.',
+      ],
+      [
+        'Should the request be cancelled as well?',
+        'Yes, or you get results arriving out of order and the older, slower response overwriting the newer one. An AbortController per keystroke is the cheap fix.',
+      ],
+    ],
+  },
+  {
+    title: 'Cascade deletes and orphaned rows',
+    turns: [
+      [
+        'If I delete a conversation, do the messages go too?',
+        'Only if the foreign key says on delete cascade. Without it the delete fails outright, or worse succeeds and leaves orphans, depending on how the constraint was written.',
+      ],
+      [
+        'What about rows that reference a user who is deleted?',
+        'Decide per column: cascade where the row is meaningless without the user, set null where it is still worth keeping. Usage records usually want set null, so the totals survive an account closing.',
+      ],
+    ],
+  },
+  {
+    title: 'Reading a query plan for the first time',
+    turns: [
+      [
+        'How do I read EXPLAIN ANALYZE output without drowning?',
+        'Read it inside out — the deepest node runs first. Compare estimated rows against actual rows at each level: where those diverge by an order of magnitude is where the planner was misled, and that is usually the whole story.',
+      ],
+      [
+        'What counts as a bad number?',
+        "Rows off by an order of magnitude, or a nested loop over thousands of rows where a hash join belonged. Both mean the planner's statistics disagree with reality, which ANALYZE often fixes on its own.",
+      ],
+    ],
+  },
+  {
+    title: 'Retry storms and jittered backoff',
+    turns: [
+      [
+        'Is exponential backoff enough to protect an upstream service?',
+        'Not on its own. Without jitter, every client that failed at the same moment retries at the same moment, so you have rebuilt the spike you were trying to smooth. Add randomness proportional to the delay.',
+      ],
+      [
+        'How many attempts before giving up?',
+        'Fewer than instinct suggests. Three is usually right for an interactive request: past that the user has already decided the app is broken, and you are only spending someone else quota to confirm it.',
+      ],
+    ],
+  },
+  {
+    title: 'CSV injection in an export',
+    turns: [
+      [
+        'Is there anything to sanitise in a CSV export?',
+        'Yes — a cell beginning with =, +, - or @ is treated as a formula by spreadsheet software, which will happily execute it on open. Prefix such cells with an apostrophe, or wrap them, before writing.',
+      ],
+      [
+        'Does quoting not handle it?',
+        'Quoting solves the delimiter problem, not the formula problem — a spreadsheet strips the quotes and still sees a leading equals sign. They are two different escapes and you need both.',
+      ],
+    ],
+  },
+  {
+    title: 'Keeping secrets out of logs',
+    turns: [
+      [
+        'How do I make sure an API key never lands in a log line?',
+        'Stop relying on scrubbing the output and constrain the input: make the log payload a fixed set of typed fields with nowhere to put a secret. A regex filter runs second, as insurance, not first as the design.',
+      ],
+      [
+        'What about the error messages from upstream?',
+        'Those are the dangerous ones — an upstream error frequently quotes the request back, including the credential it rejected. Scrub the field before it is written rather than trusting where it came from.',
+      ],
+    ],
+  },
+  {
+    title: 'Idempotent webhooks',
+    turns: [
+      [
+        'A payment webhook fired twice and we charged twice. What is the fix?',
+        'Treat the provider event id as a unique key and write it in the same transaction as the effect. Then the second delivery violates the constraint and becomes a no-op instead of a second charge.',
+      ],
+      [
+        'Where should the key live?',
+        'In its own table with a unique index, written in the same transaction as the effect. Keeping it beside the effect is what makes the two atomic; a cache in front of the handler is not.',
+      ],
+    ],
+  },
+  {
+    title: 'Timezones in a daily report',
+    turns: [
+      [
+        'My "today" numbers disagree with the dashboard by a few hours.',
+        'Something is bucketing in local time and something else in UTC. Pick one, name it in the column comment, and convert only at the point of display.',
+      ],
+      [
+        'Which one should I pick?',
+        "UTC for storage and aggregation, always. Convert to the reader's zone in the interface, where you know who is asking — a stored local timestamp cannot be corrected later because the offset is gone.",
+      ],
+    ],
+  },
+  {
+    title: 'When to reach for a database view',
+    turns: [
+      [
+        'Row-level security cannot hide a column, so how do I expose a table with a secret in it?',
+        'You do not — you expose a view over it that simply does not select that column, and revoke direct access to the base table. RLS decides which rows; the view decides which columns.',
+      ],
+      [
+        'Does the view need its own policies?',
+        'In Postgres a view runs with the privileges of its owner by default, which quietly bypasses RLS on the base table. Either make it security_invoker or accept that the view itself is the boundary and lock down who can select from it.',
+      ],
+    ],
+  },
+  {
+    title: 'Testing without a test framework',
+    turns: [
+      [
+        'Is it defensible to have assertions but no test framework?',
+        'It depends what the bugs look like. If they are integration-shaped — a policy that recurses, a query returning the wrong end of a sort — then a script hitting a real database catches them and a mocked unit test does not. What you give up is watch mode and structured reporting.',
+      ],
+      [
+        'What is the honest downside?',
+        'No isolation. Suites share one database, so one leaving a row behind breaks the next, and you find out through an unrelated failure. It is fixable with discipline, but the framework would have given it to you for free.',
+      ],
+    ],
+  },
+  {
+    title: 'A migration that cannot be rolled back',
+    turns: [
+      [
+        'How careful should I be about dropping a column?',
+        'Treat it as irreversible, because it is: the data is gone the moment it runs, and a down migration recreates the column empty. Stop writing it, deploy, wait, then drop in a later migration.',
+      ],
+      [
+        'What does a safe sequence look like?',
+        'Add the new column, backfill, start writing both, switch reads, stop writing the old one, then drop it — five deploys. It feels absurd until the one time you need to stop halfway.',
+      ],
+    ],
+  },
+  {
+    title: 'Prefers-reduced-motion, in practice',
+    turns: [
+      [
+        'What actually needs to change when a user asks for reduced motion?',
+        'Anything that moves large areas, loops, or animates without the user asking — parallax, autoplay carousels, entrance animations on every item. Small state-change transitions can usually stay; the guideline targets vestibular triggers, not all motion.',
+      ],
+      [
+        'Is disabling every transition the safe default?',
+        'It is safe but worse — instant state changes make an interface feel broken. Reduce duration rather than removing it, and cut anything that travels a long distance or repeats.',
+      ],
+    ],
+  },
+  {
+    title: 'Choosing a contrast ratio target',
+    turns: [
+      [
+        'Is 4.5:1 enough for body text?',
+        'It is the AA threshold for normal-size text, so it is the floor rather than a goal. Large text drops to 3:1. Anything you expect people to read for minutes at a time is worth more headroom than the minimum.',
+      ],
+      [
+        'How do I check it without eyeballing?',
+        'Compute it from the tokens rather than from screenshots. If the palette is data, every pairing can be checked automatically, and a new theme gets checked without anyone writing a new test.',
+      ],
+    ],
+  },
+  {
+    title: 'What a model knows about itself',
+    turns: [
+      [
+        'Which model are you, and how do you know?',
+        'I am told. A model is finished before it is deployed, so its own version number is generally not in its training data — which is why models elsewhere answer this confidently and wrongly. Here the application writes the selected model name into the system prompt, so the answer tracks the setting.',
+      ],
+      [
+        'So it could still be wrong?',
+        'It could be wrong about anything not in the prompt, yes. What it cannot be wrong about here is the name, because that came from the application rather than from memory.',
+      ],
+    ],
+  },
+  {
+    title: 'Presigned uploads and the CORS surprise',
+    turns: [
+      [
+        'The presigned URL works from the server but fails in the browser.',
+        'That is CORS, not credentials — the browser preflights the PUT and the bucket has to allow the origin, the method and the content-type header explicitly. Proving the round trip server-side first is what lets you say that with confidence.',
+      ],
+      [
+        'Which headers does the bucket need to allow?',
+        'The method you presigned for, the origin you are calling from, and content-type — that last one is the usual omission, because the browser only preflights once you set it.',
+      ],
+    ],
+  },
+  {
+    title: 'Counting tokens before sending',
+    turns: [
+      [
+        'Do I need an exact token count before a request?',
+        'Rarely. An estimate good to a few percent is enough to decide whether to truncate; exactness only matters if you are billing on your own count rather than the provider reported one.',
+      ],
+      [
+        'What is a reasonable truncation strategy?',
+        'Keep the system prompt and the most recent turns, drop from the middle, and tell the user you did. Silently forgetting the start of a conversation is worse than a visible boundary.',
+      ],
     ],
   },
 ];
@@ -231,14 +493,18 @@ const DEMO_THREADS: { title: string; turns: [string, string][] }[] = [
 async function seedDemoData(adminUserId: string) {
   console.log('\nDemo data');
 
-  const { data: existing } = await admin
-    .from('conversations')
-    .select('id')
-    .like('title', `${DEMO_TAG}%`)
-    .limit(1);
+  // Both tables are checked. Looking only at conversations is what allowed a
+  // clean-then-reseed to pass this guard and write a SECOND full set of usage
+  // rows, because cleanup could not remove the first set.
+  const [{ data: existingThreads }, { count: existingUsage }] = await Promise.all([
+    admin.from('conversations').select('id').like('title', `${DEMO_TAG}%`).limit(1),
+    admin.from('usage_logs').select('*', { count: 'exact', head: true }).eq('source', DEMO_SOURCE),
+  ]);
 
-  if (existing && existing.length > 0) {
-    console.log('  skip  demo data already present — run with --clean-demo first');
+  if ((existingThreads && existingThreads.length > 0) || (existingUsage ?? 0) > 0) {
+    console.log(
+      `  skip  demo data already present (${existingThreads?.length ?? 0} thread(s), ${existingUsage ?? 0} usage row(s)) — run with --clean-demo first`,
+    );
     return;
   }
 
@@ -258,15 +524,30 @@ async function seedDemoData(adminUserId: string) {
   let messages = 0;
   let usageRows = 0;
 
+  /**
+   * Each template is used exactly ONCE.
+   *
+   * The previous version ran a fixed 30-day × 2-per-weekday loop and indexed
+   * into the pool modulo its length — 52 conversations drawn from six
+   * templates, so every title appeared about nine times. In a sidebar that is
+   * unmistakably fake, and the screenshots this data exists for were the one
+   * place it would be seen.
+   *
+   * Driving the loop from the pool instead means the pool size IS the amount of
+   * data: adding a template adds a conversation, and no title can repeat.
+   */
+  const queue = [...DEMO_THREADS];
+  let cursor = 0;
+
   // Thirty days of history, so the analytics ranges (7 / 30 / 90) all differ.
-  for (let day = 0; day < 30; day++) {
+  for (let day = 0; day < 30 && cursor < queue.length; day++) {
     // A weekday shape rather than a flat line: a chart of uniform bars looks
     // as fake as it is, and the point of this data is to look plausible.
     const weekday = new Date(now - day * DAY).getUTCDay();
     const threadsToday = weekday === 0 || weekday === 6 ? 1 : 2;
 
-    for (let n = 0; n < threadsToday; n++) {
-      const template = DEMO_THREADS[(day * 2 + n) % DEMO_THREADS.length]!;
+    for (let n = 0; n < threadsToday && cursor < queue.length; n++) {
+      const template = queue[cursor++]!;
       const model = models[(day + n) % models.length]!;
       const started = now - day * DAY - n * 3 * 60 * 60 * 1000;
 
@@ -327,6 +608,8 @@ async function seedDemoData(adminUserId: string) {
           output_tokens: outputTokens,
           estimated_cost: Number(cost.toFixed(6)),
           created_at: new Date(started + 60_000).toISOString(),
+          // What makes this row removable. Real usage leaves it NULL.
+          source: DEMO_SOURCE,
         });
         usageRows++;
       }
@@ -349,16 +632,30 @@ async function cleanDemoData() {
 
   const ids = (threads ?? []).map((t) => t.id);
   if (ids.length === 0) {
-    console.log('  ok    nothing tagged as demo data');
-    return;
+    // Deliberately does NOT return: usage rows can outlive their conversations
+    // (that was the bug), so cleanup has to try both independently.
+    console.log('  ok    no demo conversations to remove');
   }
 
-  // Messages cascade from conversations; usage_logs do not reference a
-  // conversation, so those are matched by the timestamps this script wrote.
-  await admin.from('conversations').delete().in('id', ids);
-  console.log(`  ok    ${ids.length} demo conversations removed (messages cascade)`);
-  console.log('  note  usage_logs rows are NOT removed — they are indistinguishable');
-  console.log('        from real usage by design. Delete them by date if needed.');
+  // Messages cascade from conversations. Usage rows do not reference a
+  // conversation, so they are matched on the source tag this script writes —
+  // which is the whole reason that column exists.
+  if (ids.length > 0) {
+    await admin.from('conversations').delete().in('id', ids);
+    console.log(`  ok    ${ids.length} demo conversations removed (messages cascade)`);
+  }
+
+  const { count, error } = await admin
+    .from('usage_logs')
+    .delete({ count: 'exact' })
+    .eq('source', DEMO_SOURCE);
+
+  if (error) {
+    console.error(`  FAIL  usage rows not removed — ${error.message}`);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`  ok    ${count ?? 0} demo usage rows removed`);
 }
 
 async function main() {

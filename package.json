@@ -39,7 +39,9 @@
     "verify:email": "tsx scripts/verify-email.ts",
     "security:audit": "tsx scripts/security-audit.ts",
     "audit:report": "tsx scripts/audit-report.ts",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "verify:riso": "tsx scripts/verify-riso.ts",
+    "shoot": "tsx scripts/shoot.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
@@ -73,6 +75,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^26",
     "@types/react": "^19",

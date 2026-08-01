@@ -1,6 +1,10 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
+/* The Riso print treatment. Every rule in it is scoped to
+   `html[data-theme='riso']` — `npm run verify:riso` fails the build if one is
+   not, so importing it cannot affect the other seven presets. */
+@import './riso.css';
 
 @custom-variant dark (&:is(.dark *));
 
