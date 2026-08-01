@@ -73,6 +73,7 @@ const SUITES: Suite[] = [
 
   { script: 'verify:gates', needs: 'server' },
   { script: 'verify:appearance', needs: 'server' },
+  { script: 'verify:persistence', needs: 'server' },
   { script: 'verify:api', needs: 'server' },
   { script: 'verify:storage', needs: 'server' },
   { script: 'verify:chat', needs: 'server' },
