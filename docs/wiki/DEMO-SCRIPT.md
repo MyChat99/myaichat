@@ -19,9 +19,10 @@ npm run dev
 
 - [ ] **Sign in first.** Nobody wants to watch you type a password, and the
       login screen is the least interesting thing here.
-- [ ] **Pick a non-default theme** — Midnight or Ocean. The default looks like
-      every other chat app; the whole point of the theming work is that it does
-      not have to.
+- [ ] **Leave the default theme alone.** The default is now Riso — newsprint
+      paper, Federal Blue ink, hard black keylines. It does not look like every
+      other chat app, which is the whole point, and switching away from it on
+      camera gives that away for free.
 - [ ] **Close the terminal**, and anything else on screen. Notifications off.
 - [ ] **Check the header**: your account email is in it. Fine if you do not mind
       it public.
@@ -87,23 +88,27 @@ app tells it*, and it says so.
 
 **Click:** Appearance.
 
-**Click through three presets** — one every two seconds. Do not narrate the
-colours; the screen is doing that.
+**Click through three presets, then come back to Riso** — one every two
+seconds. Do not narrate the colours; the screen is doing that. Ending where you
+started is what shows the default was a choice.
 
 **Say:**
 
-> Seven themes, light and dark, per user. The interesting bit is that there's no
-> flash on load — both token sets are server-rendered and a tiny inline script
-> resolves the system preference before first paint.
+> Eight themes, light and dark, per user. The default is a risograph print
+> look — paper stock rather than a white page, and two real Riso inks. The
+> interesting bit is that there's no flash on load: both token sets are
+> server-rendered and a tiny inline script resolves the system preference before
+> first paint.
 
 **Change the accent colour once.** It applies live, with no reload — that is the
 point worth showing.
 
 **Say:**
 
-> Every theme is checked against WCAG AA contrast automatically. 134 assertions,
-> computed from the token data, so adding an eighth theme gets checked without
-> anyone writing a new test.
+> Every theme is checked against WCAG AA contrast automatically — computed from
+> the token data, so adding a theme gets it checked without anyone writing a new
+> test. Three of Riso's ink colours had to be darkened to clear AA, and that
+> test is how I found out which three.
 
 ---
 

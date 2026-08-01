@@ -13,7 +13,7 @@
 import { createClient, type Session } from '@supabase/supabase-js';
 
 import type { Database } from '../lib/db/types';
-import { getTheme, THEMES } from '../lib/theme/presets';
+import { DEFAULT_APPEARANCE, getTheme, THEMES } from '../lib/theme/presets';
 import { PUBLISHABLE_KEY, SECRET_KEY, SUPABASE_URL } from './_env';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
@@ -99,7 +99,28 @@ async function main() {
       .maybeSingle();
 
     check('preferences row created on signup', initial !== null);
-    check('defaults are sane', initial?.theme === 'system' && initial?.preset_theme === 'default');
+    /**
+     * Asserted against DEFAULT_APPEARANCE, not a hardcoded string.
+     *
+     * The database column default and the application's declared default are
+     * two separate facts that must agree: the column decides what a new row
+     * gets, and `DEFAULT_APPEARANCE` decides what a signed-out visitor is
+     * rendered with. If they drift, a user sees one theme before signing in and
+     * a different one after — which reads as a bug in the theme system rather
+     * than a mismatched constant. Naming the literal here would have made this
+     * check pass while the two disagreed.
+     */
+    check(
+      `the database default matches DEFAULT_APPEARANCE (${DEFAULT_APPEARANCE.presetTheme})`,
+      initial?.preset_theme === DEFAULT_APPEARANCE.presetTheme,
+      `column gives "${initial?.preset_theme}", app declares "${DEFAULT_APPEARANCE.presetTheme}"`,
+    );
+    check('mode defaults to system', initial?.theme === 'system', String(initial?.theme));
+    check(
+      'the default theme is a real preset',
+      THEMES.some((t) => t.id === DEFAULT_APPEARANCE.presetTheme),
+      DEFAULT_APPEARANCE.presetTheme,
+    );
 
     // Write a distinctive set, then prove the SERVER renders it.
     const wanted = {
