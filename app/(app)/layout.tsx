@@ -4,6 +4,7 @@ import { Sidebar, type SidebarConversation } from '@/components/chat/sidebar';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/db/server';
 import { requireUser } from '@/lib/security/auth';
+import { loadAppearance } from '@/lib/theme/preferences';
 
 import { signOut } from '../(auth)/actions';
 
@@ -32,6 +33,12 @@ function groupFor(updatedAt: string): string {
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const supabase = await createClient();
+
+  // Resolved here so the printed treatment's COPY is server-rendered rather
+  // than revealed by CSS. `loadAppearance` is request-cached, so this shares
+  // the read the root layout already did.
+  const { presetTheme } = await loadAppearance();
+  const riso = presetTheme === 'riso';
 
   // RLS scopes this to the signed-in user; no explicit user_id filter needed.
   //
@@ -80,6 +87,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
      */
     <div className="flex h-dvh overflow-hidden">
       <Sidebar
+        riso={riso}
         conversations={conversations}
         /* Formatted on the server. `new Date()` in a client component renders
            one string on the server and another in the browser whenever the two

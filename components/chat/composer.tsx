@@ -28,6 +28,8 @@ type Props = {
   storageEnabled?: boolean;
   /** Blocks send while a file is still going up. */
   uploading?: boolean;
+  /** Selects the printed treatment's copy. Styling stays in CSS. */
+  riso?: boolean;
 };
 
 const MAX_HEIGHT_PX = 200;
@@ -46,6 +48,7 @@ export function Composer({
   dropHandlers,
   storageEnabled = false,
   uploading = false,
+  riso = false,
 }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -88,11 +91,14 @@ export function Composer({
     <div className="border-border bg-background border-t p-4" data-riso="coupon-wrap">
       <div className="relative mx-auto max-w-3xl" {...dropHandlers} data-riso="coupon">
         {/* The boxed COMPOSE panel's label rail. Riso-only: every other theme
-            already says this once, under the field. */}
-        <div data-riso-only data-riso="coupon-l">
-          <span>Compose</span>
-          <span>Enter to send · Shift+Enter for a new line</span>
-        </div>
+            already says this once, under the field — rendering both is how the
+            page ended up reading "ComposeEnter to send". */}
+        {riso ? (
+          <div data-riso="coupon-l">
+            <span>Compose</span>
+            <span>Enter to send · Shift+Enter for a new line</span>
+          </div>
+        ) : null}
         <DropOverlay active={dragging} />
 
         {onRemoveAttachment ? (
@@ -148,14 +154,20 @@ export function Composer({
         </div>
       </div>
 
-      <p
-        className="text-muted-foreground mx-auto mt-2 max-w-3xl text-center text-xs"
-        data-riso-hide
-      >
-        {uploading
-          ? 'Waiting for attachments to finish uploading…'
-          : 'Enter to send · Shift+Enter for a new line'}
-      </p>
+      {/* Riso says this on the COMPOSE rail above the field instead, so saying
+          it here too would be the same sentence twice. */}
+      {riso ? null : (
+        <p className="text-muted-foreground mx-auto mt-2 max-w-3xl text-center text-xs">
+          {uploading
+            ? 'Waiting for attachments to finish uploading…'
+            : 'Enter to send · Shift+Enter for a new line'}
+        </p>
+      )}
+      {riso && uploading ? (
+        <p className="text-muted-foreground mx-auto mt-2 max-w-3xl text-center text-xs">
+          Waiting for attachments to finish uploading…
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -16,9 +16,17 @@
    fails the build on any rule that does not, so the other seven presets cannot
    be damaged from here even by accident.
 
-   The two visibility rules this depends on — hiding `[data-riso-only]` chrome
-   by default — live in globals.css, because by definition they must apply when
-   Riso is NOT active.
+   ── Why there are no visibility rules here ──────────────────────────────────
+   An earlier version rendered BOTH the plain and the printed wording and hid
+   one with a stylesheet. The moment that stylesheet did not apply — a dev
+   server that had not picked up a newly imported file, a cache, a build that
+   ordered things differently — the page read "New chat Start a page" and
+   "myaichatmyaichat". A theme that degrades into duplicated words is worse
+   than one that degrades into plain words.
+
+   Copy is now chosen on the server from the stored preference, so only one
+   variant is ever in the document. This file styles what is there; it never
+   decides what exists.
 
    ── On the mockup's colours ─────────────────────────────────────────────────
    The mockup is a static page with no contrast obligations. This is an
@@ -83,17 +91,6 @@ html[data-theme='riso'].dark {
   --riso-shadow: #3a3a46;
 }
 
-/* ── visibility ──────────────────────────────────────────────────────────────
-   The counterpart of the `[data-riso-only] { display: none }` rule in
-   globals.css. `revert` rather than `block`, so a span stays inline and a div
-   stays a block — the markup already knows what it is. */
-html[data-theme='riso'] [data-riso-only] {
-  display: revert;
-}
-html[data-theme='riso'] [data-riso-hide] {
-  display: none;
-}
-
 /* ── paper ───────────────────────────────────────────────────────────────────
    A fine grain over everything, multiplied into the page the way stock shows
    through ink. Light mode only: multiply against a near-black background does
@@ -123,6 +120,10 @@ html[data-theme='riso'] aside {
   background: var(--riso-paper-2);
   border-right-width: var(--riso-rule);
   border-right-color: var(--riso-ink);
+  /* 236px in the mockup. The app's default 288px leaves the slips floating in
+     a column too wide for them, and the printed page wants the margin on the
+     text, not on the furniture. */
+  width: 236px;
 }
 
 html[data-theme='riso'] [data-riso='masthead'] {
@@ -224,6 +225,22 @@ html[data-theme='riso'] aside input {
   background: var(--background);
 }
 
+/* Room for the offset shadows to land.
+   The app's default padding is 8px, and a 4px offset plus a 2px keyline needs
+   more than that — the shadows were being clipped by the sidebar's own border,
+   which reads as a rendering fault rather than as a print effect. */
+html[data-theme='riso'] [data-riso='actions'] {
+  padding: 14px 18px 12px 14px;
+}
+html[data-theme='riso'] aside nav {
+  padding-left: 14px;
+  padding-right: 18px;
+}
+html[data-theme='riso'] aside > div:has(input) {
+  padding-left: 14px;
+  padding-right: 18px;
+}
+
 /* ── section rules ── */
 html[data-theme='riso'] [data-riso='divider'] {
   display: flex;
@@ -315,8 +332,13 @@ html[data-theme='riso'] [data-riso='square'][data-filled='true'] {
 
 /* ═══════════════════════════════════════════════════ the page (main) */
 
+/* The masthead band runs the full width.
+   In the mockup the publication's name and the navigation share one strip. The
+   app keeps its header as a separate element, so it takes the masthead's stock
+   instead — two bands of the same paper read as one strip, where two bands of
+   different paper read as two chrome bars stacked on top of each other. */
 html[data-theme='riso'] header {
-  background: var(--background);
+  background: var(--riso-paper-2);
   border-bottom-width: var(--riso-rule);
   border-bottom-color: var(--riso-ink);
 }
@@ -325,10 +347,38 @@ html[data-theme='riso'] header a[href='/'] {
   letter-spacing: -0.02em;
 }
 
+/* Navigation as section tabs, underscored in the second ink on hover. */
+html[data-theme='riso'] header nav a {
+  font-size: 13px;
+  padding-bottom: 2px;
+  border-bottom: 2.5px solid transparent;
+  text-decoration: none;
+  transition:
+    color 0.18s,
+    border-color 0.18s;
+}
+html[data-theme='riso'] header nav a:hover {
+  color: var(--primary);
+  border-bottom-color: var(--riso-pink);
+  text-decoration: none;
+}
+
 html[data-theme='riso'] [data-riso='rule'] {
   border-bottom-width: var(--riso-rule);
   border-bottom-color: var(--riso-ink);
   background: var(--background);
+  /* Folio left, ticket right — the band has two ends in the mockup. */
+  justify-content: space-between;
+  padding: 13px 26px;
+}
+html[data-theme='riso'] [data-riso='folio'] {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  margin-right: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── the yellow ticket ──────────────────────────────────────────────────────
@@ -358,9 +408,18 @@ html[data-theme='riso'] [data-riso='ticket']:hover {
 html[data-theme='riso'] [data-riso='spread'] {
   /* An editorial page is set from the top, not centred in the window. */
   justify-content: flex-start;
-  padding-top: 44px;
   align-items: stretch;
   max-width: 660px;
+  padding: 34px 26px 24px;
+
+  /* `height: auto`, not the base `h-full`.
+     With a fixed 100% height the spread cannot grow past the window, so once
+     the colophon was added the content overflowed a container that could not
+     scroll — and the lede was simply cut off the top of the page. `min-height`
+     keeps it filling a tall window; `height: auto` lets the scroller above it
+     do its job on a short one. */
+  height: auto;
+  min-height: 100%;
 }
 html[data-theme='riso'] [data-riso='lede'] {
   text-align: left;
@@ -400,7 +459,7 @@ html[data-theme='riso'] [data-riso='standfirst'] {
   color: var(--foreground);
   opacity: 0.86;
   max-width: 46ch;
-  margin: 0 0 32px;
+  margin: 0 0 26px;
   padding-left: 14px;
   border-left: 3px solid var(--riso-pink);
   text-align: left;
@@ -416,7 +475,7 @@ html[data-theme='riso'] [data-riso='pick'] {
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  padding: 14px 15px;
+  padding: 11px 15px;
   background: var(--background);
   border: var(--riso-hairline) solid var(--riso-ink);
   font-size: 15px;
@@ -435,6 +494,22 @@ html[data-theme='riso'] [data-riso='pick']:hover [data-riso='pick-n'] {
   background: var(--riso-pink);
   color: var(--riso-pink-ink);
 }
+html[data-theme='riso'] [data-riso='pick-body'] {
+  display: block;
+  min-width: 0;
+}
+html[data-theme='riso'] [data-riso='pick-t'] {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+html[data-theme='riso'] [data-riso='pick-d'] {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
 html[data-theme='riso'] [data-riso='pick-n'] {
   flex: none;
   width: 30px;
@@ -448,6 +523,55 @@ html[data-theme='riso'] [data-riso='pick-n'] {
   transition:
     background 0.2s,
     color 0.2s;
+}
+
+/* ── correspondence ──────────────────────────────────────────────────────────
+   The two voices differ in MATERIAL, not only in position. The reply is set on
+   a tinted field with a rule in the first ink down its edge — which is what
+   the mockup does, and it also survives the Document bubble style, where the
+   question loses its block and position alone stops distinguishing them. */
+html[data-theme='riso'] [data-message='assistant'] {
+  background: var(--riso-paper-2);
+  border-left: 3px solid var(--primary);
+  padding: 14px 16px;
+}
+html[data-theme='riso'] [data-message='user'] {
+  border: var(--riso-hairline) solid var(--riso-ink);
+}
+
+/* ── colophon ────────────────────────────────────────────────────────────────
+   Three cells in one box with internal rules, the way a masthead sets its
+   figures. The 2px outer keyline and 1.5px inner ones are the mockup's, and
+   the difference between them is deliberate — the box is the object, the
+   divisions are inside it. */
+html[data-theme='riso'] [data-riso='colophon'] {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: var(--riso-rule) solid var(--riso-ink);
+  background: var(--riso-paper-2);
+  width: 100%;
+  margin-top: 26px;
+}
+html[data-theme='riso'] [data-riso='col-c'] {
+  padding: 10px 14px;
+  border-right: var(--riso-hairline) solid var(--riso-ink);
+}
+html[data-theme='riso'] [data-riso='col-c']:last-child {
+  border-right: 0;
+}
+html[data-theme='riso'] [data-riso='col-l'] {
+  font-family: var(--riso-mono);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+html[data-theme='riso'] [data-riso='col-v'] {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--primary);
+  margin-top: 3px;
 }
 
 /* ═══════════════════════════════════════════════════ the coupon (composer) */

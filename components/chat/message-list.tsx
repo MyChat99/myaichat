@@ -4,7 +4,7 @@ import { Check, Copy, Pencil, RefreshCw, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { Markdown } from '@/components/chat/markdown';
-import { MessageEntrance } from '@/components/motion/motion';
+import { MessageEntrance, useHydrated } from '@/components/motion/motion';
 import { Button } from '@/components/ui/button';
 
 export type UiMessage = {
@@ -146,6 +146,9 @@ const ACTIVE_TAIL = 6;
 export function MessageList({ messages, streaming, onRegenerate, onEdit }: Props) {
   const lastAssistantId = [...messages].reverse().find((m) => m.role === 'assistant')?.id;
   const [expanded, setExpanded] = useState(false);
+  // Messages in the server-rendered HTML must not animate in — see
+  // MessageEntrance. Only those mounted after this flips do.
+  const hydrated = useHydrated();
 
   const hiddenCount = expanded ? 0 : Math.max(0, messages.length - WINDOW_SIZE);
   const visible = hiddenCount > 0 ? messages.slice(hiddenCount) : messages;
@@ -174,7 +177,7 @@ export function MessageList({ messages, streaming, onRegenerate, onEdit }: Props
 
         if (message.role === 'user') {
           return (
-            <MessageEntrance key={message.id} style={offscreenStyle}>
+            <MessageEntrance key={message.id} style={offscreenStyle} entering={hydrated}>
               <UserMessage message={message} disabled={streaming} onEdit={onEdit} />
             </MessageEntrance>
           );
@@ -183,7 +186,12 @@ export function MessageList({ messages, streaming, onRegenerate, onEdit }: Props
         const isStreamingThis = streaming && message.id === 'streaming';
 
         return (
-          <div key={message.id} style={offscreenStyle} className="group flex flex-col gap-1">
+          <div
+            key={message.id}
+            style={offscreenStyle}
+            className="group flex flex-col gap-1"
+            data-message="assistant"
+          >
             <Markdown content={message.content} />
 
             {isStreamingThis ? (

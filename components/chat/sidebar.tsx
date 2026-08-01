@@ -28,12 +28,28 @@ export type SidebarConversation = {
 
 export type SidebarIssue = { number: number; date: string };
 
+/**
+ * `riso` selects the printed treatment's COPY, not its styling.
+ *
+ * Styling is still pure CSS. This exists because the previous approach
+ * rendered both the plain and the printed wording and hid one with a
+ * stylesheet — so the instant that stylesheet did not apply, the page read
+ * "New chat Start a page" and "myaichatmyaichat". A theme that degrades into
+ * duplicated words is worse than one that degrades into plain words.
+ *
+ * Resolved on the server from the stored preference, so the first paint is
+ * already right. The cost is that switching theme in the appearance panel
+ * updates colours instantly but swaps this wording on save, when the route
+ * re-renders — a fair trade for copy that cannot double.
+ */
 export function Sidebar({
   conversations,
   issue,
+  riso = false,
 }: {
   conversations: SidebarConversation[];
   issue?: SidebarIssue;
+  riso?: boolean;
 }) {
   const params = useParams<{ id?: string }>();
   const [query, setQuery] = useState('');
@@ -101,20 +117,24 @@ export function Sidebar({
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Riso prints a masthead here; every other theme keeps its wordmark in
-            the page header and hides this. See `[data-riso-only]` in
-            globals.css. */}
-        <div data-riso-only data-riso="masthead">
-          <div data-riso="wordmark">
-            myaichat
-            <span aria-hidden="true">myaichat</span>
-          </div>
-          {issue ? (
-            <div data-riso="issue">
-              No. {issue.number} · {issue.date}
+        {/* Riso prints a masthead here; every other theme keeps its wordmark
+            in the page header. The doubled word is the second ink plate, laid
+            over the first — it only reads as a duplicate if the stylesheet
+            that positions it is missing, which is why it is not rendered at
+            all unless Riso is active. */}
+        {riso ? (
+          <div data-riso="masthead">
+            <div data-riso="wordmark">
+              myaichat
+              <span aria-hidden="true">myaichat</span>
             </div>
-          ) : null}
-        </div>
+            {issue ? (
+              <div data-riso="issue">
+                No. {issue.number} · {issue.date}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="flex items-center gap-2 p-3" data-riso="actions">
           <form action={createConversation} className="flex-1">
@@ -126,11 +146,8 @@ export function Sidebar({
               data-riso="draft"
             >
               <MessageSquarePlus className="mr-2 size-4" />
-              <span data-riso-hide>New chat</span>
-              <span data-riso-only>Start a page</span>
-              <small data-riso-only data-riso="shortcut">
-                ⌘K
-              </small>
+              {riso ? 'Start a page' : 'New chat'}
+              {riso ? <small data-riso="shortcut">⌘K</small> : null}
             </Button>
           </form>
           <Button
@@ -171,8 +188,8 @@ export function Sidebar({
                      it — nested inside, it sat within the card's border and
                      read as part of the first conversation. */
                   <Fragment key={c.id}>
-                    {heading ? (
-                      <li data-riso-only data-riso="divider" role="presentation">
+                    {riso && heading ? (
+                      <li data-riso="divider" role="presentation">
                         {heading}
                       </li>
                     ) : null}
@@ -222,16 +239,18 @@ export function Sidebar({
                           </Link>
 
                           {/* The slip's stamp line: which press set it, and how
-                            long it ran. Riso-only so the other themes keep the
-                            single-line list they were designed around. */}
-                          <div data-riso-only data-riso="stamp">
-                            <span data-riso="square" data-filled={c.pinned ? 'true' : 'false'} />
-                            {c.modelName ?? 'No model'}
-                            {' · '}
-                            {c.messageCount
-                              ? `${c.messageCount} note${c.messageCount === 1 ? '' : 's'}`
-                              : 'blank'}
-                          </div>
+                              long it ran. Riso-only — every other theme keeps
+                              the single-line list it was designed around. */}
+                          {riso ? (
+                            <div data-riso="stamp">
+                              <span data-riso="square" data-filled={c.pinned ? 'true' : 'false'} />
+                              {c.modelName ?? 'No model'}
+                              {' · '}
+                              {c.messageCount
+                                ? `${c.messageCount} note${c.messageCount === 1 ? '' : 's'}`
+                                : 'blank'}
+                            </div>
+                          ) : null}
 
                           <div className="absolute top-1/2 right-1 flex -translate-y-1/2 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
                             <Button

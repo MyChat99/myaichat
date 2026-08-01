@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { cache } from 'react';
 import { z } from 'zod';
 
 import { createClient } from '@/lib/db/server';
@@ -41,7 +42,7 @@ export type Appearance = z.infer<typeof appearanceSchema>;
  * out ones, and a preferences problem must not take down the whole app. A bad
  * stored value degrades to the default rather than blanking the page.
  */
-export async function loadAppearance(): Promise<Appearance> {
+export const loadAppearance = cache(async function loadAppearance(): Promise<Appearance> {
   try {
     const supabase = await createClient();
     const {
@@ -70,7 +71,7 @@ export async function loadAppearance(): Promise<Appearance> {
   } catch {
     return DEFAULT_APPEARANCE;
   }
-}
+});
 
 /**
  * Resolves a named accent preset to hex; passes a hex value straight through.

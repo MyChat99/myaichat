@@ -112,13 +112,37 @@ function main() {
     keyframeNames.filter((n) => !n.startsWith('riso-')).join(', '),
   );
 
-  // The counterpart rule has to exist somewhere that is NOT scoped, or the
-  // Riso-only chrome renders on every theme.
-  check(
-    'globals.css hides [data-riso-only] by default',
-    /\[data-riso-only\]\s*\{[^}]*display:\s*none/.test(globals.replace(/\/\*[\s\S]*?\*\//g, '')),
-  );
   check('globals.css imports the stylesheet', globals.includes("@import './riso.css'"));
+
+  /**
+   * No copy may depend on CSS to be hidden.
+   *
+   * The first version of this theme rendered both the plain and the printed
+   * wording and hid one with a stylesheet. When that stylesheet did not apply
+   * the page read "New chat Start a page" and "myaichatmyaichat" — a theme
+   * degrading into duplicated words, which is worse than degrading into plain
+   * ones. Copy is now chosen on the server, and these attributes must stay
+   * gone: their presence means the fragile pattern has come back.
+   */
+  const componentSource = [
+    'components/chat/sidebar.tsx',
+    'components/chat/chat-thread.tsx',
+    'components/chat/composer.tsx',
+    'components/chat/model-selector.tsx',
+  ]
+    .map((f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'))
+    .join('\n');
+
+  for (const attribute of ['data-riso-only', 'data-riso-hide']) {
+    check(
+      `no component uses ${attribute} (copy is chosen on the server)`,
+      !componentSource.includes(attribute),
+    );
+    check(
+      `no stylesheet hides copy via ${attribute}`,
+      !css.includes(attribute) && !globals.includes(attribute),
+    );
+  }
 
   /**
    * The reduced-motion escape hatch, checked because its absence is silent and
@@ -199,14 +223,7 @@ function main() {
    * no error, no failing page, just a look that is missing a piece. These are
    * the hooks whose absence would not be obvious.
    */
-  const sources = [
-    'components/chat/sidebar.tsx',
-    'components/chat/chat-thread.tsx',
-    'components/chat/composer.tsx',
-    'components/chat/model-selector.tsx',
-  ]
-    .map((f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'))
-    .join('\n');
+  const sources = componentSource;
 
   const required = [
     'masthead',

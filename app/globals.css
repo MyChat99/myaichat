@@ -236,19 +236,6 @@
   font-weight: 700;
 }
 
-/* ------------------------------------------------------------ riso chrome
-   Riso adds structure the other themes have no place for — a masthead, section
-   rules, a stamp line under each conversation, numbered picks. That markup is
-   rendered on every theme so switching themes stays a pure CSS change with no
-   re-render, and hidden by default here.
-
-   This rule is deliberately NOT in riso.css: by definition it has to apply when
-   Riso is *not* the active theme, which is the one thing that file forbids. Its
-   counterpart — revealing these under `[data-theme='riso']` — is there. */
-[data-riso-only] {
-  display: none;
-}
-
 /* ------------------------------------------------------------ appearance
    Message style: `bubbles` keeps chat framing, `flat` reads as a document.
    Driven by a data attribute the server renders, so it is correct on first
