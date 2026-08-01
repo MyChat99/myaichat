@@ -23,6 +23,9 @@ Best for: you want the click, not the read. Pair with the chat screenshot.
 > Anthropic keys and get streaming chat, an admin panel, per-user theming and
 > usage analytics.
 >
+> It does not look like every other chat app. The default theme is a risograph
+> print: newsprint paper, Federal Blue ink, hard black keylines.
+>
 > The part I'm most pleased with isn't a feature. Adding a third AI provider
 > takes one adapter file and one line in a registry — no route changes, no UI
 > changes. There's a test that greps the codebase and fails the build if a
@@ -43,8 +46,9 @@ read. Pair with two or three screenshots.
 
 > I spent the last stretch building **myaichat** — a multi-provider AI chat
 > platform. Bring your own OpenAI and Anthropic keys; get streaming chat, an
-> admin panel for keys and models, seven themes, usage analytics and an audit
-> trail.
+> admin panel for keys and models, eight themes, usage analytics and an audit
+> trail. The default look is a risograph print — paper stock rather than a white
+> page, and two real Riso inks.
 >
 > Three things I'd point at:
 >
@@ -86,6 +90,16 @@ without anyone clicking through. Lead with the chat screenshot.
 > streaming chat, an admin panel for keys and models, per-user theming, usage
 > analytics and an audit trail. Next.js 16, Supabase with row-level security on
 > all 12 tables, TypeScript strict throughout, deployed on Railway.
+>
+> **It also has a visual identity**, which most side projects skip. The default
+> theme is a risograph print — newsprint stock with a green undertone, Federal
+> Blue and Fluorescent Pink as the two inks, and hard black keylines where a
+> normal app would put a soft grey border. Three of those ink colours had to be
+> darkened to clear WCAG AA, and I found out which three because the contrast
+> checker is computed from the token data rather than eyeballed: adding a theme
+> gets it checked without anyone writing a new test. The fluorescent pink still
+> cannot reach 4.5:1 on paper — being brighter than the stock is what
+> fluorescent means — so it moved to dark mode, where it genuinely glows.
 >
 > The architecture claim I care about: **adding a third provider is one adapter
 > file and one registry line.** No route change, no UI change, no schema change.

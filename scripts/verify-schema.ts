@@ -6,6 +6,8 @@
  *
  *   npx tsx scripts/verify-schema.ts
  */
+import { readFileSync } from 'node:fs';
+
 import { createClient } from '@supabase/supabase-js';
 
 import { SECRET_KEY, SUPABASE_URL } from './_env';
@@ -31,6 +33,49 @@ const TABLES = [
 
 const VIEWS = ['providers_public'] as const;
 
+/**
+ * The column names in one relation's `Row` type, read from the source text.
+ *
+ * Reading the source rather than the type is the only option — types are erased
+ * before anything runs, so there is nothing left to introspect at runtime. It
+ * scans from the relation's `Row:` to the brace that closes it, taking
+ * identifiers in property position, and expands the `Timestamps &` intersection
+ * the file uses to avoid repeating created_at/updated_at nine times.
+ */
+function declaredColumns(source: string, relation: string): Set<string> | null {
+  const at = source.indexOf(`      ${relation}: {`);
+  if (at === -1) return null;
+
+  const rowAt = source.indexOf('Row:', at);
+  if (rowAt === -1) return null;
+
+  const open = source.indexOf('{', rowAt);
+  let depth = 0;
+  let close = -1;
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        close = i;
+        break;
+      }
+    }
+  }
+  if (close === -1) return null;
+
+  const columns = new Set<string>();
+  if (source.slice(rowAt, open).includes('Timestamps')) {
+    columns.add('created_at');
+    columns.add('updated_at');
+  }
+  for (const line of source.slice(open + 1, close).split('\n')) {
+    const match = /^\s{10}([a-z_][a-z0-9_]*)\??:/.exec(line);
+    if (match) columns.add(match[1]);
+  }
+  return columns.size > 0 ? columns : null;
+}
+
 async function main() {
   let failed = 0;
 
@@ -47,6 +92,85 @@ async function main() {
       failed++;
     } else {
       console.log(`  ok    ${rel.padEnd(18)} ${count ?? 0} rows`);
+    }
+  }
+
+  // ──────────────────────────────────────── column-level drift
+  //
+  // `lib/db/types.ts` is hand-written, because `supabase gen types` runs its
+  // introspection in a container and there is no Docker here (ISSUE-005). The
+  // `--db-url` workaround that fixed `db push` does NOT fix this: the CLI
+  // connects to the database and then still demands a container runtime.
+  //
+  // The existing checks above prove every relation EXISTS. They say nothing
+  // about its columns, which is where drift actually happens — a migration adds
+  // a column, the hand-written type does not, and every query touching it is
+  // silently untyped until something breaks at runtime. That has already
+  // happened once here (ISSUE-013).
+  //
+  // The source of truth is PostgREST's own OpenAPI document. It is derived from
+  // the live database, needs no container and no new migration, and is exactly
+  // the schema the client library actually talks to — so a column missing from
+  // it is a column our code genuinely cannot reach.
+  console.log('\nColumn parity with lib/db/types.ts\n');
+
+  {
+    const spec = await fetch(`${SUPABASE_URL()}/rest/v1/`, {
+      headers: { apikey: SECRET_KEY(), Authorization: `Bearer ${SECRET_KEY()}` },
+    })
+      .then(
+        (r) =>
+          r.json() as Promise<{
+            definitions?: Record<string, { properties?: Record<string, unknown> }>;
+          }>,
+      )
+      .catch(() => null);
+
+    if (!spec?.definitions) {
+      console.error('  FAIL  PostgREST schema document could not be read');
+      failed++;
+    } else {
+      const source = readFileSync(new URL('../lib/db/types.ts', import.meta.url), 'utf8');
+
+      for (const rel of [...TABLES, ...VIEWS]) {
+        const live = Object.keys(spec.definitions[rel]?.properties ?? {});
+        if (live.length === 0) {
+          console.error(`  FAIL  ${rel.padEnd(18)} not present in the PostgREST schema`);
+          failed++;
+          continue;
+        }
+
+        const declared = declaredColumns(source, rel);
+        if (declared === null) {
+          console.error(`  FAIL  ${rel.padEnd(18)} no Row block found in lib/db/types.ts`);
+          failed++;
+          continue;
+        }
+
+        const missing = live.filter((c) => !declared.has(c));
+        const extra = [...declared].filter((c) => !live.includes(c));
+
+        if (missing.length === 0 && extra.length === 0) {
+          console.log(`  ok    ${rel.padEnd(18)} ${live.length} columns match`);
+        } else {
+          // Reported separately because they are different bugs. A column the
+          // database has and the types do not is invisible to our code; a
+          // column the types have and the database does not is a query that
+          // will fail at runtime while type-checking perfectly.
+          if (missing.length) {
+            console.error(
+              `  FAIL  ${rel.padEnd(18)} in the database, absent from types.ts: ${missing.join(', ')}`,
+            );
+            failed++;
+          }
+          if (extra.length) {
+            console.error(
+              `  FAIL  ${rel.padEnd(18)} in types.ts, absent from the database: ${extra.join(', ')}`,
+            );
+            failed++;
+          }
+        }
+      }
     }
   }
 
