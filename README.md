@@ -21,8 +21,10 @@ Tailwind. TypeScript throughout, strict mode, no `any` in the core paths.
 - **Switch models mid-conversation** — Anthropic and OpenAI, in the same thread
 - **Markdown with syntax-highlighted code**, sanitised against XSS, one-click copy
 - **Conversation management** — search, rename, pin, delete
-- **Seven themes** in light and dark, plus accent colour, font size and bubble
-  style, persisted per user and applied with **no flash on load**
+- **Eight themes** in light and dark — the default is **Riso**, a risograph
+  print look: newsprint paper, Federal Blue ink, hard black keylines — plus
+  accent colour, font size and bubble style, persisted per user and applied with
+  **no flash on load**
 - **Command palette** (`⌘K`) and a keyboard-shortcut reference (`?`)
 
 **For whoever runs it**
@@ -50,8 +52,8 @@ npm run dev
 
 | File | Screen | Capture it in this state |
 | --- | --- | --- |
-| `chat.png` | `/` or `/c/<id>` | **Mid-stream.** Send "Explain closures with an example", capture while tokens are still arriving so the cursor is visible. Model selector in shot. Sidebar showing several named conversations, not "New chat" ×3. |
-| `themes.png` | `/settings` | A **non-default** preset selected — Midnight or Ocean. The live preview panel visible. The default looks like every other chat app; the point of this screen is that it does not have to. |
+| `chat.png` | `/` or `/c/<id>` | **Mid-stream, in Riso (the default) — this is the hero shot.** Send "Explain closures with an example", capture while tokens are still arriving so the cursor is visible. Model selector in shot. Sidebar showing several named conversations, not "New chat" ×3. Riso is what a first-time visitor sees, so the hero image should be it. |
+| `themes.png` | `/settings` | **Riso in dark mode**, where the ink turns fluorescent pink against near-black. The live preview panel visible, and enough of the picker in frame to show the other seven. Capturing a *different* theme here than in `chat.png` is the point — one image proves there is a default, two prove it is a choice. |
 | `admin-providers.png` | `/admin/providers` | **After pressing Test connection**, so the green result and latency are on screen. Both provider cards visible with masked keys (`••••••••` + last four). |
 | `admin-analytics.png` | `/admin/analytics` | The **30-day** range, so all three charts have shape. With demo data seeded this shows real variation rather than a flat line. |
 

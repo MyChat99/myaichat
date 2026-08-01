@@ -41,6 +41,57 @@ export type ThemeDefinition = {
 
 export const THEMES: ThemeDefinition[] = [
   {
+    /**
+     * Riso — printed matter rather than emitted light.
+     *
+     * From the risograph mockup (docs/mockups/05-riso.html): newsprint stock
+     * with a green undertone, two real Riso stock inks (Federal Blue and
+     * Fluorescent Pink), and hard ink rules instead of soft grey borders. The
+     * border token is deliberately near-black — the 2px black keylines ARE the
+     * look, and a polite #e4e4e7 hairline would erase it.
+     *
+     * Three colours were darkened from the mockup to clear AA. Each moved along
+     * its own hue rather than toward neutral, so the character survives:
+     *   textMuted   #7a8094 → #606575  (21% darker, 3.38:1 → 4.56:1)
+     *   destructive #ff48b0 → #bd3582  (26% darker, 2.65:1 → 4.52:1)
+     *   success     #00a95c → #00753f  (31% darker, Riso Green)
+     * The fluorescent pink cannot reach 4.5:1 on paper — that is what makes it
+     * fluorescent. Darkened only until legible, and still unmistakably magenta
+     * rather than red (blue channel stays above green).
+     *
+     * Dark mode is "riso at night": the fluoro pink becomes the accent and
+     * genuinely glows against near-black, which is the one thing the ink can do
+     * on screen that it cannot do on paper. It needed no adjustment.
+     */
+    id: 'riso',
+    label: 'Riso',
+    light: {
+      background: '#f1eee2',
+      surface: '#e8e4d5',
+      surfaceHover: '#dedac9',
+      // Hard ink keyline, not a hairline. See the note above.
+      border: '#1d2230',
+      accent: '#3d5588',
+      accentForeground: '#f1eee2',
+      text: '#1d2230',
+      textMuted: '#606575',
+      destructive: '#bd3582',
+      success: '#00753f',
+    },
+    dark: {
+      background: '#16161a',
+      surface: '#1e1e24',
+      surfaceHover: '#26262e',
+      border: '#3a3a46',
+      accent: '#ff48b0',
+      accentForeground: '#16161a',
+      text: '#f1eee2',
+      textMuted: '#9a9aa8',
+      destructive: '#ff48b0',
+      success: '#7fa3e0',
+    },
+  },
+  {
     id: 'default',
     label: 'Default',
     light: {
@@ -271,3 +322,27 @@ export const BUBBLE_STYLES = [
   { id: 'bubbles', label: 'Bubbles' },
   { id: 'flat', label: 'Document' },
 ] as const;
+
+/**
+ * What a visitor with no stored preference is rendered with.
+ *
+ * Lives here rather than in preferences.ts because that module is
+ * `server-only`, and this value has to be readable by anything that checks the
+ * application and the database agree about the default. They are two separate
+ * facts — the column decides what a new row gets, this decides what a
+ * signed-out visitor sees — and if they drift, someone sees one theme before
+ * signing in and another after.
+ *
+ * `verify:appearance` asserts they match.
+ */
+export const DEFAULT_APPEARANCE = {
+  // Annotated so it stays the literal union member rather than widening to
+  // `string` — this object has to satisfy `Appearance`, and a widened `theme`
+  // would not.
+  theme: 'system' as const,
+  // Riso is the product's visual identity, not the shadcn default.
+  presetTheme: 'riso',
+  accentColor: 'blue',
+  fontSize: 'md',
+  bubbleStyle: 'bubbles',
+};

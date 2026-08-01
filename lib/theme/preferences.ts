@@ -3,7 +3,19 @@ import 'server-only';
 import { z } from 'zod';
 
 import { createClient } from '@/lib/db/server';
-import { ACCENT_PRESETS, BUBBLE_STYLES, FONT_SIZES, THEME_IDS } from './presets';
+import {
+  ACCENT_PRESETS,
+  BUBBLE_STYLES,
+  DEFAULT_APPEARANCE,
+  FONT_SIZES,
+  THEME_IDS,
+} from './presets';
+
+// Re-exported so existing server-side imports keep working. The constant
+// itself lives in presets.ts, which is client-safe — a `server-only` module
+// cannot be read by the test that has to prove the app and the database agree
+// about what the default is.
+export { DEFAULT_APPEARANCE };
 
 /**
  * Appearance preferences, read server-side so the correct theme is in the
@@ -20,14 +32,6 @@ export const appearanceSchema = z.object({
 });
 
 export type Appearance = z.infer<typeof appearanceSchema>;
-
-export const DEFAULT_APPEARANCE: Appearance = {
-  theme: 'system',
-  presetTheme: 'default',
-  accentColor: 'blue',
-  fontSize: 'md',
-  bubbleStyle: 'bubbles',
-};
 
 /**
  * Loads the signed-in user's appearance, falling back to defaults.
