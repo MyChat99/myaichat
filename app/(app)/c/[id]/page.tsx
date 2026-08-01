@@ -20,7 +20,7 @@ export const metadata: Metadata = { title: 'Chat' };
  * that it exists at all.
  */
 export default async function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireUser();
+  const user = await requireUser();
   const { id } = await params;
 
   const supabase = await createClient();
@@ -66,6 +66,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
       storageEnabled={isStorageConfigured()}
       maxUploadMb={await maxUploadMb()}
       riso={(await loadAppearance()).presetTheme === 'riso'}
+      isAdmin={user.role === 'admin'}
     />
   );
 }

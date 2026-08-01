@@ -48,6 +48,8 @@ Tailwind. TypeScript throughout, strict mode, no `any` in the core paths.
 
 ![Riso, the default theme](docs/screenshots/riso-light-empty-state.png)
 
+![Riso at night](docs/screenshots/riso-dark-empty-state.png)
+
 ![The same app in another preset](docs/screenshots/default-light-empty-state.png)
 
 The two images above are the same route, the same data and the same viewport —

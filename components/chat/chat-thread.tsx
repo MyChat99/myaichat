@@ -9,6 +9,7 @@ import { createConversationForMessage } from '@/app/(app)/conversations/actions'
 import { useAttachments } from '@/components/chat/attachments';
 import { CommandPalette } from '@/components/command/command-palette';
 import { Composer } from '@/components/chat/composer';
+import { RisoTabs } from '@/components/chat/riso-tabs';
 import { MessageList, type UiMessage } from '@/components/chat/message-list';
 import { ModelSelector, type SelectableModel } from '@/components/chat/model-selector';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,10 @@ type Props = {
   riso?: boolean;
   /** Figures for Riso's opening spread. Absent on every other theme. */
   colophon?: { notes: number; spendUsd: number; presses: number };
+  /** Riso moves navigation into the rule bar, so it needs to know. */
+  isAdmin?: boolean;
+  /** Riso's dateline. Formatted on the server to keep hydration stable. */
+  lede?: string;
 };
 
 /**
@@ -66,6 +71,8 @@ export function ChatThread({
   maxUploadMb,
   riso = false,
   colophon,
+  isAdmin = false,
+  lede,
 }: Props) {
   const router = useRouter();
 
@@ -324,6 +331,10 @@ export function ChatThread({
           conversationId={activeId}
           onSelect={setModelId}
         />
+
+        {/* Sections live in this bar under Riso, so the page has one top rule
+            rather than two stacked bands. See RisoTabs. */}
+        {riso ? <RisoTabs isAdmin={isAdmin} /> : null}
       </div>
 
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
@@ -335,7 +346,7 @@ export function ChatThread({
             {/* One opening or the other, never both. Riso prints an editorial
                 spread; every other theme keeps the plain prompt. */}
             <div className="text-center" data-riso="lede">
-              {riso ? <div data-riso="lede-num">Two presses inked and ready</div> : null}
+              {riso && lede ? <div data-riso="lede-num">{lede}</div> : null}
               <h1 className="text-2xl font-semibold" data-riso="headline">
                 {riso ? (
                   <>
@@ -349,7 +360,7 @@ export function ChatThread({
               </h1>
               <p className="text-muted-foreground mt-1 text-sm" data-riso="standfirst">
                 {riso
-                  ? 'Ask something badly, change your mind halfway through, and start again — nothing here is precious.'
+                  ? `${models.length} model${models.length === 1 ? ' is' : 's are'} inked and ready. Ask something badly, change your mind halfway through, and start again — nothing here is precious.`
                   : 'Pick a prompt or write your own.'}
               </p>
             </div>
@@ -369,7 +380,9 @@ export function ChatThread({
                   ) : null}
                   <span data-riso="pick-body">
                     <span data-riso="pick-t">{prompt}</span>
-                    {riso ? <span data-riso="pick-d">{note}</span> : null}
+                    {/* Inline, not stacked: in the mockup the note continues
+                        the title on the same line and wraps with it. */}
+                    {riso ? <span data-riso="pick-d"> {note}</span> : null}
                   </span>
                 </button>
               ))}
@@ -438,6 +451,7 @@ export function ChatThread({
         storageEnabled={storageEnabled}
         uploading={attachments.uploading}
         riso={riso}
+        modelLabel={models.find((m) => m.id === modelId)?.displayName ?? null}
       />
     </div>
   );

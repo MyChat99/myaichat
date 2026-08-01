@@ -21,6 +21,17 @@ export type SidebarConversation = {
   updated_at: string;
   /** Null when the conversation's model has since been removed. */
   modelName?: string | null;
+  /**
+   * Which press set it, as a slot number rather than a name.
+   *
+   * The stamp's square is filled for one press and hollow for the next — the
+   * mockup's way of telling them apart at a glance. The slot is resolved from
+   * the provider registry on the server, so this component never learns a
+   * vendor's name; `verify:providers` fails the build if one appears here, and
+   * it caught exactly that when this was first written as a comparison against
+   * a literal vendor name.
+   */
+  pressSlot?: number | null;
   messageCount?: number;
   /** Section heading, computed server-side. See `groupFor` in the app layout. */
   group?: string;
@@ -243,7 +254,10 @@ export function Sidebar({
                               the single-line list it was designed around. */}
                           {riso ? (
                             <div data-riso="stamp">
-                              <span data-riso="square" data-filled={c.pinned ? 'true' : 'false'} />
+                              <span
+                                data-riso="square"
+                                data-filled={(c.pressSlot ?? 0) % 2 === 0 ? 'true' : 'false'}
+                              />
                               {c.modelName ?? 'No model'}
                               {' · '}
                               {c.messageCount

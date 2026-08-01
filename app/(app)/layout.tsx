@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Sidebar, type SidebarConversation } from '@/components/chat/sidebar';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/db/server';
+import { registeredProviderNames } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
 import { loadAppearance } from '@/lib/theme/preferences';
 
@@ -40,6 +41,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { presetTheme } = await loadAppearance();
   const riso = presetTheme === 'riso';
 
+  // Press slots, so the sidebar can distinguish two providers without naming
+  // either. Registry order is stable, so a conversation keeps its mark.
+  const pressSlots = new Map(registeredProviderNames().map((name, i) => [name, i]));
+
   // RLS scopes this to the signed-in user; no explicit user_id filter needed.
   //
   // The model name and message count are embedded rather than fetched per row:
@@ -47,7 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // conversation from the client would be 200 requests to render a sidebar.
   const { data } = await supabase
     .from('conversations')
-    .select('id, title, pinned, updated_at, models(display_name), messages(count)')
+    .select('id, title, pinned, updated_at, models(display_name, providers(name)), messages(count)')
     .order('updated_at', { ascending: false })
     .limit(200);
 
@@ -60,6 +65,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     pinned: c.pinned,
     updated_at: c.updated_at,
     modelName: c.models?.display_name ?? null,
+    pressSlot: pressSlots.get(c.models?.providers?.name ?? '') ?? null,
     messageCount: c.messages?.[0]?.count ?? 0,
     // Grouped on the server so every visitor sees the same buckets. Doing it in
     // the browser would classify by the reader's clock, which is arguably more
@@ -99,7 +105,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-border flex items-center justify-between border-b py-3 pr-4 pl-14 md:pl-4">
+        <header
+          data-riso="masthead-bar"
+          className="border-border flex items-center justify-between border-b py-3 pr-4 pl-14 md:pl-4"
+        >
           <Link href="/" className="font-semibold">
             myaichat
           </Link>

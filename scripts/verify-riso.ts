@@ -179,19 +179,80 @@ function main() {
    */
   const riso = getTheme('riso');
 
-  const YELLOW = '#ffe800';
-  ratio('ticket text on yellow (light)', '#1d2230', YELLOW);
-  ratio('ticket text on yellow (dark)', '#16161a', YELLOW);
+  /**
+   * Read from the stylesheet, not restated here.
+   *
+   * These values were hardcoded in this file once, and when the pink changed —
+   * from the darkened #bd3582 back to the mockup's fluorescent #ff48b0 — the
+   * check went on happily verifying a colour the app no longer used. A test
+   * holding its own copy of the thing it checks is testing itself.
+   */
+  function token(name: string, mode: 'light' | 'dark'): string {
+    const block =
+      mode === 'light'
+        ? css.slice(
+            css.indexOf("html[data-theme='riso'] {"),
+            css.indexOf("html[data-theme='riso'].dark {"),
+          )
+        : css.slice(css.indexOf("html[data-theme='riso'].dark {"));
+    const found = new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`).exec(block);
+    if (!found) throw new Error(`${name} not found in the ${mode} block of riso.css`);
+    return found[1];
+  }
 
-  ratio('"Start a page" text on pink (light)', '#f1eee2', '#bd3582');
-  ratio('"Start a page" text on pink (dark)', '#16161a', '#ff48b0');
+  const YELLOW = token('--riso-yellow', 'light');
+  ratio('ticket text on yellow (light)', token('--riso-yellow-ink', 'light'), YELLOW);
+  ratio(
+    'ticket text on yellow (dark)',
+    token('--riso-yellow-ink', 'dark'),
+    token('--riso-yellow', 'dark'),
+  );
+
+  const pinkLight = token('--riso-pink', 'light');
+  const pinkDark = token('--riso-pink', 'dark');
+  ratio('"Start a page" text on pink (light)', token('--riso-pink-ink', 'light'), pinkLight);
+  ratio('"Start a page" text on pink (dark)', token('--riso-pink-ink', 'dark'), pinkDark);
+
+  // The chosen slip is overprinted and carries the conversation title.
+  ratio(
+    'chosen slip title on the overprint',
+    riso.light.background,
+    token('--riso-overprint', 'light'),
+  );
+  ratio(
+    'chosen slip title on the overprint (dark)',
+    riso.dark.text,
+    token('--riso-overprint', 'dark'),
+  );
 
   // The lede and the marked word in the headline are set in the pink. The
   // headline is display-sized, so it is held to the large-text threshold; the
   // lede is 10px and is held to the normal one.
-  ratio('lede stamp on paper', '#bd3582', riso.light.background);
-  ratio('marked word in headline on paper', '#bd3582', riso.light.background, AA_LARGE);
-  ratio('marked word in headline on night', '#ff48b0', riso.dark.background, AA_LARGE);
+  ratio('lede stamp on paper', token('--riso-pink-text', 'light'), riso.light.background);
+  ratio(
+    'marked word in headline on paper',
+    token('--riso-pink-display', 'light'),
+    riso.light.background,
+    AA_LARGE,
+  );
+  ratio(
+    'marked word in headline on night',
+    token('--riso-pink-display', 'dark'),
+    riso.dark.background,
+    AA_LARGE,
+  );
+
+  /**
+   * The FILL keeps the mockup's ink exactly. This is asserted rather than
+   * assumed: the easy way to satisfy the contrast checks above is to darken
+   * every pink until they pass, which would quietly replace the one colour the
+   * theme is named for.
+   */
+  check(
+    "the pink FILL is the mockup's Fluorescent Pink, undarkened",
+    pinkLight.toLowerCase() === '#ff48b0',
+    pinkLight,
+  );
 
   // The standfirst is the theme's own foreground at 86% over paper. Checked at
   // the composited value rather than the token, because the opacity is real.
@@ -215,6 +276,23 @@ function main() {
     riso.dark.background,
   );
 
+  /**
+   * The header replacement, checked because the failure is silent and total.
+   *
+   * Riso hides the shell's own bar on any page that renders a rule to replace
+   * it. If the `:has()` rule is dropped the page grows a second bar; if the
+   * rule bar stops carrying `RisoTabs`, a chat page loses every navigation
+   * link and the sign-out button with them, and still looks fine.
+   */
+  check(
+    'the shell bar is hidden only where a rule replaces it',
+    /body:has\(\[data-riso='rule'\]\)\s*\[data-riso='masthead-bar'\]/.test(css),
+  );
+  check(
+    'the rule bar carries the navigation that replaces it',
+    componentSource.includes('<RisoTabs'),
+  );
+
   console.log('\nMarkup contract\n');
 
   /**
@@ -223,7 +301,10 @@ function main() {
    * no error, no failing page, just a look that is missing a piece. These are
    * the hooks whose absence would not be obvious.
    */
-  const sources = componentSource;
+  const sources =
+    componentSource +
+    readFileSync(new URL('../components/chat/riso-tabs.tsx', import.meta.url), 'utf8') +
+    readFileSync(new URL('../app/(app)/layout.tsx', import.meta.url), 'utf8');
 
   const required = [
     'masthead',
@@ -240,7 +321,14 @@ function main() {
     'pick-n',
     'coupon',
     'coupon-l',
+    'coupon-b',
     'quill',
+    'quill-label',
+    'setting',
+    'tabs',
+    'tab',
+    'colophon',
+    'masthead-bar',
   ];
   for (const hook of required) {
     const inCss = css.includes(`[data-riso='${hook}']`);

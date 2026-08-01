@@ -9,6 +9,26 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 ## Entry format
 
 ```
+### DEC-018 — The fluorescent pink is kept as a fill and darkened only as text
+
+**Date:** 2026-08-01
+
+**Decision:** Riso's Fluorescent Pink exists as three tokens, not one:
+
+| token | value | where |
+| --- | --- | --- |
+| `--riso-pink` | `#ff48b0` | fills — the action button, rules, borders |
+| `--riso-pink-display` | `#ed43a4` | large text, 3.04:1 |
+| `--riso-pink-text` | `#bd3582` | normal text, 4.52:1 |
+
+**Why:** a background carries no contrast obligation; text does. Darkening every pink to satisfy the strictest case would have dulled the one colour the theme is named for in order to meet a rule that does not apply to most of the places it appears. The darkening for large text is 7% — visually indistinguishable from the mockup's ink.
+
+The mockup sets paper-coloured text on the pink action at **2.65:1**. That could not ship, so the ink is kept and the text on it is dark instead (5.14:1). The button still reads as fluorescent pink, because it is.
+
+**Enforced:** `verify:riso` reads all three from the stylesheet rather than restating them, and asserts the FILL is exactly `#ff48b0` — because the easy way to make the contrast checks pass is to darken everything, which would silently replace the theme's defining colour.
+
+---
+
 ### DEC-017 — Riso is a design system, contained by a parse rather than by care
 
 **Date:** 2026-08-01
@@ -24,6 +44,16 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 - Colours the stylesheet introduces itself — the yellow ticket, the pink action — never pass through `presets.ts`, so `verify:theme` cannot see them. `verify:riso` checks their contrast instead.
 
 **Cost, stated plainly:** the components now carry presentational hooks for one theme. That is a real smell. It is accepted because the alternative — a second set of components behind a theme check — duplicates every chat surface and guarantees they drift.
+
+**Amended 2026-08-01 — copy is resolved on the server, not hidden with CSS.** The first version rendered both the plain and the printed wording and hid one with a stylesheet. When that stylesheet did not apply, every label doubled: `myaichatmyaichat`, `New chat Start a page`, `ComposeEnter to send`. A theme that degrades into duplicated words is worse than one that degrades into plain words. Only one variant is now ever in the document, and `verify:riso` fails if the `[data-riso-only]` pattern returns.
+
+**Amended 2026-08-01 — one top bar, via `:has()`.** The mockup gives the page a single bar; the app stacks two, because navigation lives in the layout and the model selector's state lives in the thread. Rather than lift that state, the navigation comes down into the rule bar and the shell's bar is hidden on any page that renders a rule to replace it:
+
+```css
+html[data-theme='riso'] body:has([data-riso='rule']) [data-riso='masthead-bar'] { display: none }
+```
+
+It resolves at first paint with no JavaScript, and it cannot hide the bar on settings, profile or admin — those render no rule and keep theirs. Where `:has()` is unsupported the page shows two bars, both fully functional, which is the right way for this to fail.
 
 ### DEC-NNN — Short title
 **Date:** YYYY-MM-DD | **Phase:** N | **Status:** Active | Superseded by DEC-NNN

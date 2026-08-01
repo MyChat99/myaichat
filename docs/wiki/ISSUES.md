@@ -33,6 +33,19 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 **Resolution:** A new nullable `usage_logs.source` column (migration `20260801120000`); demo rows set it, cleanup deletes on it, and the guard checks both tables. The loop is now driven by the pool, so each template is used exactly once and no title can repeat — the pool size *is* the amount of data. Pool expanded from 6 to 24 threads.
 **Proven:** 366 → 395 → 366 across `--demo` / `--clean-demo`, and 24 conversations with 24 unique titles. Pre-existing untagged rows are [ISSUE-031](#issue-031).
 
+### ISSUE-034 — Riso copy doubled wherever the stylesheet did not apply
+
+**Status:** Resolved | **Severity:** High | **Phase:** 5 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01
+**Problem:** Riso rendered BOTH the plain and the printed wording and hid one with CSS. Any moment `riso.css` did not apply — a dev server that had not picked up a newly `@import`ed file is enough — every label doubled: `myaichatmyaichat`, `New chat Start a page`, `How can I help?A quiet place to think out loud`, `ComposeEnter to send`. Reported by the owner; invisible to all 1,085 assertions and to my own screenshots, because in my environment the stylesheet applied.
+**Resolution:** Copy is resolved on the server from the stored preference, so only one variant is ever in the document. `[data-riso-only]` / `[data-riso-hide]` deleted; `verify:riso` fails the build if either returns, and `npm run shoot` fails if both variants render.
+**Lesson:** the failure mode of a design should be considered, not just its success. Hiding content with CSS makes the stylesheet load-bearing for correctness, not just appearance.
+
+### ISSUE-033 — Every message was server-rendered invisible
+
+**Status:** Resolved | **Severity:** Medium | **Phase:** 2 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01
+**Problem:** `MessageEntrance` set `initial={{ opacity: 0 }}` whenever `useMotionSafe()` was true — and `useReducedMotion()` cannot know the preference on the server, so it returned false there. Every message in every conversation was therefore server-rendered at `opacity: 0` and only became visible once JavaScript faded it in; without JS it stayed invisible. In a reduced-motion browser the client disagreed, producing a hydration mismatch on every conversation page.
+**Resolution:** the entrance applies only to messages mounted after hydration, tracked with `useSyncExternalStore` (separate server snapshot). Conversations are now visible without JavaScript and hydration agrees.
+
 ### ISSUE-032 — A `typeof window` branch in the appearance panel broke hydration
 
 **Status:** Resolved | **Severity:** Medium | **Phase:** 5 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01

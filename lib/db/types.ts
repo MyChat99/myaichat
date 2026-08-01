@@ -89,7 +89,15 @@ export interface Database {
           supports_documents?: boolean;
         };
         Update: Partial<Database['public']['Tables']['models']['Row']>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'models_provider_id_fkey';
+            columns: ['provider_id'];
+            isOneToOne: false;
+            referencedRelation: 'providers';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       conversations: {
         Row: Timestamps & {

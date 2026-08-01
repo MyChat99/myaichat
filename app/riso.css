@@ -62,10 +62,34 @@ html[data-theme='riso'] {
   --riso-yellow: #ffe800;
   --riso-yellow-ink: #1d2230;
 
-  /* The primary action's pink. Darkened from the mockup's #ff48b0 to clear AA
-     against paper-coloured text; still unmistakably magenta. */
-  --riso-pink: #bd3582;
-  --riso-pink-ink: #f1eee2;
+  /* Fluorescent Pink, exactly as the mockup prints it.
+     The mockup sets paper-coloured text on this, which is 2.65:1 — below AA,
+     and not something an application can ship on its primary action. The INK
+     is what makes the theme, so the ink is kept and the text on it is dark
+     instead: #1d2230 on #ff48b0 is 6.4:1. The button still reads as
+     fluorescent pink, because it is. */
+  --riso-pink: #ff48b0;
+  --riso-pink-ink: #1d2230;
+
+  /* Blue + pink, multiplied — what the two plates make where they overlap.
+     Used for the chosen slip, which the mockup overprints rather than tints. */
+  --riso-overprint: #3d3d6e;
+
+  /* ── the pink, three ways ──────────────────────────────────────────────────
+     A background carries no contrast obligation; text does. So the ink stays
+     exactly as the mockup prints it wherever it is a FILL — the action button,
+     the rules, the standfirst's edge — and is darkened only where it becomes
+     TEXT on paper, by the minimum each size actually requires:
+
+       fill      #ff48b0   the mockup's Fluorescent Pink, untouched
+       display   #ed43a4   7% darker  → 3.04:1, clears AA for large text
+       text      #bd3582   26% darker → 4.52:1, clears AA for normal text
+
+     Darkening everything to the strictest of the three would have dulled the
+     one colour the theme is named for, to satisfy a rule that does not apply
+     to most of the places it appears. */
+  --riso-pink-display: #ed43a4;
+  --riso-pink-text: #bd3582;
 
   --riso-rule: 2px;
   --riso-hairline: 1.5px;
@@ -85,6 +109,10 @@ html[data-theme='riso'].dark {
   /* At night the fluorescent ink is the accent, and it glows. */
   --riso-pink: #ff48b0;
   --riso-pink-ink: #16161a;
+  --riso-overprint: #2f2f57;
+  /* On near-black the fluorescent needs no help — it is 5.85:1 as it is. */
+  --riso-pink-display: #ff48b0;
+  --riso-pink-text: #ff48b0;
 
   /* A light shadow on a dark page. The ink colour itself would be nearly the
      same value as the paper and the offset would vanish. */
@@ -190,19 +218,38 @@ html[data-theme='riso'] [data-riso='issue'] {
    offset. Pressing it moves the button INTO the shadow rather than shrinking
    it, which is what makes it feel like a stamp. */
 html[data-theme='riso'] [data-riso='draft'] {
+  position: relative;
   width: 100%;
   justify-content: space-between;
-  padding: 11px 13px;
+  padding: 12px 14px;
   height: auto;
   background: var(--riso-pink) !important;
   color: var(--riso-pink-ink) !important;
   border: var(--riso-rule) solid var(--riso-ink);
   box-shadow: 4px 4px 0 var(--riso-shadow);
   font-weight: 700;
-  font-size: 13.5px;
+  font-size: 14px;
+  overflow: hidden;
   transition:
     transform 0.16s var(--riso-ease),
     box-shadow 0.16s var(--riso-ease);
+}
+
+/* The halftone screen. A riso ink field is not flat — it is a dot screen, and
+   at this size the dots are visible. Printed over the pink only. */
+html[data-theme='riso'] [data-riso='draft']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(
+    circle at center,
+    rgb(255 255 255 / 0.5) 0.9px,
+    transparent 1px
+  );
+  background-size: 3.6px 3.6px;
+  mix-blend-mode: screen;
+  opacity: 0.5;
 }
 html[data-theme='riso'] [data-riso='draft']:hover {
   transform: translate(-2px, -2px);
@@ -272,9 +319,10 @@ html[data-theme='riso'] [data-riso='divider']::after {
    one. A state that is styled from a class name is a state that changes
    whenever someone adjusts a hover colour. */
 html[data-theme='riso'] [data-riso='slip'] {
-  margin-bottom: 7px;
+  position: relative;
+  margin-bottom: 8px;
   background: var(--background);
-  border: var(--riso-hairline) solid var(--riso-ink);
+  border: var(--riso-rule) solid var(--riso-ink);
   transition:
     transform 0.18s var(--riso-ease),
     box-shadow 0.18s var(--riso-ease);
@@ -299,8 +347,11 @@ html[data-theme='riso'] [data-riso='slip'] > a:hover {
 
 /* The chosen slip is overprinted rather than tinted — the whole card takes the
    first ink, and both rows reverse out of it. */
+/* Overprinted, not tinted: the first ink laid down, then the second on top of
+   it. The mockup does this with a multiply layer; the composite is the same
+   colour and one fewer paint layer. */
 html[data-theme='riso'] [data-riso='slip'][data-active='true'] {
-  background: var(--primary);
+  background: var(--riso-overprint);
   box-shadow: 4px 4px 0 var(--riso-shadow);
 }
 html[data-theme='riso'] [data-riso='slip'][data-active='true'] > a,
@@ -337,18 +388,21 @@ html[data-theme='riso'] [data-riso='square'][data-filled='true'] {
    app keeps its header as a separate element, so it takes the masthead's stock
    instead — two bands of the same paper read as one strip, where two bands of
    different paper read as two chrome bars stacked on top of each other. */
-html[data-theme='riso'] header {
-  background: var(--riso-paper-2);
+/* The shell's own bar, targeted by attribute rather than by element.
+   `header` alone also matched the <header> that settings, profile and admin use
+   for their page titles, and painted each of them as a masthead. */
+html[data-theme='riso'] [data-riso='masthead-bar'] {
+  background: var(--background);
   border-bottom-width: var(--riso-rule);
   border-bottom-color: var(--riso-ink);
 }
-html[data-theme='riso'] header a[href='/'] {
+html[data-theme='riso'] [data-riso='masthead-bar'] a[href='/'] {
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
 /* Navigation as section tabs, underscored in the second ink on hover. */
-html[data-theme='riso'] header nav a {
+html[data-theme='riso'] [data-riso='masthead-bar'] nav a {
   font-size: 13px;
   padding-bottom: 2px;
   border-bottom: 2.5px solid transparent;
@@ -357,28 +411,70 @@ html[data-theme='riso'] header nav a {
     color 0.18s,
     border-color 0.18s;
 }
-html[data-theme='riso'] header nav a:hover {
+html[data-theme='riso'] [data-riso='masthead-bar'] nav a:hover {
   color: var(--primary);
   border-bottom-color: var(--riso-pink);
   text-decoration: none;
+}
+
+/* ── one top rule, not two bands ─────────────────────────────────────────────
+   The mockup gives the page a single bar: title and model ticket on the left,
+   sections on the right. The application normally stacks two — a header with
+   navigation, and this rule with the model selector — because navigation lives
+   in the layout and the selector's state lives in the thread.
+
+   Rather than lift that state up, the navigation comes down (RisoTabs) and the
+   header is hidden on any page that has a rule to replace it. `:has()` decides
+   that at first paint with no JavaScript, and it cannot hide the header on
+   settings, profile or admin, which render no rule and keep theirs. */
+html[data-theme='riso'] body:has([data-riso='rule']) [data-riso='masthead-bar'] {
+  display: none;
 }
 
 html[data-theme='riso'] [data-riso='rule'] {
   border-bottom-width: var(--riso-rule);
   border-bottom-color: var(--riso-ink);
   background: var(--background);
-  /* Folio left, ticket right — the band has two ends in the mockup. */
-  justify-content: space-between;
+  /* Folio and ticket left, sections right. */
+  justify-content: flex-start;
+  gap: 12px;
   padding: 13px 26px;
+}
+
+html[data-theme='riso'] [data-riso='tabs'] {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-left: auto;
+}
+html[data-theme='riso'] [data-riso='tab'] {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  padding-bottom: 2px;
+  border-bottom: 2.5px solid transparent;
+  background: none;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    color 0.18s,
+    border-color 0.18s;
+}
+html[data-theme='riso'] [data-riso='tab']:hover {
+  color: var(--foreground);
+}
+/* The section you are in takes the first ink, underscored in the second. */
+html[data-theme='riso'] [data-riso='tab'][data-on='true'] {
+  color: var(--primary);
+  border-bottom-color: var(--riso-pink);
 }
 html[data-theme='riso'] [data-riso='folio'] {
   font-weight: 700;
   font-size: 15px;
   letter-spacing: -0.02em;
-  margin-right: auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 40ch;
 }
 
 /* ── the yellow ticket ──────────────────────────────────────────────────────
@@ -429,7 +525,7 @@ html[data-theme='riso'] [data-riso='lede-num'] {
   font-size: 10px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--riso-pink);
+  color: var(--riso-pink-text);
   margin-bottom: 14px;
 }
 html[data-theme='riso'] [data-riso='headline'] {
@@ -443,7 +539,7 @@ html[data-theme='riso'] [data-riso='headline'] {
 }
 html[data-theme='riso'] [data-riso='headline'] mark {
   background: none;
-  color: var(--riso-pink);
+  color: var(--riso-pink-display);
   mix-blend-mode: multiply;
 }
 /* Same reason as the wordmark: pink on pink is not two inks. */
@@ -474,10 +570,10 @@ html[data-theme='riso'] [data-riso='picks'] {
 html[data-theme='riso'] [data-riso='pick'] {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
-  padding: 11px 15px;
+  gap: 16px;
+  padding: 13px 16px;
   background: var(--background);
-  border: var(--riso-hairline) solid var(--riso-ink);
+  border: var(--riso-rule) solid var(--riso-ink);
   font-size: 15px;
   font-weight: 600;
   transition:
@@ -495,28 +591,27 @@ html[data-theme='riso'] [data-riso='pick']:hover [data-riso='pick-n'] {
   color: var(--riso-pink-ink);
 }
 html[data-theme='riso'] [data-riso='pick-body'] {
-  display: block;
   min-width: 0;
+  line-height: 1.5;
 }
+/* Inline, so the note continues the title on the same line and wraps with it —
+   one sentence set in two weights, which is how the mockup reads. */
 html[data-theme='riso'] [data-riso='pick-t'] {
-  display: block;
   font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 2px;
+  font-weight: 700;
 }
 html[data-theme='riso'] [data-riso='pick-d'] {
-  display: block;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--muted-foreground);
 }
 html[data-theme='riso'] [data-riso='pick-n'] {
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
-  border: var(--riso-hairline) solid var(--riso-ink);
+  border: var(--riso-rule) solid var(--riso-ink);
   font-family: var(--riso-mono);
   font-size: 12px;
   font-weight: 700;
@@ -606,29 +701,67 @@ html[data-theme='riso'] [data-riso='coupon-l'] {
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
-html[data-theme='riso'] [data-riso='coupon-b'] {
-  padding: 10px 12px 12px;
+/* The field: full width, no chrome of its own — the panel is the chrome. */
+html[data-theme='riso'] [data-riso='coupon-f'] {
+  padding: 14px 16px;
 }
-html[data-theme='riso'] [data-riso='coupon-b'] textarea {
+html[data-theme='riso'] [data-riso='coupon-f'] textarea {
   border: 0;
   background: transparent;
-  padding: 4px 2px;
+  padding: 0;
   font-size: 15px;
+  min-height: 34px;
 }
-html[data-theme='riso'] [data-riso='coupon-b'] textarea:focus-visible {
-  outline: none;
+
+/* The action rail, ruled off from the field in solid ink — where the label
+   rail above is dashed, as on a perforated coupon. */
+html[data-theme='riso'] [data-riso='coupon-b'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px 10px 14px;
+  border-top: var(--riso-hairline) solid var(--riso-ink);
 }
+html[data-theme='riso'] [data-riso='rail-left'] {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+/* Which press is set. Named, not just coloured. */
+html[data-theme='riso'] [data-riso='setting'] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 9px;
+  border: var(--riso-hairline) solid var(--riso-ink);
+  font-family: var(--riso-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 html[data-theme='riso'] [data-riso='quill'] {
   border: var(--riso-hairline) solid var(--riso-ink);
   background: var(--primary);
   color: var(--primary-foreground);
+  height: auto;
+  padding: 7px 13px;
+  box-shadow: 3px 3px 0 var(--riso-ink);
   transition:
     transform 0.16s var(--riso-ease),
     box-shadow 0.16s;
 }
+html[data-theme='riso'] [data-riso='quill-label'] {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
 html[data-theme='riso'] [data-riso='quill']:hover:not(:disabled) {
   transform: translate(-2px, -2px);
-  box-shadow: 3px 3px 0 var(--riso-ink);
+  box-shadow: 5px 5px 0 var(--riso-ink);
 }
 html[data-theme='riso'] [data-riso='quill']:active:not(:disabled) {
   transform: translate(1px, 1px);
