@@ -13,6 +13,14 @@ A multi-provider AI chat platform. You bring your own OpenAI and Anthropic keys;
 it gives you streaming chat, an admin panel to manage providers and models,
 per-user theming, usage analytics and an audit trail.
 
+It also has a look. The default theme, **Riso**, is a risograph print rather
+than a white page: newsprint stock with a green undertone, Federal Blue and
+Fluorescent Pink as the two inks, and hard black keylines where the rest of the
+industry puts a soft grey border. Seven other presets are a click away, and
+every one of them — all 152 foreground/background pairings — is checked against
+WCAG AA from the token data, so adding a theme gets it checked without anyone
+writing a new test.
+
 The interesting constraint is that **it is not tied to a provider**. Adding a
 third means writing one adapter file and one registry line — no route change, no
 UI change, no schema change. That claim is enforced by a test that greps the
@@ -120,7 +128,7 @@ asserts the window *ends with the newest message and excludes the oldest*.
 | Suite | Asserts | Needs |
 | --- | --- | --- |
 | `verify:degradation` | 194 — every dependency fails clearly and leaks nothing | — |
-| `verify:theme` | 134 — WCAG AA contrast, every theme, both modes | — |
+| `verify:theme` | 152 — WCAG AA contrast, every theme, both modes | — |
 | `verify:api` | 84 — every route rejects bad input and other users | server |
 | `verify:logging` | 67 — one log shape, no secrets, proven by capture | — |
 | `verify:resilience` | 50 — retry policy, backoff, outbound timeouts | — |
@@ -206,7 +214,7 @@ built; `Verified` means every criterion proved.
 | 2 | Streaming chat, persistence, message actions | Verified | `118fa3c` |
 | 3 | Provider abstraction, second provider, model selector | Verified | `37fa660` |
 | 4 | Admin panel, encrypted keys, audit logging | Verified | `46d112e` |
-| 5 | Theming — 7 presets, zero-flash SSR | Done | `f52e633` |
+| 5 | Theming — 8 presets, Riso default, zero-flash SSR | Done | `f52e633` |
 | 6 | R2 uploads, attachments, Resend templates | **Blocked** — needs credentials | `09eebd4` |
 | 7 | Analytics, audit UI, motion, command palette | Partial | `6c67cc5` |
 | 8 | CI/CD, branch protection, health check | Done | `f99674e` |

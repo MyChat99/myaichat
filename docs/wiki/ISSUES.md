@@ -507,13 +507,16 @@ in ROADMAP rather than here.
 
 **Status:** Open | **Severity:** Low | **Phase:** 1 | **Opened:** 2026-07-30 | **Resolved:** —
 **Problem:** A clean `create-next-app` on Next 16.2.12 reports 12 high-severity advisories, all transitive: `minimatch`/`brace-expansion` DoS through the ESLint chain (dev-only), `postcss` source-map path traversal (build-time), and `sharp`/libvips CVEs (image optimization). None introduced by our code.
-**Resolution:** Left as-is — `npm audit fix --force` would downgrade Next itself. Re-check at Phase 8 when CI is set up; most should clear via upstream patch releases. Revisit sooner if `sharp` ends up on a request path handling untrusted images.
+**Re-checked 2026-08-01:** down to **3**, all `sharp`/libvips. The ESLint-chain and `postcss` advisories cleared via upstream patch releases exactly as predicted, without any action here. The remaining three still require `--force`, which downgrades Next.
+**Resolution:** Left as-is. Revisit if `sharp` ends up on a request path handling untrusted images — it is currently only reachable through Next's image optimizer, and nothing in this app passes user uploads through it.
 
 ### ISSUE-005 — `supabase gen types` needs Docker, so `lib/db/types.ts` is hand-maintained
 
-**Status:** Open | **Severity:** Medium | **Phase:** 1 | **Opened:** 2026-07-30 | **Resolved:** —
+**Status:** Open — mitigated, drift is now detected automatically | **Severity:** ~~Medium~~ **Low** | **Phase:** 1 | **Opened:** 2026-07-30 | **Resolved:** —
 **Problem:** Type generation runs its introspection in a container, so it fails with `LegacyContainerRuntimeNotFoundError` without Docker. `lib/db/types.ts` is therefore written by hand and can silently drift from the migrations.
-**Resolution:** Update `lib/db/types.ts` in the same commit as any migration change — noted in the file header and README. `npm run verify:schema` catches missing relations but **not** column-level drift. Resolves itself if Docker is installed (see ISSUE-004).
+**Tried 2026-08-01 — the `--db-url` workaround does NOT help.** It fixes `db push` ([ISSUE-020](#issue-020)) but not this: `gen types --db-url` connects to the database and *then* demands a container runtime. Ruled out; do not retry without Docker.
+**Mitigated 2026-08-01:** `verify:schema` now compares every column of every table and view against PostgREST's own OpenAPI document — derived from the live database, no container, no new migration, and exactly the schema supabase-js talks to. Both drift directions are reported separately, because they are different bugs: a column the database has and the types do not is invisible to our code; a column the types have and the database does not type-checks perfectly and fails at runtime. Proven to fail in both directions before being committed. 87 columns across 10 relations currently match.
+**Remaining:** column *types* are still unchecked — only names. Renaming `text` to `jsonb` would pass. Fully resolved by installing Docker (see ISSUE-004).
 
 ### ISSUE-004 — No local Supabase stack; migrations run against the hosted database
 

@@ -92,7 +92,7 @@ Single source of truth for build status. Update immediately after any phase work
 | 2   | [Chat interface with streaming](../phases/PHASE-2-chat-streaming.md)               | Verified    | 2026-07-30 | 2026-07-30 |
 | 3   | [Provider abstraction + model selector](../phases/PHASE-3-provider-abstraction.md) | Verified    | 2026-07-30 | 2026-07-30 |
 | 4   | [Admin panel — keys, models, users](../phases/PHASE-4-admin-panel.md)              | Verified    | 2026-07-30 | 2026-07-30 |
-| 5   | [Theming & appearance](../phases/PHASE-5-theming.md)                               | Done        | 2026-07-31 | —          |
+| 5   | [Theming \& appearance](../phases/PHASE-5-theming.md)                               | Done        | 2026-08-01 | —          |
 | 6   | [R2 uploads + Resend emails](../phases/PHASE-6-storage-email.md)                   | Partial     | 2026-07-31 | —          |
 | 7   | [Analytics, audit UI, polish](../phases/PHASE-7-analytics-polish.md)               | Partial     | 2026-07-31 | —          |
 | 8   | [CI/CD + Railway deployment](../phases/PHASE-8-cicd-deploy.md)                     | Done        | 2026-07-31 | —          |
@@ -1724,3 +1724,111 @@ than left to read as current.
 | Sign-out invalidates | pass |
 | Family revocation on reuse | **not observed** — warned, not asserted |
 | `verify:all` | pass — 22 suites |
+
+---
+
+## Working session — Riso as the default look · 2026-08-01
+
+Three merged PRs: [#36](https://github.com/MyChat99/myaichat/pull/36),
+[#37](https://github.com/MyChat99/myaichat/pull/37), #38.
+
+### The theme
+
+Mockup option 5 (`docs/mockups/05-riso.html`) is now a real preset and the
+default for anyone who has not chosen one — new accounts and every signed-out
+page. Printed matter rather than emitted light: paper stock with a green
+undertone, two genuine Riso stock inks, and hard black keylines where every
+other preset has a soft grey border. That border token (`#1d2230` in light) is
+the one value that looks like a mistake in a table and is not — the 2px rules
+are the whole identity.
+
+Three ink colours were darkened to clear AA, each along its own hue rather than
+toward neutral, so the character survives:
+
+| token | mockup | shipped | before | after |
+| --- | --- | --- | --- | --- |
+| `textMuted` | `#7a8094` | `#606575` | 3.38:1 | 4.56:1 |
+| `destructive` | `#ff48b0` | `#bd3582` | 2.65:1 | 4.52:1 |
+| `success` | `#00a95c` | `#00753f` | 3.32:1 | 4.62:1 |
+
+Each was found by darkening in 1% steps until AA passed, so the delta is the
+minimum rather than a guess. Dark mode needed no adjustment: there the
+fluorescent pink is the accent and glows against near-black, which is the one
+thing that ink does on a screen and cannot do on paper.
+
+**Existing preferences were not touched.** Both migrations move a column
+`DEFAULT`, which applies to rows inserted afterwards and never to rows already
+there. Confirmed against the live database after each: the one stored
+preference is still `default/blue`.
+
+### The bug the second PR found
+
+PR #36 claimed Riso was the default look. It was two-thirds true. The default
+accent was the named preset `blue`, which resolves to `#1d4ed8` and is written
+into `--primary` in **both** modes — so the shipped default was Riso's paper
+with a generic Tailwind blue painted over it, and Federal Blue and the fluoro
+pink never appeared for anyone who had not been into settings.
+
+The fix is a sentinel accent, `'theme'`, meaning *follow the preset's own
+per-mode ink*. `withAccent(tokens, null)` already returned theme tokens
+untouched, and the existing column CHECK admits a lowercase word, so it is a
+default-value change rather than a mechanism or constraint change. `/login` now
+serves `--primary:#3d5588` in light and `--primary:#ff48b0` in dark.
+
+It was only caught because the check got strict enough to catch it. The old
+signed-out assertion was `includes('id="theme-tokens"')` — which a page that
+emits tokens and then swaps them on hydration passes while still flashing.
+
+### What is now checked
+
+`verify:appearance` grew 20 → 30. For a signed-out visitor on `/login`, from the
+served bytes alone: 200; default theme and mode resolved in the markup; **both**
+modes' tokens in the same document (system mode means ~half of first-time
+visitors need dark, and a missing dark block *is* the flash); token block and
+pre-paint script both in `<head>`, in that order; no hardcoded `dark` class
+under system; and `--primary` is the theme's own ink in each block. Every column
+default is compared against `DEFAULT_APPEARANCE`, not just `preset_theme`.
+
+`verify:theme` is at 152 contrast checks (was 134) — all 18 new Riso pairings
+pass, muted text included.
+
+Two test bugs fixed while writing this: the script-position check anchored on
+`prefers-color-scheme`, which matches Next's own injected stylesheet ~1800 bytes
+earlier and so measured somebody else's CSS; and the defaults check named
+`'default'` as a literal, which would have passed while the database and the
+application disagreed.
+
+### ISSUES sweep
+
+- **ISSUE-005** (hand-maintained types) — the `--db-url` workaround that fixed
+  `db push` does **not** fix `gen types`: it connects and then still demands a
+  container. Ruled out, recorded, do not retry without Docker. Instead the
+  named gap is closed: `verify:schema` now compares every column of every table
+  and view against PostgREST's own OpenAPI document — live-derived, no
+  container, no new migration. Both drift directions reported separately, and
+  proven to fail in both before commit. 87 columns across 10 relations match.
+  Severity Medium → Low. Column *types* remain unchecked.
+- **ISSUE-006** — re-measured: 12 high-severity advisories are now **3**, all
+  `sharp`/libvips. The ESLint-chain and `postcss` ones cleared upstream exactly
+  as predicted, with no action taken here.
+
+### Not touched, deliberately
+
+Every Phase 6 human check in the pause block above. None has been performed and
+none is marked done. Phase 6 remains **not Done**, and production still lacks
+the R2 and Resend variables.
+
+### What needs your eyes
+
+Contrast is arithmetic and it passes; whether Riso *looks* right is not
+something a headless check can answer. Worth seeing both modes, the picker in
+`/settings`, and the two new controls there — a two-tone "match theme" accent
+swatch and a "Reset to default" button.
+
+| Criterion | Result |
+| --- | --- |
+| `verify:theme` | pass — 152 contrast checks |
+| `verify:appearance` | pass — 30 checks |
+| `verify:schema` | pass — including 87-column parity |
+| `verify:all` | pass — 22 suites, 93s, clean before and after |
+| lint / type-check / build | pass |
