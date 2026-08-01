@@ -16,7 +16,11 @@ per-user theming, usage analytics and an audit trail.
 It also has a look. The default theme, **Riso**, is a risograph print rather
 than a white page: newsprint stock with a green undertone, Federal Blue and
 Fluorescent Pink as the two inks, and hard black keylines where the rest of the
-industry puts a soft grey border. Seven other presets are a click away, and
+industry puts a soft grey border. It is not a palette — it restyles the sidebar
+into bordered slips under mono section rules, the empty state into an editorial
+spread with numbered picks, and the composer into a boxed COMPOSE panel. A test
+parses the stylesheet and fails the build if any rule is not scoped to the
+theme, which is how seven other presets stay untouched by it. Seven other presets are a click away, and
 every one of them — all 152 foreground/background pairings — is checked against
 WCAG AA from the token data, so adding a theme gets it checked without anyone
 writing a new test.
@@ -33,7 +37,7 @@ tree and fails if a vendor SDK import or a provider name appears outside
 | --- | --- |
 | TypeScript | 20,097 lines across 139 files, strict mode |
 | Database | 12 tables, all with row-level security, 16 committed migrations |
-| Verification | 23 suites, ~900 assertions, run by one command |
+| Verification | 24 suites, 1,085 assertions, run by one command |
 | History | 70 commits across 8 phases and 30 pull requests |
 | Decisions recorded | 19 |
 | Issues opened | 28, of which 8 remain — none of them code |
@@ -129,6 +133,7 @@ asserts the window *ends with the newest message and excludes the oldest*.
 | --- | --- | --- |
 | `verify:degradation` | 194 — every dependency fails clearly and leaks nothing | — |
 | `verify:theme` | 152 — WCAG AA contrast, every theme, both modes | — |
+| `verify:riso` | 29 — every Riso rule is scoped; its own colours meet AA | — |
 | `verify:api` | 84 — every route rejects bad input and other users | server |
 | `verify:logging` | 67 — one log shape, no secrets, proven by capture | — |
 | `verify:resilience` | 50 — retry policy, backoff, outbound timeouts | — |

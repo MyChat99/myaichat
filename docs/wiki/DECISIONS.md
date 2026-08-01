@@ -9,6 +9,22 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 ## Entry format
 
 ```
+### DEC-017 — Riso is a design system, contained by a parse rather than by care
+
+**Date:** 2026-08-01
+
+**Decision:** The Riso look lives in `app/riso.css`, and **every selector in that file begins with `html[data-theme='riso']`**. `npm run verify:riso` parses the stylesheet and fails the build on any rule that does not — including an unscoped second entry in a comma-separated list, which is the case a human reviewer misses.
+
+**Why:** Riso is the only theme that is not a palette. It restyles the sidebar, the empty state, the composer and every card, so the usual guarantee — "themes are just eight tokens, they cannot break each other" — no longer holds for it. Something had to replace that guarantee, and a reviewer's attention is not it.
+
+**Consequences:**
+- Riso-only markup (`[data-riso-only]`) is rendered on **every** theme and hidden by a single rule in globals.css. That rule cannot live in `riso.css`, because by definition it must apply when Riso is *not* active.
+- Switching themes stays a pure CSS change with no re-render, which is what keeps the appearance panel's live preview honest. Conditionally rendering the chrome per theme would have broken that.
+- `@keyframes` names are global regardless of what they animate, so they are namespaced `riso-` by hand and checked.
+- Colours the stylesheet introduces itself — the yellow ticket, the pink action — never pass through `presets.ts`, so `verify:theme` cannot see them. `verify:riso` checks their contrast instead.
+
+**Cost, stated plainly:** the components now carry presentational hooks for one theme. That is a real smell. It is accepted because the alternative — a second set of components behind a theme check — duplicates every chat surface and guarantees they drift.
+
 ### DEC-NNN — Short title
 **Date:** YYYY-MM-DD | **Phase:** N | **Status:** Active | Superseded by DEC-NNN
 **Decision:** What was chosen.

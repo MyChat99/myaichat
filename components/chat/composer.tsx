@@ -85,15 +85,21 @@ export function Composer({
   const canSend = Boolean(value.trim()) || ready.length > 0;
 
   return (
-    <div className="border-border bg-background border-t p-4">
-      <div className="relative mx-auto max-w-3xl" {...dropHandlers}>
+    <div className="border-border bg-background border-t p-4" data-riso="coupon-wrap">
+      <div className="relative mx-auto max-w-3xl" {...dropHandlers} data-riso="coupon">
+        {/* The boxed COMPOSE panel's label rail. Riso-only: every other theme
+            already says this once, under the field. */}
+        <div data-riso-only data-riso="coupon-l">
+          <span>Compose</span>
+          <span>Enter to send · Shift+Enter for a new line</span>
+        </div>
         <DropOverlay active={dragging} />
 
         {onRemoveAttachment ? (
           <AttachmentTray items={attachments} onRemove={onRemoveAttachment} />
         ) : null}
 
-        <div className="flex items-end gap-2">
+        <div className="flex items-end gap-2" data-riso="coupon-b">
           {onAddFiles ? (
             <AttachButton
               onFiles={onAddFiles}
@@ -134,6 +140,7 @@ export function Composer({
               aria-label={
                 uploading ? 'Waiting for attachments to finish uploading' : 'Send message'
               }
+              data-riso="quill"
             >
               <ArrowUp className="size-4" />
             </Button>
@@ -141,7 +148,10 @@ export function Composer({
         </div>
       </div>
 
-      <p className="text-muted-foreground mx-auto mt-2 max-w-3xl text-center text-xs">
+      <p
+        className="text-muted-foreground mx-auto mt-2 max-w-3xl text-center text-xs"
+        data-riso-hide
+      >
         {uploading
           ? 'Waiting for attachments to finish uploading…'
           : 'Enter to send · Shift+Enter for a new line'}

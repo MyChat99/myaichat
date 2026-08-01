@@ -39,7 +39,8 @@
     "verify:email": "tsx scripts/verify-email.ts",
     "security:audit": "tsx scripts/security-audit.ts",
     "audit:report": "tsx scripts/audit-report.ts",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "verify:riso": "tsx scripts/verify-riso.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

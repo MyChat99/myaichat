@@ -1,6 +1,10 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
+/* The Riso print treatment. Every rule in it is scoped to
+   `html[data-theme='riso']` — `npm run verify:riso` fails the build if one is
+   not, so importing it cannot affect the other seven presets. */
+@import './riso.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -230,6 +234,19 @@
 }
 .hljs-strong {
   font-weight: 700;
+}
+
+/* ------------------------------------------------------------ riso chrome
+   Riso adds structure the other themes have no place for — a masthead, section
+   rules, a stamp line under each conversation, numbered picks. That markup is
+   rendered on every theme so switching themes stays a pure CSS change with no
+   re-render, and hidden by default here.
+
+   This rule is deliberately NOT in riso.css: by definition it has to apply when
+   Riso is *not* the active theme, which is the one thing that file forbids. Its
+   counterpart — revealing these under `[data-theme='riso']` — is there. */
+[data-riso-only] {
+  display: none;
 }
 
 /* ------------------------------------------------------------ appearance

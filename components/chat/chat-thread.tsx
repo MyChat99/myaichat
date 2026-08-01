@@ -255,7 +255,10 @@ export function ChatThread({
         onSelectModel={setModelId}
       />
 
-      <div className="border-border flex items-center justify-end gap-1 border-b px-4 py-1.5">
+      <div
+        className="border-border flex items-center justify-end gap-1 border-b px-4 py-1.5"
+        data-riso="rule"
+      >
         {activeId ? (
           <>
             {/* Plain anchors, not fetch + Blob: the browser already knows how
@@ -290,20 +293,45 @@ export function ChatThread({
 
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
         {empty ? (
-          <div className="mx-auto flex h-full max-w-3xl flex-col items-center justify-center gap-6 px-4">
-            <div className="text-center">
-              <h1 className="text-2xl font-semibold">How can I help?</h1>
-              <p className="text-muted-foreground mt-1 text-sm">Pick a prompt or write your own.</p>
+          <div
+            className="mx-auto flex h-full max-w-3xl flex-col items-center justify-center gap-6 px-4"
+            data-riso="spread"
+          >
+            <div className="text-center" data-riso="lede">
+              {/* Riso prints an editorial opening instead of a prompt; the
+                  plain heading stays for every other theme. */}
+              <div data-riso-only data-riso="lede-num">
+                Two presses inked and ready
+              </div>
+              <h1 className="text-2xl font-semibold" data-riso="headline">
+                <span data-riso-hide>How can I help?</span>
+                <span data-riso-only>
+                  A quiet place
+                  <br />
+                  to <mark>think out loud</mark>.
+                </span>
+              </h1>
+              <p className="text-muted-foreground mt-1 text-sm" data-riso="standfirst">
+                <span data-riso-hide>Pick a prompt or write your own.</span>
+                <span data-riso-only>
+                  Ask something badly, change your mind halfway through, and start again — nothing
+                  here is precious.
+                </span>
+              </p>
             </div>
-            <div className="grid w-full gap-2 sm:grid-cols-2">
-              {STARTERS.map((prompt) => (
+            <div className="grid w-full gap-2 sm:grid-cols-2" data-riso="picks">
+              {STARTERS.map((prompt, i) => (
                 <button
                   key={prompt}
                   type="button"
                   onClick={() => send(prompt)}
                   className="border-border hover:bg-accent rounded-lg border p-3 text-left text-sm transition"
+                  data-riso="pick"
                 >
-                  {prompt}
+                  <span data-riso-only data-riso="pick-n" aria-hidden="true">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span data-riso="pick-t">{prompt}</span>
                 </button>
               ))}
             </div>

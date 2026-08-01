@@ -64,7 +64,7 @@ read. Pair with two or three screenshots.
 > rotating a key asks for the password again — a stolen session alone shouldn't
 > be able to swap the key that bills your account.
 >
-> **There's no test framework.** 23 suites, ~900 assertions, every one against
+> **There's no test framework.** 24 suites, 1,085 assertions, every one against
 > the real database, the real server or the real source. That's deliberate: the
 > bugs this project actually hit weren't the kind a mocked unit test catches.
 > One example — an RLS policy that queried its own table recursed infinitely and
@@ -137,7 +137,7 @@ without anyone clicking through. Lead with the chat screenshot.
 > HTML login page**, because the proxy redirected it and `fetch` followed the
 > redirect. Tests now assert status *and* content type.
 >
-> There's no test framework — 23 suites, ~900 assertions, all against the real
+> There's no test framework — 24 suites, 1,085 assertions, all against the real
 > database, the real running server, or the real source. Given what actually
 > broke, mocks would have caught approximately none of it.
 >
@@ -184,7 +184,7 @@ distinctive material and the least common thing to post.
 
 **What is deliberately absent:** "cutting-edge", "leveraging", "seamless",
 "game-changing", any claim about time taken, and any metric I cannot show. The
-figures used — 12 tables, 23 suites, ~900 assertions — are all checkable in the
+figures used — 12 tables, 24 suites, 1,085 assertions — are all checkable in the
 repo, which is the point of quoting them.
 
 **Figures as of away session 4B**, and they drift. Re-check before posting:

@@ -87,6 +87,7 @@ export function ModelSelector({ models, selectedId, conversationId, onSelect }: 
         aria-haspopup="listbox"
         aria-expanded={open}
         className="gap-1.5"
+        data-riso="ticket"
       >
         {selected ? <ProviderLogo provider={selected.providerName} /> : null}
         <span className="max-w-[10rem] truncate text-xs">

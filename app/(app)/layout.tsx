@@ -8,6 +8,24 @@ import { requireUser } from '@/lib/security/auth';
 import { signOut } from '../(auth)/actions';
 
 /**
+ * Which masthead section a conversation belongs under.
+ *
+ * Riso renders these as printed section rules — TODAY / YESTERDAY / BACK
+ * ISSUES. Every other theme ignores the value entirely, so the vocabulary is
+ * deliberately generic in the data and only becomes editorial in the CSS.
+ */
+function groupFor(updatedAt: string): string {
+  const day = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const startOfToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const at = new Date(updatedAt).getTime();
+
+  if (at >= startOfToday) return 'Today';
+  if (at >= startOfToday - day) return 'Yesterday';
+  return 'Back issues';
+}
+
+/**
  * Protected shell. Middleware already redirects anonymous visitors, but this
  * re-checks server-side — middleware is a convenience gate, not the boundary.
  */
@@ -16,17 +34,61 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const supabase = await createClient();
 
   // RLS scopes this to the signed-in user; no explicit user_id filter needed.
+  //
+  // The model name and message count are embedded rather than fetched per row:
+  // PostgREST resolves both in the same round trip, where a count per
+  // conversation from the client would be 200 requests to render a sidebar.
   const { data } = await supabase
     .from('conversations')
-    .select('id, title, pinned, updated_at')
+    .select('id, title, pinned, updated_at, models(display_name), messages(count)')
     .order('updated_at', { ascending: false })
     .limit(200);
 
-  const conversations = (data ?? []) as SidebarConversation[];
+  // No cast: the embed is typed from the foreign keys declared in
+  // lib/db/types.ts, so a column that stops existing is a compile error rather
+  // than an undefined at runtime.
+  const conversations: SidebarConversation[] = (data ?? []).map((c) => ({
+    id: c.id,
+    title: c.title,
+    pinned: c.pinned,
+    updated_at: c.updated_at,
+    modelName: c.models?.display_name ?? null,
+    messageCount: c.messages?.[0]?.count ?? 0,
+    // Grouped on the server so every visitor sees the same buckets. Doing it in
+    // the browser would classify by the reader's clock, which is arguably more
+    // correct and definitely a hydration mismatch.
+    group: groupFor(c.updated_at),
+  }));
 
   return (
-    <div className="flex min-h-full flex-1 overflow-hidden">
-      <Sidebar conversations={conversations} />
+    /**
+     * `h-dvh`, not `min-h-full`.
+     *
+     * This shell is a fixed frame with its own scrollers inside it — the
+     * conversation list scrolls, the message list scrolls, the settings form
+     * scrolls. `min-h-full` let the shell GROW past the viewport instead of
+     * bounding those scrollers, so on any page whose content was taller than
+     * the window the document scrolled instead: the header and the whole
+     * sidebar scrolled up out of view, leaving the content beside empty space.
+     *
+     * `dvh` rather than `vh` because on mobile `vh` is the height with the
+     * browser chrome hidden, which leaves the composer under the URL bar.
+     *
+     * No `flex-1` here either. In a column flex container `flex-1` sets
+     * `flex-basis: 0%`, and the basis IS the height — so it silently overrode
+     * `h-dvh` and the shell went back to sizing itself from its content.
+     */
+    <div className="flex h-dvh overflow-hidden">
+      <Sidebar
+        conversations={conversations}
+        /* Formatted on the server. `new Date()` in a client component renders
+           one string on the server and another in the browser whenever the two
+           disagree about the locale or the day, which is a hydration error. */
+        issue={{
+          number: conversations.length,
+          date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }),
+        }}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="border-border flex items-center justify-between border-b py-3 pr-4 pl-14 md:pl-4">

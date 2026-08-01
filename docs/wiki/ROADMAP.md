@@ -78,3 +78,22 @@ Not committed. Candidates once the core platform ships.
 - Structured logging and error tracking (Sentry)
 - Response caching for repeated identical prompts to cut provider spend
 - Staging environment on Railway mirroring production
+
+## Gap found 2026-08-01 — nothing in this repo loads a page in a browser
+
+Three defects shipped past 1,085 assertions because every one of them checks
+bytes, database rows or source text, and none of them renders:
+
+- a hydration mismatch on `/settings` (ISSUE-032), which the Next dev overlay
+  had been reporting as "1 Issue" to nobody
+- the app shell scrolling the header and sidebar away (ISSUE-029)
+- 52 demo conversations sharing 5 titles (ISSUE-030) — visible the moment you
+  look at the sidebar, invisible to a row count
+
+All three were found in about twenty minutes by driving headless Chrome over
+CDP — which needs no dependency, because Node ships a WebSocket client and
+Chrome is already installed.
+
+**Worth building:** a `verify:render` that loads the main routes signed in,
+fails on any console error or hydration warning, and asserts the document does
+not scroll. That is the cheap 80% and it would have caught all three.

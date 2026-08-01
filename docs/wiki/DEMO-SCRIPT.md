@@ -13,7 +13,7 @@ keys*, so that has to be visible before the first minute is out.
 ## Before you hit record
 
 ```bash
-npm run seed -- --demo     # 52 conversations, 82 usage rows over 30 days
+npm run seed -- --demo     # 24 conversations, 98 messages, 49 usage rows over 30 days
 npm run dev
 ```
 
@@ -187,7 +187,7 @@ rotate the key on camera.
 **Say:**
 
 > Next.js 16, Supabase with row-level security on all twelve tables, TypeScript
-> strict throughout. No test framework — twenty-three suites, about nine hundred
+> strict throughout. No test framework — twenty-four suites, just over a thousand
 > assertions, every one against the real database or the real running server.
 > Code's in the description.
 
@@ -198,7 +198,7 @@ rotate the key on camera.
 - **"Is it finished?"** — No, and the repo says so. File uploads are built and
   tested up to the storage call and are waiting on credentials. The
   accessibility audit needs a browser I can't automate.
-- **"Why no tests?"** — There are ~900 assertions; there is no *framework*. The
+- **"Why no tests?"** — There are 1,085 assertions; there is no *framework*. The
   bugs this project actually hit — an RLS policy that recursed, a query that
   returned the oldest rows instead of the newest, an unauthenticated POST
   answering 200 with an HTML page — are not the kind a mocked unit test catches.
