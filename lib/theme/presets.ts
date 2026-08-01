@@ -301,6 +301,23 @@ export function getTheme(id: string): ThemeDefinition {
  * `verify:theme`, so the swatches are all safe choices; a custom hex is
  * checked live in the picker instead.
  */
+/**
+ * The accent value meaning "whatever ink this theme uses".
+ *
+ * A theme defines its own accent per mode, and for a theme with a point of view
+ * that accent IS the theme — Riso's is Federal Blue on paper and Fluorescent
+ * Pink at night. A named preset overrides both with one colour in both modes,
+ * which is the right behaviour when someone has *chosen* a colour and the wrong
+ * default: it means the out-of-the-box look is a theme with its own identity
+ * painted over in generic blue.
+ *
+ * Resolving this to `null` is what makes it work — `withAccent(tokens, null)`
+ * returns the theme's tokens untouched, so each mode keeps its own ink. It is a
+ * plain lowercase word, so the existing column CHECK and Zod pattern already
+ * admit it; nothing about validation changes.
+ */
+export const THEME_ACCENT = 'theme';
+
 export const ACCENT_PRESETS: { name: string; hex: string }[] = [
   { name: 'slate', hex: '#475569' },
   { name: 'blue', hex: '#1d4ed8' },
@@ -342,7 +359,8 @@ export const DEFAULT_APPEARANCE = {
   theme: 'system' as const,
   // Riso is the product's visual identity, not the shadcn default.
   presetTheme: 'riso',
-  accentColor: 'blue',
+  // Follow the theme rather than override it. See THEME_ACCENT.
+  accentColor: THEME_ACCENT,
   fontSize: 'md',
   bubbleStyle: 'bubbles',
 };

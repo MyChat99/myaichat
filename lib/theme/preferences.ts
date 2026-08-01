@@ -8,6 +8,7 @@ import {
   BUBBLE_STYLES,
   DEFAULT_APPEARANCE,
   FONT_SIZES,
+  THEME_ACCENT,
   THEME_IDS,
 } from './presets';
 
@@ -71,8 +72,17 @@ export async function loadAppearance(): Promise<Appearance> {
   }
 }
 
-/** Resolves a named accent preset to hex; passes a hex value straight through. */
+/**
+ * Resolves a named accent preset to hex; passes a hex value straight through.
+ *
+ * `null` means "do not override the theme" — returned for THEME_ACCENT, and for
+ * any unrecognised name. Falling back to the theme rather than to a hardcoded
+ * colour is deliberate: an unknown value is most likely a preset that was
+ * renamed or removed, and the theme's own accent is always a defensible answer
+ * where an arbitrary blue is not.
+ */
 export function accentToHex(accent: string): string | null {
+  if (accent === THEME_ACCENT) return null;
   if (accent.startsWith('#')) return accent;
   return ACCENT_PRESETS.find((a) => a.name === accent)?.hex ?? null;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Loader2, Monitor, Moon, Sun } from 'lucide-react';
+import { Check, Loader2, Monitor, Moon, RotateCcw, Sun } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
@@ -16,7 +16,15 @@ import {
   toHex,
 } from '@/lib/theme/contrast';
 import { themeCss } from '@/lib/theme/css';
-import { ACCENT_PRESETS, BUBBLE_STYLES, FONT_SIZES, THEMES } from '@/lib/theme/presets';
+import {
+  ACCENT_PRESETS,
+  BUBBLE_STYLES,
+  DEFAULT_APPEARANCE,
+  FONT_SIZES,
+  getTheme,
+  THEME_ACCENT,
+  THEMES,
+} from '@/lib/theme/presets';
 import type { Appearance } from '@/lib/theme/preferences';
 
 /**
@@ -34,9 +42,19 @@ const MODES = [
   { id: 'system', label: 'System', icon: Monitor },
 ] as const;
 
-function resolveAccentHex(accent: string): string {
+/**
+ * Mirrors `accentToHex` on the server, including its `null`.
+ *
+ * It has to: the preview writes into the same `#theme-tokens` block the server
+ * renders, so any disagreement here shows up as the panel previewing one colour
+ * and the next page load showing another. This previously fell back to
+ * ACCENT_PRESETS[1] (blue) for an unrecognised name, which is exactly the case
+ * THEME_ACCENT is.
+ */
+function resolveAccentHex(accent: string): string | null {
+  if (accent === THEME_ACCENT) return null;
   if (accent.startsWith('#')) return accent;
-  return ACCENT_PRESETS.find((a) => a.name === accent)?.hex ?? ACCENT_PRESETS[1].hex;
+  return ACCENT_PRESETS.find((a) => a.name === accent)?.hex ?? null;
 }
 
 export function AppearancePanel({ initial }: { initial: Appearance }) {
@@ -46,7 +64,18 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
   );
   const [pending, startTransition] = useTransition();
 
-  const accentHex = resolveAccentHex(draft.accentColor);
+  // Which mode the preview is currently showing, so a theme-following accent
+  // can be reported honestly — it is two different colours, and which one you
+  // get depends on this.
+  const previewingDark =
+    draft.theme === 'dark' ||
+    (draft.theme === 'system' &&
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  const draftTheme = getTheme(draft.presetTheme);
+  const accentHex =
+    resolveAccentHex(draft.accentColor) ?? draftTheme[previewingDark ? 'dark' : 'light'].accent;
 
   /** Applies the draft to the live document — same code path as the server. */
   const preview = useCallback((next: Appearance) => {
@@ -98,7 +127,24 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
     setCustomHex(initial.accentColor.startsWith('#') ? initial.accentColor : '');
   }
 
+  /**
+   * Back to what a new account gets.
+   *
+   * Distinct from "Discard changes", which returns to what is *saved*. Without
+   * this there is no route back to the default once it has been changed and
+   * saved — the mode, size and style defaults are all reachable by clicking the
+   * right button, but the default accent is THEME_ACCENT, and reconstructing
+   * "no accent override" from a row of coloured circles is not something anyone
+   * should have to work out. It stages the change rather than saving it, so the
+   * preview shows the default before it is committed.
+   */
+  function restoreDefaults() {
+    setDraft(DEFAULT_APPEARANCE);
+    setCustomHex('');
+  }
+
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const isDefault = JSON.stringify(draft) === JSON.stringify(DEFAULT_APPEARANCE);
 
   return (
     <div className="space-y-8">
@@ -172,11 +218,33 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
         <div>
           <h2 className="text-sm font-medium">Accent colour</h2>
           <p className="text-muted-foreground text-xs">
-            Used for buttons, your messages and focus rings.
+            Used for buttons, your messages and focus rings. The first swatch follows the theme —
+            each theme brings its own accent for light and dark.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {/* Two-tone, because a theme-following accent genuinely is two
+              colours — light-mode ink on the left, dark-mode on the right. */}
+          <button
+            type="button"
+            aria-label="Match theme"
+            title="Match theme"
+            aria-pressed={draft.accentColor === THEME_ACCENT}
+            onClick={() => {
+              setCustomHex('');
+              update({ accentColor: THEME_ACCENT });
+            }}
+            className={`size-8 overflow-hidden rounded-full border transition ${
+              draft.accentColor === THEME_ACCENT ? 'ring-ring ring-2 ring-offset-2' : ''
+            }`}
+          >
+            <span className="flex size-full" aria-hidden>
+              <span className="h-full w-1/2" style={{ backgroundColor: draftTheme.light.accent }} />
+              <span className="h-full w-1/2" style={{ backgroundColor: draftTheme.dark.accent }} />
+            </span>
+          </button>
+
           {ACCENT_PRESETS.map((accent) => (
             <button
               key={accent.name}
@@ -304,6 +372,16 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
             Discard changes
           </Button>
         ) : null}
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={restoreDefaults}
+          disabled={pending || isDefault}
+          className="ml-auto"
+        >
+          <RotateCcw className="mr-1.5 size-3.5" />
+          Reset to default
+        </Button>
       </div>
     </div>
   );
