@@ -6,7 +6,12 @@
 >
 > ### State at pause
 >
-> **Superseded by away session 4A (2026-07-31)** — 7 more PRs since; the report
+> **Superseded by away session 4B (2026-07-31)** — the report at the end of
+> [OVERNIGHT-REPORT.md](OVERNIGHT-REPORT.md) is current. **Read its first
+> section**: three human items exist beyond the expected six, one of which
+> (ISSUE-028) should be done before the LinkedIn post.
+>
+> **Previously superseded by away session 4A (2026-07-31)** — 7 more PRs since; the report
 > at the end of [OVERNIGHT-REPORT.md](OVERNIGHT-REPORT.md) is current, and ends
 > with READY FOR SESSION 4B.
 >

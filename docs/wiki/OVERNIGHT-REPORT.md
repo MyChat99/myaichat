@@ -943,3 +943,196 @@ verify:attachments   33   verify:headers       25   smoke                18
 **21 suites via `npm run verify:all` — 82 seconds, clean before and after.**
 
 **READY FOR SESSION 4B.**
+
+---
+---
+
+# Away session 4B — 2026-07-31
+
+Seven pull requests, all merged through the protected flow with CI green on
+their own head commit. No `--admin` bypass. Production untouched.
+
+**Full suite green** — 22 suites, ~950 assertions, 77 seconds.
+
+---
+
+## ⚠️ READ FIRST — three items beyond the expected list
+
+You asked that only six human items remain. **Three more do.** None is code, and
+none blocks the others, but you should decide on them rather than discover them.
+
+**1. [ISSUE-028](ISSUES.md) — a Supabase dashboard toggle. This is the
+highest-severity open item in the repository.** A stolen refresh token stays
+valid indefinitely: replayed twenty seconds after rotation it is still accepted,
+and the legitimate session is not disturbed, so a theft leaves no trace. Fix is
+one setting — *Authentication → Sessions → Detect and revoke potentially
+compromised refresh tokens* — then `npm run verify:session -- --strict` to pin
+it so it cannot drift back. **Two minutes, and it should come before the
+LinkedIn post**, because the repository is public and this is written down in it.
+
+**2. [ISSUE-022](ISSUES.md) — three identifiers in a now-public repo.** All
+judged safe with a recommendation to leave them; it is open only because the
+judgement is yours, not mine. No action needed unless you disagree.
+
+**3. [ISSUE-004](ISSUES.md), [-005](ISSUES.md), [-006](ISSUES.md) — the Docker
+trio.** No local Supabase stack, so `lib/db/types.ts` is hand-maintained and
+migrations run against the hosted database; and the dependency advisories are
+transitive under `next` and cannot clear without downgrading the framework.
+These are *accepted constraints*, not a todo list — they are open because
+closing them would be a lie, not because they are waiting on you.
+
+Everything else on your list is exactly as you described it.
+
+---
+
+## Merged
+
+| PR | What |
+| --- | --- |
+| #27 | Three findings from the round-2 hostile pass |
+| #28 | Index the dashboard's message count, measured at 200k rows |
+| #29 | Issue the four chat pre-flight checks together |
+| #30 | Bundle: measure, find nothing to move, lock in the good state |
+| #31 | Refresh every figure, add a demo script, README entry points |
+| #32 | Remove one provably dead export, report what is not dead |
+
+---
+
+## Priority 1 — adversarial review, round 2
+
+**Three findings, all fixed.**
+
+**The health endpoint published outage details.** Unauthenticated by necessity,
+it echoed Supabase's `error.message` verbatim. The original comment argued that
+message describes the failure rather than the credential — true of the errors
+you see while everything works, and exactly wrong for the ones that appear
+during an outage, which carry a host, a port or a role name. *`verify:degradation`
+could not catch it, because its live half only ever ran against a healthy
+database.*
+
+**The admin overview could hang for 90 seconds.** `validateKey()` inherited the
+streaming timeout and is awaited during a page render, so a provider that hangs
+blocked the very page you open to find out a provider is down. Health checks now
+have their own 8-second ceiling.
+
+**A wrapper was tested for a whole session without being called anywhere.**
+`withRequestLog` had 57 checks behind it while four routes logged nothing at all.
+Tested dead code is worse than none — the suite was reporting that request
+logging worked. Now wired into presign, download and both exports.
+
+**And two bugs my own new tests caught in code written minutes earlier:**
+`withDeadline` used `.unref()`, so the timer did not hold the event loop and the
+process exited before the deadline fired; and `toAppError` matched `timeout` but
+not `timed out`, so half of all timeouts classified as `unknown` — the half that
+is *not* retryable.
+
+---
+
+## Priority 2 — performance, measured only
+
+**Analytics.** This deployment has 178 messages, where every query runs in under
+1.2ms and Postgres correctly sequential-scans. EXPLAIN against real data cannot
+distinguish a good index strategy from a bad one, so the decision was made
+against a **200,000-row temp table**:
+
+| | |
+| --- | --- |
+| before: no index | **106.8 ms** |
+| after: partial index on `(created_at) where role = 'user'` | **23.5 ms** |
+
+`messages` had indexes on `(conversation_id, …)` — excellent for one thread,
+useless for the dashboard's global count. Partial on `role = 'user'` because
+indexing the assistant half would double the write cost on the hot path of every
+chat turn to speed up queries nobody runs.
+
+**Chat latency.** A new `prepMs` field measures our own code, separately from
+`durationMs` which is dominated by how fast the model writes. Four pre-flight
+checks were four sequential round trips:
+
+| | Median `prepMs` |
+| --- | --- |
+| before | **590 ms** (n=3) |
+| after | **504 ms** (n=15) |
+
+86ms, ~15%. Cold-start samples discarded. **The results are still evaluated in
+the original order** — a foreign conversation must 404 before a rate limit can
+429, or the refusal itself reveals that someone else's conversation exists.
+
+**Bundle — the premise did not hold, and that is the finding.** Measured against
+the real build: `/login` 746KB with no trace of recharts, framer-motion, markdown
+or lucide. Next had already route-split all of it; lucide was already
+tree-shaken. **There was nothing to move.**
+
+The one genuine candidate — 450KB of markdown and highlighting on the chat route,
+which the *empty* state does not need — was deliberately left alone, because a
+conversation with existing messages needs it immediately and deferring risks a
+visible flash on the page that matters most. That is a visual change on a screen
+no check here can inspect, and the brief said no visual changes. Manufacturing a
+change to have something to show would have been the wrong instinct.
+
+`verify:bundle` locks in the state that measured well instead.
+
+---
+
+## Priority 3 — showcase
+
+Figures were a session and a half stale; re-counted rather than incremented, and
+the LinkedIn drafts now carry the commands to re-check them.
+
+**[DEMO-SCRIPT.md](DEMO-SCRIPT.md)** — three minutes, six beats, with what to
+click and what to say. The pre-record checklist matters as much as the script:
+**do not open the paperclip**, because storage is not configured and lingering
+there invites the one question that cannot be answered well.
+
+---
+
+## Priority 4
+
+Every route already had a negative-path test. One provably dead export removed.
+The sweep **reported before deleting**, which mattered: `updateSession` looked
+unreferenced because `proxy.ts` sits at the repo root, and an automated sweep
+would have deleted it and broken session refresh on every request.
+
+---
+
+## Needs your eyes
+
+Unchanged and accumulating — none blocks anything.
+
+| # | What |
+| --- | --- |
+| 1 | Admin overview cards, per-user usage page, CSV in Excel |
+| 2 | The password dialog on role change / model delete |
+| 3 | Attachment UI, analytics charts, export links |
+| 4 | The idle-timeout logout screen and the new-login email |
+| 5 | Retry behaviour under a real provider outage (cannot induce one safely) |
+
+---
+
+## Your return checklist
+
+**0. [ISSUE-028](ISSUES.md) — the Supabase toggle.** Two minutes. Do it first.
+
+1. **R2 + Resend credentials** → [PHASE-6-CHECKLIST.md](PHASE-6-CHECKLIST.md)
+2. **Finish Phase 6** — only the PUT is missing
+3. **Your visual sign-offs** — the five rows above
+4. **Deploy-gating decision** → [ISSUE-027](ISSUES.md); recommendation is still
+   *not yet*
+5. **Screenshots + demo recording** → `npm run seed -- --demo`, then the README
+   table and [DEMO-SCRIPT.md](DEMO-SCRIPT.md)
+6. **LinkedIn** → [LINKEDIN-DRAFTS.md](LINKEDIN-DRAFTS.md), after step 0
+
+---
+
+## Suite as it stands
+
+```
+verify:degradation 194   verify:theme      134   verify:api         84
+verify:logging      67   verify:resilience  50   verify:security    42
+verify:session      41   verify:authz       39   verify:csv         36
+verify:attachments  33   verify:headers     25   smoke              18
+verify:bundle        7
++ schema, seed, rls, gates, appearance, storage, chat, providers, admin, email
+```
+
+**22 suites via `npm run verify:all` — 77 seconds, clean before and after.**
