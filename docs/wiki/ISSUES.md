@@ -33,6 +33,16 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 **Resolution:** A new nullable `usage_logs.source` column (migration `20260801120000`); demo rows set it, cleanup deletes on it, and the guard checks both tables. The loop is now driven by the pool, so each template is used exactly once and no title can repeat — the pool size *is* the amount of data. Pool expanded from 6 to 24 threads.
 **Proven:** 366 → 395 → 366 across `--demo` / `--clean-demo`, and 24 conversations with 24 unique titles. Pre-existing untagged rows are [ISSUE-031](#issue-031).
 
+### ISSUE-036 — Choosing a theme did not choose it
+
+**Status:** Resolved | **Severity:** High | **Phase:** 5 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01
+**Problem:** Reported as "I select Riso, navigate back to the chat, and it reverts to the default." Read as a persistence failure — and it was not one. Storage, RLS, the server read and the zero-flash render were all correct throughout.
+**Cause:** the appearance panel previewed on click and wrote only on a separate **Save appearance** press. Because the preview repaints the entire page, selecting a theme was visually indistinguishable from setting it — so navigating away discarded a choice the user had every reason to believe was already made. Nothing in the interface said otherwise.
+**Reproduced:** `verify:persistence` picks Ocean, navigates away without saving, and observed the theme return to the previous value. That is the whole bug.
+**Resolution:** every control in the panel now commits on change — a theme is a preference, not a form submission; nothing there is destructive and nothing needs confirming. The Save and Discard buttons are gone; a live status line replaces them, and **Reset to default** stays because it is the one action that is not itself a choice.
+**Now guarded:** `verify:persistence` logs in through the real form, selects a theme, then navigates by CLICKING LINKS — never `page.goto`, which is a full reload and would repaint correctly even if client-side navigation lost the theme — through chat → admin → chat → hard reload, comparing the computed `--background`, `--primary`, the `dark` class and the `data-theme` attribute at every step, and screenshotting each.
+**Lesson:** "it doesn't persist" was a true description of the experience and a false description of the mechanism. The interface, not the storage, was lying.
+
 ### ISSUE-035 — Selecting Riso removed every navigation link
 
 **Status:** Resolved | **Severity:** High | **Phase:** 5 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01

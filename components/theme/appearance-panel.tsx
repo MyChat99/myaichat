@@ -75,6 +75,7 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
    * built for another. That mismatch is what removed the navigation bar once.
    */
   const savedRef = useRef<Appearance>(initial);
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   /**
    * Whether the OS is asking for dark, tracked in state rather than read
@@ -135,8 +136,40 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
     return () => preview(savedRef.current);
   }, [preview]);
 
+  /**
+   * Applies a change AND commits it. There is no draft to lose.
+   *
+   * This panel used to preview on click and write only on a separate "Save
+   * appearance" press. Because the preview repaints the whole page, choosing a
+   * theme looked exactly like setting it — so navigating away silently
+   * discarded a choice the user had every reason to believe was made, and the
+   * theme appeared not to persist. That was the reported bug, and no amount of
+   * correctness in the storage layer would have fixed it.
+   *
+   * A theme is a preference, not a form submission: nothing here is destructive
+   * and nothing needs confirming, so selecting it IS choosing it.
+   */
   function update(patch: Partial<Appearance>) {
-    setDraft((prev) => ({ ...prev, ...patch }));
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    commit(next);
+  }
+
+  function commit(next: Appearance) {
+    setStatus('saving');
+    startTransition(async () => {
+      const result = await saveAppearance(next);
+      if (result.ok) {
+        savedRef.current = next;
+        setStatus('saved');
+        // The theme decides server-rendered STRUCTURE here, not only colour, so
+        // the document must be rebuilt rather than recoloured.
+        router.refresh();
+      } else {
+        setStatus('error');
+        toast.error(result.error);
+      }
+    });
   }
 
   // Live legibility readout for a custom accent. A mid-tone colour can fail AA
@@ -149,28 +182,6 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
     const ratio = contrastRatioHex(fg, accentHex);
     return ratio === null ? null : { ratio, fg, passes: ratio >= AA_NORMAL };
   }, [accentHex]);
-
-  function save() {
-    startTransition(async () => {
-      const result = await saveAppearance(draft);
-      if (result.ok) {
-        savedRef.current = draft;
-        toast.success('Appearance saved.');
-        // The theme decides server-rendered STRUCTURE, not just colour — Riso
-        // prints a masthead and moves the navigation. Without re-rendering, the
-        // document would keep markup built for the previous theme until a full
-        // reload.
-        router.refresh();
-      } else {
-        toast.error(result.error);
-      }
-    });
-  }
-
-  function reset() {
-    setDraft(initial);
-    setCustomHex(initial.accentColor.startsWith('#') ? initial.accentColor : '');
-  }
 
   /**
    * Back to what a new account gets.
@@ -186,9 +197,9 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
   function restoreDefaults() {
     setDraft(DEFAULT_APPEARANCE);
     setCustomHex('');
+    commit(DEFAULT_APPEARANCE);
   }
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
   const isDefault = JSON.stringify(draft) === JSON.stringify(DEFAULT_APPEARANCE);
 
   return (
@@ -408,15 +419,22 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
       </section>
 
       <div className="flex items-center gap-2">
-        <Button type="button" onClick={save} disabled={pending || !dirty}>
-          {pending ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : null}
-          Save appearance
-        </Button>
-        {dirty ? (
-          <Button type="button" variant="ghost" onClick={reset} disabled={pending}>
-            Discard changes
-          </Button>
-        ) : null}
+        {/* No "Save" button: every control above commits as you use it. What is
+            left is the one action that is not itself a choice. */}
+        <span aria-live="polite" className="text-muted-foreground text-xs">
+          {status === 'saving' ? (
+            <>
+              <Loader2 className="mr-1.5 inline size-3.5 animate-spin" />
+              Saving…
+            </>
+          ) : status === 'saved' ? (
+            'Saved. Applies on every device.'
+          ) : status === 'error' ? (
+            'Not saved — see the message above.'
+          ) : (
+            'Changes save as you make them.'
+          )}
+        </span>
         <Button
           type="button"
           variant="ghost"
