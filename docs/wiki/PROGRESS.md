@@ -1,89 +1,80 @@
 # Progress
 
-> ## ⏸ SESSION PAUSED — 2026-07-31
+> ## ⏸ PAUSED MID-PHASE-6 — 2026-07-31
 >
-> **Read this block first. Delete it when work resumes.**
+> **Read this block first. Delete it when Phase 6 is finished.**
 >
-> ### State at pause
+> ### Where things stand
 >
-> **Superseded by away session 4B (2026-07-31)** — the report at the end of
-> [OVERNIGHT-REPORT.md](OVERNIGHT-REPORT.md) is current. **Read its first
-> section**: three human items exist beyond the expected six, one of which
-> (ISSUE-028) should be done before the LinkedIn post.
+> **R2 and Resend credentials are in `.env.local` and they work.**
+> `isStorageConfigured()` and `isEmailConfigured()` both return `true`, and a
+> server-side round trip — presign → PUT → read back → delete → confirm gone —
+> succeeded against the real bucket. **CORS is saved** (both origins, PUT/GET/HEAD,
+> `content-type`) and **public access is disabled**, both confirmed by the owner.
 >
-> **Previously superseded by away session 4A (2026-07-31)** — 7 more PRs since; the report
-> at the end of [OVERNIGHT-REPORT.md](OVERNIGHT-REPORT.md) is current, and ends
-> with READY FOR SESSION 4B.
+> ### What passed — automated, re-run at pause
 >
-> **Previously superseded by away session 3 (2026-07-31)** — see the report at the end of
-> [OVERNIGHT-REPORT.md](OVERNIGHT-REPORT.md). Nine PRs merged since; the return
-> checklist there replaces the one below.
+> | Gate | Result |
+> | --- | --- |
+> | `lint` / `type-check` / `build` | pass |
+> | `verify:storage` | pass |
+> | `verify:attachments` | pass — 33 |
+> | `verify:email` | pass — templates only, **does not test delivery** |
+> | `smoke` local | pass — 18 |
+> | `smoke` production | pass — 19 |
+> | `verify:all` | pass — 22 suites, 101s, clean before and after |
 >
-> Everything is committed, pushed and merged. Working tree clean, `main` in sync
-> with origin, CI green, **17 verification suites all passing**. Nothing was
-> left half-finished — the last task (branch protection) completed, was proven,
-> and merged through PR #7.
+> The suite is genuinely exercising the configured path, not passing vacuously:
+> `verify:storage` branches on `isStorageConfigured()`, and that branch flipped
+> from *"a valid request reports storage as unconfigured (503)"* to **"a valid
+> request returns an upload URL"** — only possible with working credentials.
 >
-> ### ⚠️ The one thing that changed how you work
+> ### ⚠️ Phase 6 is NOT Done, and must not be marked so
 >
-> **`main` is protected and administrators are bound by it.** Direct pushes are
-> rejected. Every change — yours or an agent's — now goes:
+> Every remaining item needs hands. **Nothing below has been verified**, and no
+> browser upload has ever completed — the round trip proven so far is
+> server-side only, which does not exercise CORS at all.
 >
-> ```bash
-> git checkout -b <type>/<short-name>
-> # ... work ...
-> git push -u origin <branch>
-> gh pr create --base main --title "..." --body "..."
-> gh run watch $(gh run list --branch <branch> --limit 1 --json databaseId --jq '.[0].databaseId') --exit-status
-> gh pr merge <n> --squash --delete-branch
-> ```
+> ### The remaining human checks, in order
 >
-> `git push origin main` will fail with `GH006`. That is correct, not broken.
-> See [DEC-016](DECISIONS.md); the deliberate bypass is in [ISSUE-018](ISSUES.md).
+> Start the server (`npm run dev`), sign in, open a chat. **The paperclip should
+> be enabled.** If it is greyed out, stop — a variable is missing or misspelled.
+>
+> | # | Check | Expect |
+> | --- | --- | --- |
+> | 1 | **Attach a PNG and send** | Thumbnail + size in the chip, not stuck on "Uploading…"; message sends. **This is the one that proves CORS** — credentials are already proven |
+> | 2 | Cloudflare → `myaichat` → Objects | The file under `chat/<your-user-id>/` |
+> | 3 | **Attach a 30MB file** | Rejected instantly, before any network request |
+> | 4 | **Attach a `.exe`** | Rejected, message naming the accepted formats |
+> | 5 | **Drag a file** onto the composer | "Drop to attach" overlay; dropping attaches |
+> | 6 | **Paste a screenshot** (`⌘⇧4` then `⌘V`) | It attaches |
+> | 7 | Attach two, **remove one** before sending | Chip goes; message sends with the other |
+> | 8 | **Second user, 403** — sign in as another account, request `/api/uploads/download?key=<first user's key>` | 403/404. This is the check that proves a private bucket plus an ownership check actually compose |
+> | 9 | **Test emails** — to the address that owns the Resend account | Welcome + password reset arrive; check on a phone too |
+> | 10 | **Supabase SMTP** (checklist B5) | Route Supabase's own auth mail through Resend |
+>
+> If check 1 sticks on "Uploading…": devtools → Network → look for a failed
+> `PUT` or a blocked preflight. That is CORS and nothing else, because the
+> credentials were proven server-side before CORS was touched.
+>
+> ### Two gaps that are not bugs
+>
+> - **Production does not have these credentials.** They are in `.env.local`
+>   only; checklist A4 says both. Uploads stay disabled on Railway until the
+>   same seven variables are added there. Not done here — Railway is yours.
+> - **`RESEND_FROM_EMAIL=onboarding@resend.dev`** is an unverified domain, so
+>   Resend delivers **only to the Resend account owner's address**. Your own test
+>   mail will arrive and every real user's will silently not. Correct for now;
+>   blocks real signups until a domain is verified.
 >
 > ### First command when you resume
 >
 > ```bash
-> git pull && npm install && npm run lint && npm run type-check && npm run build
+> git pull && npm install && npm run dev
 > ```
 >
-> Then, if you want the full picture before deciding anything:
->
-> ```bash
-> npm run dev                       # a server is needed by six of the suites
-> npm run verify:api                # 61 checks — the broadest single signal
-> ```
->
-> ### What was in progress
->
-> **Nothing.** The away session finished all six of its priorities, and the
-> branch-protection task that followed it is closed. There is no partial work,
-> no stashed change, no branch left open.
->
-> ### What is next, in the order I would do it
->
-> | # | Task | Blocked by | Where the instructions are |
-> | --- | --- | --- | --- |
-> | 1 | **R2 + Resend credentials → finish Phase 6** | you having accounts | [PHASE-6-CHECKLIST.md](PHASE-6-CHECKLIST.md) — nothing in it needs a code change |
-> | 2 | **Screenshots for the README** | needs a browser | run `npm run seed -- --demo` first; four placeholders wait in `docs/screenshots/` |
-> | 3 | **Four human checks from the away session** | needs your eyes | attachment UI, analytics charts, export links, mobile — listed in the Away-session report |
-> | 4 | **Decide on Dependabot PRs #1–#4** | your call | #2 and #1 want actions at v7; I set v5 last session |
-> | 5 | **ISSUE-024** — truncation deletes by timestamp | nothing; it is just structural | needs a `seq` column, a migration, and every `created_at`-ordered read path updated |
-> | 6 | **Chain CI to the Railway deploy** | your call | comment inside `.github/workflows/ci.yml` |
->
-> Phase 7's remaining tasks (performance pass, accessibility audit) still need a
-> browser and Lighthouse, so they stay unmeasurable headlessly — see the Phase 7
-> section below.
->
-> ### Open issues worth knowing about
->
-> | Issue | What it is |
-> | --- | --- |
-> | [ISSUE-016](ISSUES.md) / [ISSUE-017](ISSUES.md) / [ISSUE-003](ISSUES.md) | Phase 6 credentials — the only thing blocking a phase |
-> | [ISSUE-022](ISSUES.md) | Three identifiers in a now-public repo; all judged safe, your call to revisit |
-> | [ISSUE-024](ISSUES.md) | Timestamp-collision truncation; logged, not fixed, structural |
-> | [ISSUE-015](ISSUES.md) | `verify:admin` and `verify:security` mutate shared state — do not run them while someone is using the app |
-> | [ISSUE-004](ISSUES.md) / [ISSUE-005](ISSUES.md) / [ISSUE-006](ISSUES.md) | No Docker: hand-maintained types, remote migrations, unfixable transitive advisories |
+> Then message me: **"Phase 6 human checks — starting check 1"** and I will walk
+> them with you one at a time.
 >
 > ---
 

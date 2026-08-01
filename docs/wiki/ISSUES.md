@@ -391,7 +391,31 @@ the main risk.
 
 ### ISSUE-017 — Resend not configured: email is rendered but never sent
 
-**Status:** Open (blocked on credentials) | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-07-31
+**Status:** Open — credentials landed 2026-07-31, **awaiting human verification** | **Severity:** Medium | **Phase:** 6
+
+**Update 2026-07-31.** `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are in
+`.env.local`; `isEmailConfigured()` returns true, so the transport has switched
+from console to Resend.
+
+**No email has been sent or received.** `verify:email` renders the templates and
+checks their contrast — it does **not** branch on `isEmailConfigured()` and does
+not test delivery, so nothing automated proves a message ever leaves. Check 9 in
+the PROGRESS.md resume block closes that half.
+
+**`RESEND_FROM_EMAIL=onboarding@resend.dev`** — an unverified domain. Resend
+delivers only to the address that owns the Resend account, so the owner's test
+mail will arrive and every real user's will silently not. Correct for now, and
+it blocks real signups until a domain is verified.
+
+**Still to do beyond delivery:** the Supabase SMTP setting (checklist B5).
+Supabase sends its own confirmation and reset mail through its default SMTP, not
+Resend, so until that dashboard change lands users get Supabase's template while
+the branded ones sit unused. Cosmetic, not broken — but it is why the two sets
+of emails look different.
+
+**Original report below.**
+
+**Status (original):** Open (blocked on credentials) | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-07-31
 **Problem:** No `RESEND_API_KEY`. `isEmailConfigured()` is false, so `lib/email/send.ts` uses a **console transport** — templates render and the calling code runs, but nothing is delivered.
 **What you must add to `.env.local`** (and to Railway):
 
@@ -406,7 +430,29 @@ Resend requires a **verified sending domain** — an unverified `from` address i
 
 ### ISSUE-016 — Cloudflare R2 not configured: uploads cannot complete
 
-**Status:** Open (blocked on credentials) | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-07-31
+**Status:** Open — credentials landed 2026-07-31, **awaiting human verification** | **Severity:** Medium | **Phase:** 6
+
+**Update 2026-07-31.** Credentials are in `.env.local` and **proven working**:
+`isStorageConfigured()` returns true, and a server-side round trip (presign →
+PUT → read back byte-identical → delete → confirm gone) succeeded against the
+real bucket. CORS is saved for both origins with the `content-type` header, and
+public access is disabled — both confirmed by the owner.
+
+`verify:storage` now takes its configured branch: *"a valid request returns an
+upload URL"*, where it previously asserted the 503.
+
+**Still open because no browser upload has ever completed.** The proven round
+trip is server-side, which does not exercise CORS at all — the browser PUT is
+precisely the untested step. Checks 1–8 in the PROGRESS.md resume block close
+this.
+
+**Also outstanding:** the seven variables exist in `.env.local` only. Production
+(Railway) does not have them, so uploads stay disabled there. Checklist A4 says
+both; Railway was not touched, per the standing rule.
+
+**Original report below.**
+
+**Status (original):** Open (blocked on credentials) | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-07-31
 **Problem:** No R2 credentials, so `isStorageConfigured()` is false. Every upload path validates correctly and then returns `503 storage_unconfigured`; the UI disables its upload controls with an explanation rather than failing on click.
 **What you must add to `.env.local`** (and to Railway):
 
