@@ -1681,3 +1681,55 @@ unreferenced" has to mean *verified*, not *not found by one grep*.
 | Unused dependencies | none |
 | Dead exports removed | 1 (`Pressable`) |
 | `verify:all` | pass — 22 suites |
+
+## ISSUE-028 resolved — and the original finding was my test's fault · 2026-07-31
+
+The owner enabled *Detect and revoke potentially compromised refresh tokens*
+with a 10s reuse interval. Verifying it produced a more interesting answer than
+expected.
+
+**The original High-severity claim was wrong.** `supabase-js`'s
+`refreshSession()` resolves successfully for a token whose successor already
+exists — returning that successor — while the auth endpoint answers `400`. My
+test read "the promise resolved" as "the token was accepted" and reported a hole
+on that basis. The SDK was being helpful; the test was not.
+
+**Measured against `POST /auth/v1/token` directly**, the realistic threat model:
+
+```
+attacker copies the token at sign-in
+  victim rotation 1 (t+12s)
+  victim rotation 2 (t+24s)
+  victim rotation 3 (t+36s)
+
+attacker replays the stolen token, 36s and 3 rotations later:
+  HTTP 400  REJECTED: Invalid Refresh Token: Already Used
+  victim's current token: HTTP 200 (unaffected)
+```
+
+The stolen token is **refused**. Exposure is bounded by the victim's next
+rotation, not open-ended. Severity **High → Low**.
+
+**Residual gap, real but small:** reuse is refused, not *detected*. The family
+is not revoked, the victim is not signed out, nothing is recorded — so a theft
+is stopped and leaves no trace. Family revocation was never observed firing
+across four probes.
+
+**Stopped investigating deliberately.** Four probes gave inconsistent
+intermediate results — a replay was accepted in some orderings and refused in
+others — and pinning down the exact internal rule is Supabase's business, not
+this repository's. What matters here is measured and stable.
+
+`verify:session` now asserts the threat model against the raw endpoint, and
+*warns* about the missing revocation rather than failing: a check demanding
+behaviour nobody can produce stays red for ever. `-- --strict` promotes it.
+
+The stale claim was also corrected in SHOWCASE.md and in the 4B report, rather
+than left to read as current.
+
+| Criterion | Result |
+| --- | --- |
+| Stolen token refused after rotation | pass — HTTP 400, "Already Used" |
+| Sign-out invalidates | pass |
+| Family revocation on reuse | **not observed** — warned, not asserted |
+| `verify:all` | pass — 22 suites |

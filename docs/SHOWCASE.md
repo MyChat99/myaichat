@@ -154,11 +154,17 @@ each one changed.
 never saw the question just asked. No error, no bad status — it reads as a model
 limitation. Found by reading the query during an adversarial review.
 
-**A stolen refresh token stayed valid.** Rotation was *assumed* to be in force
-because Supabase rotates by default. It does rotate, and it does not invalidate
-the old token: a token replayed twenty seconds later was accepted and the
-legitimate session was untouched. Found by writing a test that simulated the
-theft rather than one that asserted the assumption.
+**A stolen refresh token — and then my own test was the bug.** I wrote a test
+that simulated the theft rather than asserting the assumption, and it reported
+that a replayed token stayed valid indefinitely. It did not. `supabase-js`
+resolves successfully for a token whose successor exists, returning that
+successor, where the auth endpoint answers 400 — so "the promise resolved" is
+not "the token was accepted". Re-measured against the endpoint directly, a
+stolen token is refused as soon as the victim rotates past it. I had reported a
+High-severity hole on the strength of a helpful SDK.
+
+The residual finding is smaller and real: reuse is *refused* but not *detected*,
+so a theft is stopped and leaves no trace.
 
 **Upload endpoints were rate-limited by counting their own audit rows.** That
 coupled a permanent record to a rolling window — pruning one damaged the other.

@@ -16,71 +16,83 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
-### ISSUE-028 — A stolen refresh token stays valid, and reuse is not detected
+### ISSUE-028 — Refresh-token reuse: refused, but not detected
 
-**Status:** Open — needs a dashboard change only you can make | **Severity:** **High** | **Phase:** 1 | **Opened:** 2026-07-31
-**Found by:** measuring, rather than assuming, during away session 3.
+**Status:** Resolved (with a residual gap, recorded below) | **Severity:** ~~High~~ **Low** | **Phase:** 1 | **Opened:** 2026-07-31 | **Resolved:** 2026-07-31
 
-**Problem:** refresh-token rotation was assumed to be in force because Supabase
-rotates by default. It does rotate — every refresh issues a new token. What it
-does **not** do on this project is invalidate the old one.
+**Setting:** *Detect and revoke potentially compromised refresh tokens* is
+**enabled**, reuse interval **10s** — confirmed by the owner.
 
-Measured directly by simulating a theft:
+---
+
+#### The original finding was overstated, and the fault was in my test
+
+ISSUE-028 claimed a stolen refresh token "stays valid indefinitely". Re-measured
+properly, that is **not true**.
+
+The original test used `supabase-js`'s `refreshSession()`. For a token whose
+successor already exists, that method **resolves successfully and returns the
+successor** — while the auth endpoint itself answers `400`. I read "the promise
+resolved" as "the token was accepted", and reported a High-severity hole on that
+basis. The SDK was being helpful; the test was not.
+
+Everything below is measured against `POST /auth/v1/token?grant_type=refresh_token`
+directly, with no SDK in the way.
+
+#### What actually happens
+
+The realistic scenario — an attacker copies a token, the victim keeps using the
+app — measured over three rotations spaced past the reuse interval:
 
 ```
-rotation issues a NEW refresh token   : yes
-replay original token, 20s later      : ACCEPTED
-legitimate token after the replay     : STILL VALID — family not revoked
+attacker copies the token at sign-in: 6hjqj34fkg
+  victim rotation 1 (t+12s) → hgl4kd57pe
+  victim rotation 2 (t+24s) → 56dwpyjdvo
+  victim rotation 3 (t+36s) → pfmxvsuv5j
+
+attacker replays the stolen token, 36s and 3 rotations later:
+  HTTP 400  REJECTED: Invalid Refresh Token: Already Used
+  victim's current token: HTTP 200 (unaffected)
 ```
 
-**What that means concretely.** A refresh token copied out of a browser — an XSS
-foothold, a shared machine, a synced cookie jar, a stolen backup — keeps working
-alongside the real one. The legitimate user notices nothing, because their own
-session is never disturbed. The attacker's access ends only when the token
-expires on its own, and it is refreshed on every use, so in practice it does not
-expire at all.
+**The stolen token is refused.** The exposure is bounded by the victim's next
+rotation, not open-ended.
 
-Signing out **does** invalidate the token, which is verified and passing. So the
-exposure is bounded by the user signing out — which most people never do.
+Within the reuse interval, or while the stolen token is still the immediate
+predecessor of the current one, it returns the current successor rather than
+erroring. That is deliberate and correct: it stops a client whose refresh
+response was lost in flight from being signed out.
 
-**This is a Supabase project setting, not application code.** Nothing in this
-repository can fix it, which is why it is filed rather than patched.
+#### The residual gap, which is real but small
 
-#### The fix, when you are back
+**Reuse is refused, not *detected*.** A replay returns 400 and nothing else
+happens: the family is not revoked, the victim is not signed out, and no record
+is written. Across four separate probes, family revocation was never observed
+firing.
 
-Supabase dashboard → **Authentication** → **Sessions**:
+So a theft is *stopped* but leaves *no trace*. Nobody learns it happened.
 
-| Setting | Set to | Why |
-| --- | --- | --- |
-| Detect and revoke potentially compromised refresh tokens | **On** | The actual fix. A replayed token revokes the whole family, so a theft ends the session instead of silently sharing it |
-| Refresh token reuse interval | 10s (default) | Keeps concurrent requests and flaky networks from destroying sessions. Do not set it to 0 — you will get spurious logouts on mobile |
+**Severity downgraded from High to Low** because the access window is bounded by
+one rotation rather than indefinite. It is left open as a note rather than
+closed outright, because the detect-and-revoke behaviour the setting names is
+not observable from outside, and someone should know that before relying on it.
 
-Consider also setting a **time-boxed session length** on the same page, so even
-an undetected theft has an end date.
+**Not worth further investigation from here.** Four probes produced inconsistent
+intermediate results — a replay was accepted in some orderings and refused in
+others — and characterising the exact internal rule is Supabase's business, not
+this repository's. What matters for this app is measured and stable: the stolen
+token stops working.
 
-#### Verify it took
+#### How it is verified now
 
-```bash
-npm run verify:session
-```
+`npm run verify:session` runs the threat model above on every invocation:
 
-It replays a token 20 seconds after rotation and reports what happens. Once the
-setting is on, pin it so it cannot regress silently:
-
-```bash
-npm run verify:session -- --strict     # turns the warning into a failure
-```
-
-**Why it warns rather than fails today:** the check reports a configuration
-state that no change in this repository can turn green, and a permanently red
-suite is one people stop reading. `--strict` exists so that stops being true the
-moment the setting is fixed.
-
-**Partial mitigation shipped in the same change:** an idle-session timeout
-(`system_settings.session_idle_timeout_minutes`, default 0/off). It is honest
-about its limits — it clears *our* cookie, and does not revoke the Supabase
-refresh token. It shortens the window on an unlocked laptop; it does nothing
-against someone who has already copied the cookie jar.
+- **asserts** a stolen token is refused once the victim has rotated past it, and
+  that the refusal says *Already Used*
+- **warns** that the family survives, rather than failing — a check demanding
+  behaviour nobody can produce is a check that stays red for ever
+- `-- --strict` promotes that warning to a failure, if the behaviour ever starts
+  firing and you want it pinned
 
 ### ISSUE-027 — Gate the Railway deploy on CI (prepared, NOT applied)
 
