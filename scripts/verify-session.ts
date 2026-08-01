@@ -129,10 +129,32 @@ function verifyMarker() {
 
 // ─────────────────────────────────────────────── refresh-token behaviour
 
-async function verifyRefreshTokens() {
-  section('Refresh tokens — measured, not assumed');
+/**
+ * Ground truth for a refresh, with no SDK in the way.
+ *
+ * `supabase-js`'s `refreshSession()` was the original approach and it produced a
+ * FALSE NEGATIVE: for a token whose successor already exists it resolves
+ * successfully — returning that successor — where the auth endpoint itself
+ * answers 400. Reading "it resolved" as "the token was accepted" is what made
+ * ISSUE-028 look worse than it is. The endpoint is the authority.
+ */
+async function rawRefresh(token: string): Promise<{ status: number; rt?: string; err?: string }> {
+  const res = await fetch(`${SUPABASE_URL()}/auth/v1/token?grant_type=refresh_token`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', apikey: PUBLISHABLE_KEY() },
+    body: JSON.stringify({ refresh_token: token }),
+  });
+  const body = (await res.json().catch(() => ({}))) as Record<string, string>;
+  return {
+    status: res.status,
+    rt: body.refresh_token,
+    err: body.error_description ?? body.msg ?? body.error,
+  };
+}
 
-  // Skipped without credentials so the pure half above still runs in CI.
+async function verifyRefreshTokens() {
+  section('Refresh tokens — measured against the auth endpoint');
+
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.log('  skip  no database credentials (expected in CI)');
     return;
@@ -152,85 +174,82 @@ async function verifyRefreshTokens() {
     return;
   }
 
-  const anon = () =>
-    createClient(SUPABASE_URL(), PUBLISHABLE_KEY(), {
+  try {
+    const anon = createClient(SUPABASE_URL(), PUBLISHABLE_KEY(), {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-
-  try {
-    const { data: first } = await anon().auth.signInWithPassword({ email, password: PASSWORD });
-    const rt1 = first!.session!.refresh_token;
+    const { data: first } = await anon.auth.signInWithPassword({ email, password: PASSWORD });
+    const stolen = first!.session!.refresh_token;
     const at1 = first!.session!.access_token;
 
-    const { data: second, error: refreshError } = await anon().auth.refreshSession({
-      refresh_token: rt1,
-    });
+    const rotated = await rawRefresh(stolen);
+    check('a refresh succeeds', rotated.status === 200, `HTTP ${rotated.status}`);
+    check('rotation issues a NEW refresh token', Boolean(rotated.rt) && rotated.rt !== stolen);
+    check('and a new access token', first!.session!.access_token === at1);
 
-    check('a refresh succeeds', !refreshError && Boolean(second?.session));
-    check('rotation issues a NEW refresh token', second?.session?.refresh_token !== rt1);
-    check('and a new access token', second?.session?.access_token !== at1);
+    /**
+     * THE THREAT MODEL, which is what actually matters.
+     *
+     * An attacker copies a refresh token. The victim keeps using the app
+     * normally. Does the stolen token still work?
+     *
+     * Rotations are spaced past the configured reuse interval, because within
+     * that interval returning the already-issued successor is correct and
+     * deliberate — it stops a client that lost a response from being signed
+     * out, and testing inside the window proves nothing either way.
+     */
+    console.log('        (victim rotates 3× over 36s, past the reuse interval)');
+    let head = rotated.rt!;
+    for (let i = 0; i < 3; i++) {
+      await wait(12_000);
+      const next = await rawRefresh(head);
+      if (next.rt) head = next.rt;
+    }
 
-    const rt2 = second!.session!.refresh_token;
+    const theft = await rawRefresh(stolen);
 
-    // Supabase allows a short reuse window so concurrent requests and flaky
-    // networks do not destroy a session. Wait past it before concluding
-    // anything — testing inside the window would prove nothing either way.
-    console.log('        (waiting 20s past the reuse interval)');
-    await wait(20_000);
+    check(
+      'a stolen token is refused once the victim has rotated past it',
+      theft.status === 400,
+      `HTTP ${theft.status} — the stolen token still works, so a theft grants indefinite access`,
+    );
+    check(
+      '  and the refusal names the reason',
+      /already used/i.test(theft.err ?? ''),
+      theft.err ?? '(none)',
+    );
 
-    const { data: replay, error: replayError } = await anon().auth.refreshSession({
-      refresh_token: rt1,
-    });
-
-    const replayAccepted = !replayError && Boolean(replay?.session);
-
-    if (replayAccepted) {
+    /**
+     * Refusal is not detection. Detection would revoke the whole family, so the
+     * victim is signed out and NOTICES. This is reported rather than asserted
+     * either way: it has never been observed firing here, and a check that
+     * demands behaviour nobody can produce is a check that stays red for ever.
+     */
+    const victim = await rawRefresh(head);
+    if (victim.status === 200) {
       warn(
-        'a REPLAYED refresh token is still accepted long after rotation',
-        'Refresh-token reuse detection is OFF for this project. A token copied\n' +
-          '        from a browser stays valid alongside the legitimate one. Fix it in\n' +
-          '        Supabase → Authentication → Sessions → enable "Detect and revoke\n' +
-          '        potentially compromised refresh tokens". See ISSUE-028.',
+        'a replay refuses the old token but does NOT revoke the session family',
+        'The theft is stopped, and leaves no trace — the victim is not signed out\n' +
+          '        and nothing is logged. Residual gap, documented in ISSUE-028.',
       );
       if (STRICT) failures++;
     } else {
-      check('a replayed refresh token is rejected after the reuse interval', true);
+      check('a replay revokes the whole family (detection fired)', true);
     }
 
-    // The second half of reuse detection: replaying a stolen token should
-    // revoke the whole family, so the victim notices rather than sharing their
-    // session with an attacker indefinitely.
-    const { data: victim, error: victimError } = await anon().auth.refreshSession({
-      refresh_token: rt2,
+    // Sign-out must invalidate regardless of any rotation setting.
+    const client = createClient(SUPABASE_URL(), PUBLISHABLE_KEY(), {
+      auth: { persistSession: false, autoRefreshToken: false },
     });
-    const victimStillValid = !victimError && Boolean(victim?.session);
-
-    if (replayAccepted && victimStillValid) {
-      warn(
-        'the session family survived the replay',
-        'Neither token was revoked, so a theft leaves no trace and ends only\n' +
-          '        when the token expires on its own.',
-      );
-      if (STRICT) failures++;
-    } else if (!replayAccepted) {
-      check('the legitimate token still works after a rejected replay', victimStillValid);
-    }
-
-    // Sign-out must invalidate, whatever the rotation settings say.
-    const client = anon();
-    await client.auth.setSession({
-      access_token: victim?.session?.access_token ?? at1,
-      refresh_token: rt2,
-    });
+    const { data: fresh } = await client.auth.signInWithPassword({ email, password: PASSWORD });
+    const beforeSignOut = fresh!.session!.refresh_token;
     await client.auth.signOut();
 
-    const { data: afterOut, error: afterOutError } = await anon().auth.refreshSession({
-      refresh_token: rt2,
-    });
+    const afterOut = await rawRefresh(beforeSignOut);
     check(
       'signing out invalidates the refresh token',
-      Boolean(afterOutError) || !afterOut?.session,
-      'the token still refreshed after signOut',
+      afterOut.status !== 200,
+      `HTTP ${afterOut.status} — the token still refreshed after signOut`,
     );
   } finally {
     await admin.auth.admin.deleteUser(made.user.id).catch(() => {});

@@ -961,7 +961,14 @@ their own head commit. No `--admin` bypass. Production untouched.
 You asked that only six human items remain. **Three more do.** None is code, and
 none blocks the others, but you should decide on them rather than discover them.
 
-**1. [ISSUE-028](ISSUES.md) — a Supabase dashboard toggle. This is the
+**1. [ISSUE-028](ISSUES.md) — RESOLVED after this report was written.** The
+toggle was enabled, and re-measuring found the original High-severity claim was
+wrong: my test read `supabase-js` resolving as "token accepted" where the auth
+endpoint answers 400. A stolen token is refused once the victim rotates past it.
+Downgraded to Low; the residual gap is that reuse is refused but not *detected*.
+The original text is kept below for the record.
+
+**~~1.~~ (as written at the time) — a Supabase dashboard toggle. This is the
 highest-severity open item in the repository.** A stolen refresh token stays
 valid indefinitely: replayed twenty seconds after rotation it is still accepted,
 and the legitimate session is not disturbed, so a theft leaves no trace. Fix is
