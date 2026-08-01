@@ -110,12 +110,20 @@ async function main() {
      * than a mismatched constant. Naming the literal here would have made this
      * check pass while the two disagreed.
      */
-    check(
-      `the database default matches DEFAULT_APPEARANCE (${DEFAULT_APPEARANCE.presetTheme})`,
-      initial?.preset_theme === DEFAULT_APPEARANCE.presetTheme,
-      `column gives "${initial?.preset_theme}", app declares "${DEFAULT_APPEARANCE.presetTheme}"`,
-    );
-    check('mode defaults to system', initial?.theme === 'system', String(initial?.theme));
+    const columnDefaults: [string, unknown, unknown][] = [
+      ['theme', initial?.theme, DEFAULT_APPEARANCE.theme],
+      ['preset_theme', initial?.preset_theme, DEFAULT_APPEARANCE.presetTheme],
+      ['accent_color', initial?.accent_color, DEFAULT_APPEARANCE.accentColor],
+      ['font_size', initial?.font_size, DEFAULT_APPEARANCE.fontSize],
+      ['bubble_style', initial?.bubble_style, DEFAULT_APPEARANCE.bubbleStyle],
+    ];
+    for (const [column, fromDb, declared] of columnDefaults) {
+      check(
+        `the ${column} column default matches DEFAULT_APPEARANCE (${String(declared)})`,
+        fromDb === declared,
+        `column gives "${String(fromDb)}", app declares "${String(declared)}"`,
+      );
+    }
     check(
       'the default theme is a real preset',
       THEMES.some((t) => t.id === DEFAULT_APPEARANCE.presetTheme),
@@ -159,9 +167,106 @@ async function main() {
     const second = await fetch(`${BASE_URL}/`, { headers: { cookie } }).then((r) => r.text());
     check('preferences persist across requests', second.includes('data-theme="ocean"'));
 
-    // A signed-out visitor must still get a working page.
-    const anon = await fetch(`${BASE_URL}/login`).then((r) => r.text());
+    /**
+     * The signed-out visitor, in full.
+     *
+     * This is the first frame of the product for everyone who has never used
+     * it, and it is the one case with no stored preference to read — so it is
+     * also the case most likely to render a placeholder and correct itself
+     * afterwards. "Still renders a theme" was too weak a claim: a page that
+     * emits a token block and then swaps it on hydration passes that and still
+     * flashes.
+     *
+     * What has to be true is stronger and entirely checkable from the served
+     * bytes: the default theme is already resolved in the markup, BOTH modes'
+     * tokens are present so resolving `system` costs no request, and the
+     * mode-resolving script is in <head> ahead of any content it could
+     * repaint.
+     */
+    const anonResponse = await fetch(`${BASE_URL}/login`);
+    const anon = await anonResponse.text();
+    const fallback = getTheme(DEFAULT_APPEARANCE.presetTheme);
+    const headEnd = anon.indexOf('<body');
+
+    check(
+      'signed-out /login is served',
+      anonResponse.status === 200,
+      `HTTP ${anonResponse.status}`,
+    );
     check('signed-out pages still render a theme', anon.includes('id="theme-tokens"'));
+    check(
+      `the default theme is resolved in the markup (data-theme="${DEFAULT_APPEARANCE.presetTheme}")`,
+      anon.includes(`data-theme="${DEFAULT_APPEARANCE.presetTheme}"`),
+    );
+    check(
+      `the default mode is in the markup (data-theme-mode="${DEFAULT_APPEARANCE.theme}")`,
+      anon.includes(`data-theme-mode="${DEFAULT_APPEARANCE.theme}"`),
+    );
+    check(
+      "the default theme's light tokens are in the document",
+      anon.includes(fallback.light.background) && anon.includes(fallback.light.accent),
+      `${fallback.light.background} / ${fallback.light.accent} missing`,
+    );
+    /**
+     * The default accent must not paint over the default theme.
+     *
+     * A theme with a point of view defines its own accent per mode. The default
+     * accent used to be the named preset 'blue', which resolved to one hex in
+     * BOTH modes and overrode the theme's — so the out-of-the-box look was the
+     * default theme's paper with a generic blue on top, and the two inks that
+     * make it recognisable never appeared for anyone who had not been into
+     * settings. Asserting on --primary specifically is the point: the theme's
+     * accent hex can be *present* in the document as some other token while
+     * --primary is something else entirely.
+     */
+    check(
+      "the default accent follows the theme's own light ink",
+      anon.includes(`--primary:${fallback.light.accent}`),
+      `expected --primary:${fallback.light.accent}`,
+    );
+    check(
+      "the default accent follows the theme's own dark ink",
+      anon.includes(`--primary:${fallback.dark.accent}`),
+      `expected --primary:${fallback.dark.accent}`,
+    );
+    /**
+     * The dark tokens matter as much as the light ones, and for a reason that
+     * is easy to miss: the default mode is `system`, so roughly half of all
+     * first-time visitors need dark. If only the light block were served, that
+     * half would get a request or a re-render between paint and correctness —
+     * which is precisely the flash.
+     */
+    check(
+      "the default theme's dark tokens are in the SAME document",
+      anon.includes(fallback.dark.background) && anon.includes(fallback.dark.accent),
+      `${fallback.dark.background} / ${fallback.dark.accent} missing`,
+    );
+    check(
+      'the token block is in <head>, before any content it could repaint',
+      headEnd > 0 && anon.indexOf('id="theme-tokens"') < headEnd,
+    );
+    /**
+     * Anchored on `dataset.themeMode`, which only the pre-paint script contains.
+     * Searching for `prefers-color-scheme` instead finds Next's own injected
+     * stylesheet first — it appears ~1800 bytes earlier in the document — and
+     * the check then measures the position of somebody else's CSS.
+     */
+    const scriptAt = anon.indexOf('dataset.themeMode');
+    check(
+      'the mode-resolving script is in <head>, and after the tokens',
+      headEnd > 0 && scriptAt > anon.indexOf('id="theme-tokens"') && scriptAt < headEnd,
+      `script at ${scriptAt}, tokens at ${anon.indexOf('id="theme-tokens"')}, body at ${headEnd}`,
+    );
+    /**
+     * With `system`, light is the server-rendered baseline and the script adds
+     * `dark` when the OS asks for it. A hardcoded `dark` class here would mean
+     * every light-mode visitor gets a dark first paint — the same flash,
+     * pointed the other way.
+     */
+    check(
+      'no dark class is hardcoded while the mode is system',
+      DEFAULT_APPEARANCE.theme !== 'system' || !/<html[^>]*class="[^"]*\bdark\b/.test(anon),
+    );
 
     // Invalid stored values must degrade, not blank the page. The DB constraint
     // blocks the obvious route in, so this checks the loader's own fallback.
