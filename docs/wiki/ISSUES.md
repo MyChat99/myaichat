@@ -33,6 +33,15 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 **Resolution:** A new nullable `usage_logs.source` column (migration `20260801120000`); demo rows set it, cleanup deletes on it, and the guard checks both tables. The loop is now driven by the pool, so each template is used exactly once and no title can repeat — the pool size *is* the amount of data. Pool expanded from 6 to 24 threads.
 **Proven:** 366 → 395 → 366 across `--demo` / `--clean-demo`, and 24 conversations with 24 unique titles. Pre-existing untagged rows are [ISSUE-031](#issue-031).
 
+### ISSUE-035 — Selecting Riso removed every navigation link
+
+**Status:** Resolved | **Severity:** High | **Phase:** 5 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01
+**Problem:** Reported by the owner: switching to Riso left the page with no Profile, Appearance, Admin or Sign out, and no way back to settings.
+**Cause — two sources of truth for one fact.** Riso hides the shell's navigation bar and expects the chat page's rule bar to carry the replacement. The hide was keyed on the rule bar *existing*; but the rule bar only *carries* navigation when the SERVER rendered it with `riso=true`, while `data-theme` lives in the DOM and the appearance panel's live preview writes to it directly. So `data-theme="riso"` over markup built with `riso=false` hid the header and put nothing in its place.
+**Resolution:** the hide is keyed on the replacement itself — `body:has([data-riso='tabs'])`, not `[data-riso='rule']`. No tabs, no hiding, so navigation cannot vanish however the two get out of step. Additionally: the panel now refreshes the route after saving (the theme decides server-rendered structure, not just colour), and reverts an unsaved preview when the page unmounts, so a previewed theme never leaks into pages the server built for a different one.
+**Now guarded:** `npm run shoot` forces the mismatch — sets `data-theme="riso"` over a default-theme render — and fails unless Profile, Appearance and Sign out are all still reachable. Reproduced the exact failure before the fix.
+**Lesson:** a CSS rule that removes an element on the evidence that its replacement *should* exist is a guess. Key it on the replacement.
+
 ### ISSUE-034 — Riso copy doubled wherever the stylesheet did not apply
 
 **Status:** Resolved | **Severity:** High | **Phase:** 5 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01

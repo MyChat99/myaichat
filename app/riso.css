@@ -426,8 +426,19 @@ html[data-theme='riso'] [data-riso='masthead-bar'] nav a:hover {
    Rather than lift that state up, the navigation comes down (RisoTabs) and the
    header is hidden on any page that has a rule to replace it. `:has()` decides
    that at first paint with no JavaScript, and it cannot hide the header on
-   settings, profile or admin, which render no rule and keep theirs. */
-html[data-theme='riso'] body:has([data-riso='rule']) [data-riso='masthead-bar'] {
+   settings, profile or admin, which render no rule and keep theirs.
+
+   ⚠️ The condition is the TABS, not the rule bar. Those are different claims:
+   the rule bar exists on every chat page, but it only carries navigation when
+   the SERVER rendered it with riso=true. `data-theme` lives in the DOM and the
+   appearance panel's live preview writes to it directly, so it can say `riso`
+   over markup the server built with riso=false — and hiding the header on that
+   evidence removed Profile, Appearance, Admin and Sign out with nothing in
+   their place and no way back.
+
+   Keyed on the replacement itself, the failure cannot happen: no tabs, no
+   hiding. */
+html[data-theme='riso'] body:has([data-riso='tabs']) [data-riso='masthead-bar'] {
   display: none;
 }
 
