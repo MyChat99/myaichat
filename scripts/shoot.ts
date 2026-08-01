@@ -181,6 +181,7 @@ async function main() {
 
     let failed = await reportDuplication(page);
     failed = (await reportThemeLeak(page)) || failed;
+    failed = (await reportNavigationReachable(page)) || failed;
 
     if (problems.length) {
       console.error('\n  console errors:');
@@ -205,6 +206,55 @@ async function main() {
  * page reads "New chat Start a page" — which is not a styling problem that a
  * screenshot makes obvious at a glance, but is trivially detectable in text.
  */
+/**
+ * Navigation must survive a theme attribute that the server did not render.
+ *
+ * `data-theme` lives in the DOM and the appearance panel's live preview writes
+ * to it directly, so it can say `riso` while the server-rendered markup was
+ * built with riso=false. Riso hides the shell's navigation bar and expects the
+ * rule bar to carry the replacement — so when those two disagree, the header is
+ * hidden and nothing replaces it, and the user loses Profile, Appearance, Admin
+ * and Sign out with no way back.
+ *
+ * This forces exactly that state and asserts navigation is still reachable.
+ */
+async function reportNavigationReachable(page: Page): Promise<boolean> {
+  await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+  // Simulate a previewed-but-not-server-rendered theme.
+  //
+  // Evaluated as source text rather than a function: tsx compiles arrow
+  // functions with esbuild's `__name` helper, which does not exist in the page
+  // and throws there.
+  await page.evaluate(`document.documentElement.dataset.theme = 'riso'`);
+  await page.waitForTimeout(200);
+
+  const reachable = (await page.evaluate(`(() => {
+    var els = Array.prototype.slice.call(
+      document.querySelectorAll('a[href], button[type="submit"]'),
+    );
+    var visible = els.filter(function (el) { return el.offsetParent !== null; });
+    function has(text) {
+      return visible.some(function (el) {
+        return (el.textContent || '').trim().toLowerCase().indexOf(text) !== -1;
+      });
+    }
+    return { appearance: has('appearance'), profile: has('profile'), signOut: has('sign out') };
+  })()`)) as Record<string, boolean>;
+
+  const missing = Object.entries(reachable)
+    .filter(([, ok]) => !ok)
+    .map(([name]) => name);
+
+  if (missing.length) {
+    console.error(
+      `\n  NAVIGATION LOST when data-theme is out of step with the server: ${missing.join(', ')}`,
+    );
+    return true;
+  }
+  console.log('  navigation survives a mismatched data-theme');
+  return false;
+}
+
 async function reportDuplication(page: Page): Promise<boolean> {
   const text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   const pairs: [string, string][] = [

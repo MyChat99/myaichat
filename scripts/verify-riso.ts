@@ -284,9 +284,19 @@ function main() {
    * rule bar stops carrying `RisoTabs`, a chat page loses every navigation
    * link and the sign-out button with them, and still looks fine.
    */
+  /**
+   * Keyed on the tabs, not the rule bar. The rule bar exists on every chat page;
+   * it only CARRIES navigation when the server rendered it with riso=true, and
+   * hiding the header on the weaker condition stranded users with no navigation
+   * at all when `data-theme` ran ahead of the server.
+   */
   check(
-    'the shell bar is hidden only where a rule replaces it',
-    /body:has\(\[data-riso='rule'\]\)\s*\[data-riso='masthead-bar'\]/.test(css),
+    'the shell bar is hidden only where the tabs that replace it exist',
+    /body:has\(\[data-riso='tabs'\]\)\s*\[data-riso='masthead-bar'\]/.test(css),
+  );
+  check(
+    'the hide rule does not key on the rule bar alone',
+    !/body:has\(\[data-riso='rule'\]\)\s*\[data-riso='masthead-bar'\]/.test(css),
   );
   check(
     'the rule bar carries the navigation that replaces it',

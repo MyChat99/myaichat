@@ -1,7 +1,8 @@
 'use client';
 
 import { Check, Loader2, Monitor, Moon, RotateCcw, Sun } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
 import { saveAppearance } from '@/app/(app)/settings/actions';
@@ -63,6 +64,17 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
     initial.accentColor.startsWith('#') ? initial.accentColor : '',
   );
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
+
+  /**
+   * What the server last rendered with.
+   *
+   * The preview writes straight to the document, so leaving this page with an
+   * unsaved draft would otherwise carry a theme the server knows nothing about
+   * into every subsequent page — `data-theme` says one thing, the markup was
+   * built for another. That mismatch is what removed the navigation bar once.
+   */
+  const savedRef = useRef<Appearance>(initial);
 
   /**
    * Whether the OS is asking for dark, tracked in state rather than read
@@ -118,6 +130,11 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
     preview(draft);
   }, [draft, preview]);
 
+  // Unsaved previews do not leave this page.
+  useEffect(() => {
+    return () => preview(savedRef.current);
+  }, [preview]);
+
   function update(patch: Partial<Appearance>) {
     setDraft((prev) => ({ ...prev, ...patch }));
   }
@@ -136,8 +153,17 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
   function save() {
     startTransition(async () => {
       const result = await saveAppearance(draft);
-      if (result.ok) toast.success('Appearance saved.');
-      else toast.error(result.error);
+      if (result.ok) {
+        savedRef.current = draft;
+        toast.success('Appearance saved.');
+        // The theme decides server-rendered STRUCTURE, not just colour — Riso
+        // prints a masthead and moves the navigation. Without re-rendering, the
+        // document would keep markup built for the previous theme until a full
+        // reload.
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
     });
   }
 
