@@ -84,7 +84,34 @@ app tells it*, and it says so.
 
 ---
 
-## 1:00 – 1:25 · Themes
+## 1:00 – 1:20 · Ask the presses
+
+**Click:** Presses.
+
+**Select a second and third model** — the chips overprint as you pick them.
+
+**Type:** `Explain a closure in one sentence.` **and press Set it.**
+
+**Say, while they stream side by side:**
+
+> One prompt, three models, at once. This is the thing the abstraction buys:
+> they're different vendors with different APIs, and the app doesn't know or
+> care.
+
+**Wait for the footers.** Then, pointing at them:
+
+> Every answer carries what it cost, how many tokens it used, and time to first
+> token — which is the number that decides whether a model *feels* fast. The
+> summary underneath names the cheapest and the first to answer.
+
+**Say if the costs differ by an order of magnitude, which they usually do:**
+
+> That's the same question answered for a fraction of a cent and for twenty
+> times that. Being able to see that is the point.
+
+---
+
+## 1:20 – 1:40 · Themes
 
 **Click:** Appearance.
 

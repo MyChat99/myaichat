@@ -18,6 +18,9 @@ Tailwind. TypeScript throughout, strict mode, no `any` in the core paths.
 
 - **Streaming chat** with token-by-token rendering, stop-generation, regenerate,
   and edit-and-resubmit
+- **Ask the presses** — send one prompt to up to four models at once and read
+  the answers side by side, each with what it cost, how many tokens it used, and
+  how long it took to say its first word
 - **Switch models mid-conversation** — Anthropic, OpenAI, Groq and Perplexity, in the
   same thread
 - **Markdown with syntax-highlighted code**, sanitised against XSS, one-click copy

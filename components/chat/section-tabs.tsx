@@ -36,6 +36,7 @@ export function SectionTabs({
 
   const tabs = [
     { href: '/', label: 'Page', match: (p: string) => p === '/' || p.startsWith('/c/') },
+    { href: '/compare', label: 'Presses', match: (p: string) => p.startsWith('/compare') },
     { href: '/profile', label: 'Profile', match: (p: string) => p.startsWith('/profile') },
     { href: '/settings', label: 'Appearance', match: (p: string) => p.startsWith('/settings') },
     ...(isAdmin

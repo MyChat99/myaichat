@@ -9,6 +9,36 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 ## Entry format
 
 ```
+### DEC-021 — Overnight P4: build "Ask the presses" and per-message cost
+
+**Date:** 2026-08-02
+
+**Chosen, in order:** (a) *Ask the presses* — one prompt to several models at once, side by side, with per-answer latency, tokens and cost. (b) *Cost transparency* — what each answer and each conversation actually cost.
+
+**Why these two.** They are the only candidates that are **impossible without this app's structure**: four providers behind one abstraction, and per-message token data we already store. Every other candidate is a good chat feature that any chat app could add.
+
+**The gate, answered:**
+
+| | (a) Ask the presses | (b) Cost transparency |
+|---|---|---|
+| Enabled by our structure? | Yes — one abstraction over four vendors is the whole mechanism | Yes — `messages.input_tokens/output_tokens` already exist per row |
+| "That's clever" in 30s? | Two models answering the same question in parallel, with what each cost | Seeing a real number under an answer, and a running month total |
+| Testable headlessly? | Yes — NDJSON stream asserted per model, plus Playwright | Yes — arithmetic against stored rows |
+| Compromises anything? | Costs N× per run, so it is gated by the same rate limit and daily token budget as chat, and refuses before spending | No |
+
+**Rejected, with reasons:**
+
+- **Conversation branching (c)** — genuinely useful, but nothing about it needs multi-provider or our data. A stranger would call it a good feature, not a clever one, and it needs a schema change plus a tree UI. Highest maintenance cost of the list for the least structural advantage.
+- **Full-text search (d)** — Postgres would do the work; the app contributes nothing. Reads as table stakes rather than differentiation.
+- **Saved prompts / personas (e)** — settings-shaped. Section 6.7 forbids settings nobody asked for.
+- **Smart routing (f)** — the most interesting rejection. It genuinely uses the multi-provider advantage, but "cheap model for simple turns" requires a *classifier* to decide what is simple, and a wrong call silently downgrades an answer the user cared about. Shipping a thing that quietly picks a worse model is worse than not shipping it, and I cannot reach production quality on the judgement layer tonight. Revisit once (a) exists — comparison data is exactly what would justify a routing rule.
+- **Model handoff (g)** — already possible: switching model mid-conversation works and is tested. Marking it in the transcript is a small increment on something that exists, not a feature.
+- **Printable issue export (h)** — attractive with the press design, and `.md`/`.json` export already exists. Pure presentation; loses to both chosen candidates on the "only this app could do it" test.
+
+**How I will prove they work:** an NDJSON contract test asserting each model streams independently and one failing does not kill the others; a budget test proving a comparison is refused *before* spending when the daily limit would be exceeded; usage rows written per model so analytics stay accurate; Playwright screenshots at 1440px and 360px.
+
+**The strongest argument against (a):** it multiplies spend by the number of models selected, on an app whose own README makes a point of cost control. Chosen anyway because the spend is explicit, bounded by the existing budget, refused up front rather than mid-run, and *visible in the result itself* — the feature's output is what it cost. A cost-control story is better served by a feature that shows costs than by not building it.
+
 ### DEC-020 — Every palette gets two inks and its own stock
 
 **Date:** 2026-08-01

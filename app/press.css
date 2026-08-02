@@ -705,6 +705,182 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
   box-shadow: none;
 }
 
+/* ── ask the presses ─────────────────────────────────────────────────────────
+   A comparison is a spread: one setup panel across the top, then a column per
+   press, each its own bordered sheet. The columns are created before any answer
+   arrives, so the slowest one holds its place rather than appearing late and
+   shifting the others. */
+[data-press='compare-page'] {
+  padding: 26px;
+  gap: 22px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+[data-press='compare-setup'] {
+  border: var(--rule) solid var(--border);
+  box-shadow: 5px 5px 0 var(--primary);
+  background: var(--background);
+  margin-bottom: 22px;
+}
+[data-press='press-picker'] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 14px 0;
+  border: 0;
+}
+[data-press='press-chip'] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border: var(--hairline) solid var(--border);
+  background: var(--background);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.16s var(--press-ease),
+    box-shadow 0.16s var(--press-ease);
+}
+[data-press='press-chip']:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--border);
+}
+/* Selected is overprinted, like the chosen slip — not merely tinted. */
+[data-press='press-chip'][data-on='true'] {
+  background: var(--overprint);
+  color: var(--overprint-foreground);
+  box-shadow: 3px 3px 0 var(--border);
+}
+[data-press='press-chip']:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+[data-press='compare-field'] {
+  padding: 12px 14px;
+}
+[data-press='compare-hint'] {
+  font-family: var(--press-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+[data-press='compare-error'] {
+  border: var(--hairline) solid var(--destructive);
+  box-shadow: 3px 3px 0 var(--destructive);
+  padding: 10px 13px;
+  margin-bottom: 18px;
+  font-size: 13px;
+  color: var(--destructive);
+}
+
+[data-press='compare-empty'] {
+  max-width: 620px;
+  padding: 20px 0 0;
+}
+
+/* One column per press. `auto-fit` rather than a fixed count, so two columns
+   are wide and four are still readable, and one media query stacks them. */
+[data-press='compare-grid'] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+[data-press='compare-column'] {
+  border: var(--rule) solid var(--border);
+  background: var(--background);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+[data-press='compare-column'][data-status='error'] {
+  border-color: var(--destructive);
+}
+[data-press='compare-head'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: var(--hairline) solid var(--border);
+  background: var(--card);
+}
+[data-press='compare-model'] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--press-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  min-width: 0;
+}
+[data-press='compare-metric'] {
+  font-family: var(--press-mono);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+[data-press='compare-body'] {
+  padding: 13px 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 96px;
+  overflow-wrap: anywhere;
+}
+[data-press='compare-waiting'],
+[data-press='compare-failed'] {
+  font-family: var(--press-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+[data-press='compare-failed'] {
+  color: var(--destructive);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-size: 12px;
+}
+[data-press='compare-foot'] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 12px 10px;
+  border-top: var(--hairline) dashed var(--secondary);
+  font-family: var(--press-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+[data-compare-summary] {
+  margin-top: 18px;
+}
+
+@media (max-width: 720px) {
+  [data-press='compare-page'] {
+    padding: 14px;
+  }
+  [data-press='compare-grid'] {
+    grid-template-columns: 1fr;
+  }
+  [data-compare-summary] {
+    grid-template-columns: 1fr;
+  }
+  [data-compare-summary] [data-press='col-c'] {
+    border-right: 0;
+    border-bottom: var(--hairline) solid var(--border);
+  }
+  [data-compare-summary] [data-press='col-c']:last-child {
+    border-bottom: 0;
+  }
+}
+
 /* ── portrait ────────────────────────────────────────────────────────────────
    Square, keylined and offset. A circular avatar is the one shape this design
    has no vocabulary for — everything else on the page is a rectangle with a
