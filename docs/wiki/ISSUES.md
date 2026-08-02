@@ -617,7 +617,9 @@ in ROADMAP rather than here.
 **Status:** Open | **Severity:** Low | **Phase:** 1 | **Opened:** 2026-07-30 | **Resolved:** —
 **Problem:** A clean `create-next-app` on Next 16.2.12 reports 12 high-severity advisories, all transitive: `minimatch`/`brace-expansion` DoS through the ESLint chain (dev-only), `postcss` source-map path traversal (build-time), and `sharp`/libvips CVEs (image optimization). None introduced by our code.
 **Re-checked 2026-08-01:** down to **3**, all `sharp`/libvips. The ESLint-chain and `postcss` advisories cleared via upstream patch releases exactly as predicted, without any action here. The remaining three still require `--force`, which downgrades Next.
-**Resolution:** Left as-is. Revisit if `sharp` ends up on a request path handling untrusted images — it is currently only reachable through Next's image optimizer, and nothing in this app passes user uploads through it.
+**Re-checked 2026-08-02 — the line above is now wrong and is corrected rather than edited away.** Still 3 high, but no longer all `sharp`: three *new* `postcss` advisories landed (GHSA-qx2v-qp2m-jg93, GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849). Measured tree: `next@16.2.12` pins `postcss@8.4.31` and `sharp@0.34.5`; everything else in the tree already resolves `postcss@8.5.25`, which is patched.
+**Considered and rejected: a `package.json` override.** Pinning `postcss` to `^8.5.25` and `sharp` to `^0.35` would clear all three without downgrading Next. Not done, because neither has an exposure path here: `postcss` processes only CSS we wrote ourselves at build time, and the advisories need attacker-controlled CSS; `sharp` is reachable only through Next's image optimizer, which no user upload passes through. Overriding a framework's pinned dependency — `sharp` especially, which ships native binaries — trades a real deploy risk for no reduction in actual exposure.
+**Resolution:** Left as-is, deliberately. Revisit if either lands on a request path that handles untrusted input, or if Next itself moves off the pinned versions.
 
 ### ISSUE-005 — `supabase gen types` needs Docker, so `lib/db/types.ts` is hand-maintained
 

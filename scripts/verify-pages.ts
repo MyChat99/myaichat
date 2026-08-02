@@ -161,15 +161,23 @@ const AUDIT_SCRIPT = `(() => {
     return { width, height };
   };
 
-  // The spec exempts a target "in a sentence or block of text". A link whose
-  // parent holds prose around it is that case, and padding it to 24px would
-  // wreck the line height of the paragraph it sits in.
+  // The spec exempts a target "in a sentence or block of text", and padding
+  // such a link to 24px would wreck the line height of the paragraph it sits
+  // in.
+  //
+  // The test is the criterion itself, not a length threshold: the element is
+  // laid out \`inline\` — so it flows within a line rather than occupying its own
+  // box — and there is other text beside it in its parent. A first attempt used
+  // "parent is at least 12 characters longer", which called "No account?
+  // Create one" a standalone control by one character.
   const inlineInProse = function (el) {
     if (el.tagName !== 'A') return false;
+    if (getComputedStyle(el).display !== 'inline') return false;
     const parent = el.parentElement;
     if (!parent) return false;
-    const own = (el.textContent || '').trim().length;
-    return (parent.textContent || '').trim().length > own + 12;
+    const own = (el.textContent || '').trim();
+    const all = (parent.textContent || '').trim();
+    return all.length > own.length && all.replace(own, '').trim().length > 0;
   };
 
   const smallTargets = controls
@@ -280,6 +288,13 @@ async function main() {
     { path: '/admin/users', name: 'admin-users' },
     { path: `/admin/users/${userId}`, name: 'admin-user-detail' },
     { path: '/this-route-does-not-exist', name: 'not-found' },
+    /**
+     * The two pages a visitor sees before anything else, audited signed OUT.
+     * They live outside the app shell, so nothing above covers them — and a
+     * broken login page is the only defect that costs you every user at once.
+     */
+    { path: '/login', name: 'login', anonymous: true },
+    { path: '/signup', name: 'signup', anonymous: true },
   ];
 
   const browser = await chromium.launch();
@@ -301,8 +316,15 @@ async function main() {
         },
       ]);
 
+      // The signed-out pages need a context with no session, or the app
+      // redirects them straight to the chat and they are never audited.
+      const anonContext = await browser.newContext({
+        viewport: { width: viewport.width, height: viewport.height },
+        reducedMotion: 'reduce',
+      });
+
       for (const route of routes) {
-        const page = await context.newPage();
+        const page = await (route.anonymous ? anonContext : context).newPage();
         const consoleErrors: string[] = [];
         page.on('console', (message) => {
           if (message.type() !== 'error') return;
@@ -372,6 +394,7 @@ async function main() {
       }
 
       await context.close();
+      await anonContext.close();
     }
 
     /**
