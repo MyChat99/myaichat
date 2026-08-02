@@ -38,6 +38,12 @@ assertions · Playwright verified working (screenshot taken before any work).
   shadcn writes `rounded-lg` as a literal class where `--radius: 0` cannot reach
   it. Fixed for those primitives everywhere they appear.
   → `docs/screenshots/login/before-360.png` vs `after-360.png`
+- **Land on a sign-in page that looks like the product and says what it is.**
+  It was a bare card in an empty page — no name, no description, nothing
+  connecting it to the design behind it. It now carries the masthead, sets its
+  fields in the composer's mono rail, and says "Multi-provider AI chat", which
+  nothing on that page said before.
+  → `docs/screenshots/login/gate-light.png`, `gate-dark.png`
 - **Be told what to do when you are suspended.** The banner said you could read
   but not send. It now also says who to ask to have it lifted.
 - **Send a message with a stale attachment and get told what to do**, instead of
@@ -125,12 +131,15 @@ you.
 | # | Work | Value gate | Outcome | Class |
 |---|---|---|---|---|
 | 0 | Pre-flight: merged PR #46, baselined suite, verified Playwright | — | 25 suites green, 1,176 assertions | — |
-| 2 | **Ask the presses** — one prompt to up to four models, side by side, with cost, tokens and time-to-first-token | Helps you (demo) and any visitor: they can see four vendors answer the same question and what each cost, which needs the abstraction and our per-message token data | Merged | USER-VISIBLE |
-| 1 | Unconfigured providers offered models that could not answer; missing attachment returned 500 | Helps anyone on the live site: they stop being offered models that fail on send, and a stale attachment tells them what to do | Merged | CORRECTNESS |
+| 1 | Unconfigured providers offered models that could not answer; missing attachment returned 500 | Helps anyone on the live site: they stop being offered models that fail on send, and a stale attachment tells them what to do | Merged (PR #47) | CORRECTNESS |
+| 2 | **Ask the presses** — one prompt to up to four models, side by side, with cost, tokens and time-to-first-token | Helps you (demo) and any visitor: they can see four vendors answer the same question and what each cost, which needs the abstraction and our per-message token data | Merged (PR #48) | USER-VISIBLE |
 | 3 | **Cost transparency** — what each answer and each conversation cost, plus a running month total | Helps you and every user: the app charged for tokens and showed the number only to admins. Needs our per-message token rows, which a wrapper around one vendor's API does not have | Merged (PR #49) | USER-VISIBLE |
 | 4 | The mobile nav was unreachable; `verify:pages` renders every route at 360/768/1440 | Helps anyone who opens this on a phone — they could not sign out or reach settings | Merged (PR #51) | CORRECTNESS |
 | 5 | `/login` and `/signup` had never been rendered by any suite; the sign-in page mixed square and round | Helps every visitor: it is the first page anyone sees, and it did not look like the product | Merged (PR #52) | USER-VISIBLE |
 | 6 | `verify:failures` induces six real failures in a browser and reads what the screen says | Helps anyone who hits a limit or an outage: they now get a message that says what happened and what to do | Merged (PR #53) | CORRECTNESS |
+| 7 | `/api/compare` accepted the same model twice — billed twice, rendered both answers into both columns | Protects anyone using the comparison: a crafted request cost double for one answer | Merged (PR #55) | SECURITY |
+| 8 | ARCHITECTURE gained the comparison path and the cost link; SHOWCASE's numbers were a week stale | Helps you demo it and anyone read it — the route that best shows off the abstraction was undocumented | Merged (PR #56) | DOCS |
+| 9 | **The sign-in page** now carries the masthead and says what the product is | Helps every visitor: the first page anyone sees looked like a scaffold and named nothing | Merged (PR #58) | USER-VISIBLE |
 
 ### Detail
 
@@ -222,3 +231,81 @@ That suite's capability check was also selecting any enabled non-vision model,
 which after this change was one the app would never offer — so it had quietly
 stopped testing capability refusal. It now selects from the models actually
 offered, and says so when none is text-only rather than passing silently.
+
+---
+
+## § THE MORNING BRIEFING
+
+Written to be read in three minutes, before the sections above.
+
+### What happened
+
+**Eleven pull requests, all merged, all with CI green on the exact commit.**
+Zero regressions: the suite went from 25 suites / 1,176 assertions to **29
+suites / 1,536 assertions**, and every run since has passed with shared state
+unchanged.
+
+Two features shipped complete, as briefed — **Ask the presses** and **cost
+transparency** — and then the night turned into something I did not plan.
+
+### The thing that mattered most, and I did not see it coming
+
+I built a suite that opens pages. It found, immediately, that **the navigation
+was unreachable on a phone**: at 360px, Presses, Profile, Appearance, Admin and
+Sign out were all past the right edge — clipped away by an `overflow: hidden`
+with no scrollbar to hint they existed. You could not open settings or sign out
+from a phone at all.
+
+That had been true for some time, past 1,176 passing assertions. Every suite in
+this repo asserted rows, bytes or source text. **None of them had ever opened a
+page.** The same suite then found the sign-in page rendering in two different
+design languages, and a second suite found the app answering a spent budget with
+the word "Loading".
+
+If you take one thing from tonight: the gap was never in how much was tested. It
+was that nothing looked.
+
+### What I would want you to check first
+
+1. **Open the live site on your phone.** That is the fix I am least able to
+   prove is *right* rather than merely *not broken* — I verified it at three
+   fixed widths in a headless browser, not on a real device with a real thumb.
+2. **The sign-in page**, light and dark. It is the one change tonight that is a
+   design opinion rather than a defect being fixed, and it is the first thing
+   any visitor sees.
+3. **Send one message and look under the answer.** The price should be there,
+   and the masthead should show a running total.
+
+### Honest assessment
+
+**What I am confident in.** The two features are complete and tested against
+stored state, not response shape. The security-relevant work — the ownership
+scope on conversation costs, the duplicate-model fix, the pre-spend refusal —
+was proven by deliberately breaking each check and watching it fail. Nothing
+merged on a red or stale CI run. No secret was logged, printed or committed, and
+no control was weakened to make anything pass.
+
+**What I am less confident in.** The mobile fix is verified at 360, 768 and
+1440 in Chromium only — not on iOS Safari, which has its own opinions about
+`dvh` and safe areas. The sign-in redesign is taste, and you may disagree with
+it; it is one file and one CSS block, and reverting it costs nothing.
+
+**Where I was wrong tonight, and corrected it in the open.** Three of the new
+suite's own checks were wrong before they were right, and I only know that
+because I broke the app on purpose to test them — the headline overflow check
+does not fire at all in this layout, and I would have shipped it as a green
+light on a broken page. Twice a test I wrote reported a bug that was not there:
+the daily budget refuses once usage has *reached* the limit rather than
+predicting the next turn, and an absolute message count proves nothing when an
+earlier section of the same suite sends a message on purpose. Both are recorded
+in the commits rather than quietly fixed. I also found that a previous session's
+edit had left half of `DECISIONS.md` inside an unclosed code fence; that is
+fixed and said so.
+
+**What I deliberately did not do.** I did not delete the 366 untagged demo usage
+rows, because that means destroying analytics data on my own inference — it is
+in § WHAT I NEED FROM YOU with the count query first. I did not override
+`postcss` or `sharp` to clear three advisories, because neither has an exposure
+path here and overriding a framework's pinned native dependency trades a real
+deploy risk for no reduction in actual exposure; the reasoning is written into
+ISSUE-006 rather than left implicit. I touched no dashboard.
