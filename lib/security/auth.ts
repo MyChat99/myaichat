@@ -12,6 +12,8 @@ export type SessionUser = {
   avatarUrl: string | null;
   role: UserRole;
   suspended: boolean;
+  /** When the account was created. Drives the masthead's issue number. */
+  createdAt: string;
 };
 
 /**
@@ -31,7 +33,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('display_name, avatar_url, role, suspended')
+    .select('display_name, avatar_url, role, suspended, created_at')
     .eq('id', user.id)
     .single();
 
@@ -43,6 +45,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     // Default to the least privilege if the profile row is somehow missing.
     role: profile?.role ?? 'user',
     suspended: profile?.suspended ?? false,
+    createdAt: profile?.created_at ?? user.created_at,
   };
 }
 

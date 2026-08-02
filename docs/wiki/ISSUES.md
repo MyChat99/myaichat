@@ -33,6 +33,26 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 **Resolution:** A new nullable `usage_logs.source` column (migration `20260801120000`); demo rows set it, cleanup deletes on it, and the guard checks both tables. The loop is now driven by the pool, so each template is used exactly once and no title can repeat — the pool size *is* the amount of data. Pool expanded from 6 to 24 threads.
 **Proven:** 366 → 395 → 366 across `--demo` / `--clean-demo`, and 24 conversations with 24 unique titles. Pre-existing untagged rows are [ISSUE-031](#issue-031).
 
+### ISSUE-038 — Browser uploads are blocked by the bucket's CORS policy
+
+**Status:** Open — needs your hands (Cloudflare dashboard) | **Severity:** High | **Phase:** 6 | **Opened:** 2026-08-01
+**This is Phase 6 human check #1, finally performed — by a script, and it fails.**
+**Problem:** the browser's `PUT` to R2 never leaves the page. `Fetch API cannot load https://myaichat.<account>.r2.cloudflarestorage.com/chat/…` — a CORS refusal. The attachment chip therefore sits on "Uploading…" forever and the send button stays disabled.
+**Not the application.** Presigning is correct and `verify:storage` still passes a full server-side round trip — presign → PUT → read back → delete. The failing step is the only one that depends on the bucket allowing a cross-origin request, and only the bucket can allow it.
+**Fix (Cloudflare → R2 → bucket → Settings → CORS policy):**
+```json
+[{
+  "AllowedOrigins": ["http://localhost:3000", "https://myaichat-production.up.railway.app"],
+  "AllowedMethods": ["PUT", "GET", "HEAD"],
+  "AllowedHeaders": ["content-type"],
+  "ExposeHeaders": ["ETag"],
+  "MaxAgeSeconds": 3600
+}]
+```
+`content-type` is required in `AllowedHeaders`: the client sends it on the PUT because it is part of what was signed, so a policy without it fails the preflight. The policy must be on the **S3 API** bucket endpoint shown in the error, not the public `r2.dev` domain.
+**How to confirm:** `npm run verify:upload` — it attaches a file in a real browser, waits for the upload, sends, and asserts against the database that the message stored the attachment. It prints this policy when it detects a CORS refusal.
+**Deliberately not in `verify:all`:** it depends on infrastructure outside the repository, and a suite that cannot go green without a dashboard change stops being a signal.
+
 ### ISSUE-037 — The layout was tied to one theme
 
 **Status:** Resolved | **Severity:** High | **Phase:** 5 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01

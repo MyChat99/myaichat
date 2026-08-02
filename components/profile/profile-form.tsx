@@ -49,7 +49,12 @@ export function ProfileForm({
         <h2 className="text-sm font-medium">Avatar</h2>
 
         <div className="flex items-center gap-4">
-          <div className="bg-muted flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full">
+          {/* Square, hard-bordered, offset. Circles belong to the soft UI this
+              design replaced — a printed portrait is a block on the page. */}
+          <div
+            className="bg-muted flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full"
+            data-press="portrait"
+          >
             {avatarKey ? (
               // Served through our route, never the bucket — the URL is a
               // short-lived presigned redirect.

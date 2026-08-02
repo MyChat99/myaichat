@@ -48,7 +48,7 @@ export function AttachmentTray({ items, onRemove }: Props) {
   if (items.length === 0) return null;
 
   return (
-    <ul className="mb-2 flex flex-wrap gap-2" aria-label="Attachments">
+    <ul className="mb-2 flex flex-wrap gap-2" aria-label="Attachments" data-press="tray">
       {items.map((item) => {
         const Icon = iconFor(item.kind);
         const failed = Boolean(item.error);
@@ -56,6 +56,8 @@ export function AttachmentTray({ items, onRemove }: Props) {
         return (
           <li
             key={item.id}
+            data-press="chip"
+            data-failed={failed ? 'true' : 'false'}
             className={`border-border bg-muted/40 flex items-center gap-2 rounded-lg border py-1.5 pr-1.5 pl-2 text-xs ${
               failed ? 'border-destructive/50 bg-destructive/5' : ''
             }`}
@@ -68,10 +70,14 @@ export function AttachmentTray({ items, onRemove }: Props) {
                 src={item.previewUrl}
                 alt=""
                 className="size-7 rounded object-cover"
+                data-press="chip-thumb"
                 aria-hidden
               />
             ) : (
-              <span className="bg-background text-muted-foreground grid size-7 place-items-center rounded">
+              <span
+                className="bg-background text-muted-foreground grid size-7 place-items-center rounded"
+                data-press="chip-thumb"
+              >
                 <Icon className="size-3.5" aria-hidden />
               </span>
             )}
@@ -143,6 +149,7 @@ export function AttachButton({
         aria-label={title}
         title={title}
         onClick={() => input.current?.click()}
+        data-press="clip"
       >
         <Paperclip className="size-4" />
       </Button>
@@ -154,8 +161,13 @@ export function AttachButton({
 export function DropOverlay({ active }: { active: boolean }) {
   if (!active) return null;
   return (
-    <div className="border-primary bg-background/90 absolute inset-0 z-10 grid place-items-center rounded-lg border-2 border-dashed">
-      <p className="text-sm font-medium">Drop to attach</p>
+    <div
+      className="border-primary bg-background/90 absolute inset-0 z-10 grid place-items-center rounded-lg border-2 border-dashed"
+      data-press="drop"
+    >
+      <p className="text-sm font-medium" data-press="drop-label">
+        Drop here
+      </p>
     </div>
   );
 }

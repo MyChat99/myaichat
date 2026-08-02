@@ -33,16 +33,10 @@ export default async function NewChatPage() {
       storageEnabled={isStorageConfigured()}
       maxUploadMb={await maxUploadMb()}
       isAdmin={user.role === 'admin'}
+      avatarKey={user.avatarUrl}
+      email={user.email}
       colophon={await loadColophon(presses)}
-      /* Formatted on the server: `new Date()` in a client component renders one
-         string on the server and another in the browser. */
-      /* Formatted on the server: `new Date()` in a client component renders one
-         string on the server and another in the browser. */
-      lede={[
-        new Date().toLocaleDateString('en-GB', { weekday: 'long' }),
-        new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }),
-        `${presses} press${presses === 1 ? '' : 'es'} running`,
-      ].join(' · ')}
+      lede={{ now: new Date().toISOString(), presses }}
     />
   );
 }
