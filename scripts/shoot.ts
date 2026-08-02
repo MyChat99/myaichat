@@ -285,7 +285,6 @@ async function reportThemeLeak(page: Page): Promise<boolean> {
   // The structure is permanent now — see verify:structure, which asserts every
   // palette renders it identically. Nothing is theme-only to leak.
   return false;
-  // eslint-disable-next-line no-unreachable
 
   const RISO_ONLY = [
     'masthead',

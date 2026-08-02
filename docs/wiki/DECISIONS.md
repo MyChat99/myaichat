@@ -9,6 +9,25 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 ## Entry format
 
 ```
+### DEC-020 — Every palette gets two inks and its own stock
+
+**Date:** 2026-08-01
+
+**Decision:** the palette set is seven presses, not seven hues: Riso, Newsprint, Blueprint, Pulp, Neon, Botanical, Mono. Each has a **stock** of its own — grey, deep blue, tan, near-black, cream, pure white — and **two contrasting inks**, not one accent on near-white.
+
+**Why:** the previous set was eight near-white backgrounds with one mid-tone accent each. Structurally identical *and* perceptually identical, which made the picker a list of tints. Riso was the only one with character, and the only one using two inks.
+
+**A sixth role was added** — `display`, the second ink at large type — because the ink that works as a filled chip is often unusable as text. Riso's yellow pill cannot be a headline; Mono has no second ink at all and repeats its first, deliberately.
+
+**Two measurement lessons, both learned by getting it wrong:**
+
+- **`mix-blend-mode: multiply` is not an overprint, it is a subtraction.** It leaves the backdrop untouched wherever the ink is lighter than the stock, so on Blueprint's deep blue paper the marked headline words vanished completely. Removed; the second ink is now set as a plain colour.
+- **Contrast ratio is the wrong metric for "are these two inks different".** It compares luminance, so it scored Neon's electric green against its magenta at **1.04:1** — two colours that could not look less alike, rated nearly identical. Ink separation is measured as distance in RGB (≥60) instead. Using contrast ratio would have forced the palettes to be dull in order to pass.
+
+**Retired ids are migrated, not dropped:** `default → newsprint`, `midnight/ocean → blueprint`, `forest → botanical`, `sunset/rose → pulp`. A row pointing at a palette that no longer exists is a broken row, so this migration does touch existing preferences — the only theme migration that does, and it says so.
+
+---
+
 ### DEC-019 — The layout is permanent; a theme is colour and nothing else
 
 **Date:** 2026-08-01 · **Supersedes the containment half of [DEC-017](#dec-017)**

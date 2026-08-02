@@ -12,7 +12,7 @@
  *
  *   npm run verify:theme
  */
-import { AA_NORMAL, contrastRatioHex } from '../lib/theme/contrast';
+import { AA_NORMAL, contrastRatioHex, parseHex } from '../lib/theme/contrast';
 import { ACCENT_PRESETS, THEMES, type ThemeTokens } from '../lib/theme/presets';
 
 let failures = 0;
@@ -35,7 +35,7 @@ function check(label: string, ratio: number | null, minimum = AA_NORMAL) {
   }
 }
 
-function checkMode(themeLabel: string, mode: 'light' | 'dark', t: ThemeTokens) {
+function checkMode(themeLabel: string, mode: 'light' | 'dark', t: ThemeTokens, id: string) {
   const prefix = `${themeLabel}/${mode}`;
 
   // Primary text everywhere it lands.
@@ -71,6 +71,43 @@ function checkMode(themeLabel: string, mode: 'light' | 'dark', t: ThemeTokens) {
    * 3:1 is WCAG 1.4.11's bar for a non-text element that carries meaning, and a
    * card boundary carries meaning.
    */
+  /**
+   * The second ink at display size. 3:1 is WCAG AA for large text, and the
+   * headline is the only place this colour is set — it is never body copy.
+   */
+  check(`${prefix}: display ink on paper`, contrastRatioHex(t.display, t.background), 3);
+
+  /**
+   * And it has to be a SECOND ink, not the first one again.
+   *
+   * Measured as distance in RGB, NOT as a contrast ratio. Contrast ratio is a
+   * luminance comparison, so it scores Neon's electric green against its
+   * magenta at 1.04:1 — two colours that could not look less alike, rated
+   * nearly identical, because they happen to be equally bright. Using it here
+   * would have demanded the palettes be dull rather than distinct.
+   *
+   * The headline sets its first ink differently by mode — the accent on light
+   * stock, the paper colour at night — so the comparison follows that.
+   *
+   * Mono is exempt by design: brutalism with one ink is the point, and its
+   * display colour repeats the first deliberately.
+   */
+  if (id !== 'mono') {
+    const against = mode === 'dark' ? t.text : t.accent;
+    const a = parseHex(t.display);
+    const b = parseHex(against);
+    const distance = a && b ? Math.hypot(a.r - b.r, a.g - b.g, a.b - b.b) : null;
+    checks++;
+    if (distance !== null && distance >= 60) {
+      console.log(`  ok    ${prefix}: the two inks are distinguishable — Δ${distance.toFixed(0)}`);
+    } else {
+      console.error(
+        `  FAIL  ${prefix}: the two inks are distinguishable — Δ${distance?.toFixed(0) ?? '?'} (needs 60)`,
+      );
+      failures++;
+    }
+  }
+
   check(`${prefix}: ink reads against the paper`, contrastRatioHex(t.border, t.background), 3);
   check(`${prefix}: ink reads against the stock`, contrastRatioHex(t.border, t.surface), 3);
 }
@@ -78,8 +115,8 @@ function checkMode(themeLabel: string, mode: 'light' | 'dark', t: ThemeTokens) {
 console.log('WCAG AA contrast — every theme, both modes\n');
 
 for (const theme of THEMES) {
-  checkMode(theme.label, 'light', theme.light);
-  checkMode(theme.label, 'dark', theme.dark);
+  checkMode(theme.label, 'light', theme.light, theme.id);
+  checkMode(theme.label, 'dark', theme.dark, theme.id);
   console.log('');
 }
 
