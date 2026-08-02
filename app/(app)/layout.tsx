@@ -95,6 +95,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               pushes the horizontal scrollbar onto the whole page. */}
           <nav className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
             <Link
+              href="/compare"
+              className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+            >
+              Presses
+            </Link>
+
+            <Link
               href="/profile"
               className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
             >
