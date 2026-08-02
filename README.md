@@ -18,7 +18,8 @@ Tailwind. TypeScript throughout, strict mode, no `any` in the core paths.
 
 - **Streaming chat** with token-by-token rendering, stop-generation, regenerate,
   and edit-and-resubmit
-- **Switch models mid-conversation** — Anthropic and OpenAI, in the same thread
+- **Switch models mid-conversation** — Anthropic, OpenAI, Groq and Perplexity, in the
+  same thread
 - **Markdown with syntax-highlighted code**, sanitised against XSS, one-click copy
 - **Conversation management** — search, rename, pin, delete
 - **Eight themes** in light and dark. Seven are palettes; the default, **Riso**,

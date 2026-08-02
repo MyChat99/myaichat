@@ -9,7 +9,8 @@ and what state it is actually in. No hype, and the unfinished parts are named.
 
 ## What it is
 
-A multi-provider AI chat platform. You bring your own OpenAI and Anthropic keys;
+A multi-provider AI chat platform. You bring your own keys for any of four
+providers — Anthropic, OpenAI, Groq and Perplexity;
 it gives you streaming chat, an admin panel to manage providers and models,
 per-user theming, usage analytics and an audit trail.
 
@@ -26,7 +27,7 @@ WCAG AA from the token data, so adding a theme gets it checked without anyone
 writing a new test.
 
 The interesting constraint is that **it is not tied to a provider**. Adding a
-third means writing one adapter file and one registry line — no route change, no
+fourth meant writing one adapter file and one registry line — no route change, no
 UI change, no schema change. That claim is enforced by a test that greps the
 tree and fails if a vendor SDK import or a provider name appears outside
 `lib/providers`.

@@ -40,6 +40,8 @@ graph TB
     subgraph vendors["Third parties"]
         ANTH["Anthropic API"]
         OAI["OpenAI API"]
+        GROQ["Groq API"]
+        PPLX["Perplexity API"]
         R2["Cloudflare R2"]
         RESEND["Resend"]
     end
@@ -69,8 +71,17 @@ Three things about this drawing are load-bearing:
 **Only `lib/providers` touches a vendor SDK.** The chat route asks the registry
 for an adapter and streams whatever comes back; it names no vendor and imports
 no vendor package. `npm run verify:providers` greps the tree to prove it, because
-two providers both working is not evidence — an `if/else` in the route would
-pass that test and fail this one.
+providers all working is not evidence — an `if/else` in the route would pass that
+test and fail this one.
+
+Four are registered: Anthropic, OpenAI, Groq and Perplexity. The last two speak
+OpenAI's wire format at a different base URL, so they share
+`openai-compatible.ts` rather than re-implementing the same stream parsing three
+times — and the parts of "OpenAI-compatible" that are not (the output-cap
+parameter's name, whether `stream_options` is accepted, whether `GET /models`
+exists) are the config that file exposes. `npm run verify:adapters` exercises
+every rejection path against a local fake, so 401 / 429 / quota / context-length
+handling is tested without a credential and without spending anything.
 
 **Mutations are Server Actions, not route handlers.** Next verifies the `Origin`
 header before a Server Action body runs, which is the CSRF control. A mutation

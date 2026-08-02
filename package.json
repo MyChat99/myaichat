@@ -43,7 +43,8 @@
     "shoot": "tsx scripts/shoot.ts",
     "verify:persistence": "tsx scripts/verify-persistence.ts",
     "verify:structure": "tsx scripts/verify-structure.ts",
-    "verify:upload": "tsx scripts/verify-upload.ts"
+    "verify:upload": "tsx scripts/verify-upload.ts",
+    "verify:adapters": "tsx --conditions=react-server scripts/verify-adapters.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

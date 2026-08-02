@@ -4,7 +4,9 @@ import { createAdminClient } from '@/lib/db/admin';
 import { decryptSecret } from '@/lib/security/crypto';
 
 import { ANTHROPIC_PROVIDER_NAME, createAnthropicProvider } from './anthropic';
+import { GROQ_PROVIDER_NAME, createGroqProvider } from './groq';
 import { OPENAI_PROVIDER_NAME, createOpenAIProvider } from './openai';
+import { PERPLEXITY_PROVIDER_NAME, createPerplexityProvider } from './perplexity';
 import { ProviderError, type ChatProvider } from './types';
 
 /**
@@ -20,6 +22,8 @@ import { ProviderError, type ChatProvider } from './types';
 const ADAPTERS: Record<string, (apiKey: string) => ChatProvider> = {
   [ANTHROPIC_PROVIDER_NAME]: createAnthropicProvider,
   [OPENAI_PROVIDER_NAME]: createOpenAIProvider,
+  [GROQ_PROVIDER_NAME]: createGroqProvider,
+  [PERPLEXITY_PROVIDER_NAME]: createPerplexityProvider,
 };
 
 /**
@@ -32,6 +36,8 @@ const ADAPTERS: Record<string, (apiKey: string) => ChatProvider> = {
 const ENV_FALLBACK: Record<string, string | undefined> = {
   [ANTHROPIC_PROVIDER_NAME]: 'ANTHROPIC_API_KEY',
   [OPENAI_PROVIDER_NAME]: 'OPENAI_API_KEY',
+  [GROQ_PROVIDER_NAME]: 'GROQ_API_KEY',
+  [PERPLEXITY_PROVIDER_NAME]: 'PERPLEXITY_API_KEY',
 };
 
 export type ResolvedModel = {
