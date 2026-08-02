@@ -64,7 +64,7 @@ export default async function UserUsagePage({ params }: { params: Promise<{ id: 
       <div>
         <Link
           href="/admin/users"
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
+          className="text-muted-foreground hover:text-foreground inline-flex min-h-6 items-center gap-1.5 text-sm"
         >
           <ArrowLeft className="size-3.5" aria-hidden />
           All users

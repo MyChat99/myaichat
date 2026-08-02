@@ -387,6 +387,13 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
   font-size: 13px;
   color: var(--muted-foreground);
   padding-bottom: 2px;
+  /* 24px is the WCAG 2.2 minimum target size. These measured 23.5px, which is
+     a thumb-sized miss on a phone. Grown upward — `flex-end` keeps the text and
+     its underline exactly where they were, so the rule gains height without
+     the masthead moving. */
+  display: inline-flex;
+  align-items: flex-end;
+  min-height: 24px;
   border-bottom: 2.5px solid transparent;
   background: none;
   text-decoration: none;
@@ -750,6 +757,49 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
    itself is not. */
 @media (max-width: 900px) {
   [data-press='ledger'] {
+    display: none;
+  }
+
+  /* Dropping the ledger was not enough, and the comment above was written on
+     the assumption that it would be.
+     Measured at 360px: the band's contents ran to 665px inside a 360px pane
+     that clips with `overflow: hidden`. Presses, Profile, Appearance, Admin
+     and Sign out were all past the right edge — not scrolled off, *gone*, with
+     no scrollbar to suggest they existed. A phone could not reach settings or
+     sign out at all. At 768px it cost Admin and Sign out.
+     The band now wraps, so the tabs take a line of their own rather than being
+     cut. They keep `margin-left: auto`, so they stay right-aligned on it. */
+  [data-press='rule'] {
+    flex-wrap: wrap;
+    row-gap: 9px;
+  }
+  /* The tabs wrap among themselves too. At 360px the row still ran 30px long
+     and dropped "Sign out" off the end — the one control a shared or borrowed
+     phone most needs. */
+  [data-press='tabs'] {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 15px;
+  }
+  [data-press='folio'] {
+    max-width: 20ch;
+  }
+}
+
+/* Below Tailwind's `md`, the sidebar toggle floats over this band on
+   `position: absolute`, so the folio started underneath it and the two
+   overlapped. The band is indented to clear it. */
+@media (max-width: 767px) {
+  [data-press='rule'] {
+    padding-left: 56px;
+  }
+}
+
+/* The keyboard hint describes a keyboard the phone does not have, and at this
+   width it collided with the panel's own label rather than sitting opposite
+   it. */
+@media (max-width: 560px) {
+  [data-press='coupon-l'] span:last-child {
     display: none;
   }
 }

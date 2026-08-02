@@ -96,21 +96,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <nav className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
             <Link
               href="/compare"
-              className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+              className="text-muted-foreground hover:text-foreground inline-flex min-h-6 items-center text-sm underline-offset-4 hover:underline"
             >
               Presses
             </Link>
 
             <Link
               href="/profile"
-              className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+              className="text-muted-foreground hover:text-foreground inline-flex min-h-6 items-center text-sm underline-offset-4 hover:underline"
             >
               Profile
             </Link>
 
             <Link
               href="/settings"
-              className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+              className="text-muted-foreground hover:text-foreground inline-flex min-h-6 items-center text-sm underline-offset-4 hover:underline"
             >
               Appearance
             </Link>
@@ -118,7 +118,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             {user.role === 'admin' ? (
               <Link
                 href="/admin"
-                className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+                className="text-muted-foreground hover:text-foreground inline-flex min-h-6 items-center text-sm underline-offset-4 hover:underline"
               >
                 Admin
               </Link>
