@@ -233,6 +233,123 @@ async function auditPage(page: Page): Promise<Audit> {
   return page.evaluate(AUDIT_SCRIPT) as Promise<Audit>;
 }
 
+/**
+ * Contrast as it is actually painted, which is not the same question as
+ * contrast between two tokens.
+ *
+ * `verify:theme` proves every pair in a palette definition meets AA. That says
+ * nothing about whether the CSS pairs the *right* two: the selected
+ * conversation card was painted in `--overprint` and reversed out in
+ * `--primary-foreground`, two colours which had each passed against their own
+ * partner and which came to **1.43:1** against each other at night. The one
+ * thing on the page you are looking at was very nearly invisible, and no
+ * token-level check could have seen it.
+ *
+ * So this walks the rendered page, takes the computed colour of every element
+ * with its own text, resolves the first opaque background behind it, and
+ * applies WCAG 1.4.3 — 4.5:1, or 3:1 for large text.
+ */
+const CONTRAST_SCRIPT = `(() => {
+  const relative = function (channel) {
+    const s = channel / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  const luminance = function (rgb) {
+    return 0.2126 * relative(rgb[0]) + 0.7152 * relative(rgb[1]) + 0.0722 * relative(rgb[2]);
+  };
+  /**
+   * Resolved by painting it, not by parsing it.
+   *
+   * \`getComputedStyle().color\` returns \`oklch(...)\` for anything built with
+   * \`color-mix()\`, and a regex that grabs the first three numbers reads
+   * \`oklch(0.83 0.115 350)\` as RGB(0.83, 0.115, 350). That is not a small
+   * error — it invented a 2.85:1 failure for a token measuring 5.97:1, and I
+   * nearly changed the syntax colours on the strength of it. Canvas
+   * \`fillStyle\` alone is not enough either: it declines to normalise an
+   * out-of-sRGB value to hex. Painting one pixel and reading it back always
+   * yields sRGB bytes.
+   */
+  const canvas = document.createElement('canvas');
+  canvas.width = 1;
+  canvas.height = 1;
+  const paint = canvas.getContext('2d', { willReadFrequently: true });
+  const parse = function (value) {
+    if (!value) return null;
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = '#000000';
+    paint.fillStyle = value;
+    paint.fillRect(0, 0, 1, 1);
+    const data = paint.getImageData(0, 0, 1, 1).data;
+    return [data[0], data[1], data[2]];
+  };
+  const ratio = function (a, b) {
+    const x = luminance(a);
+    const y = luminance(b);
+    const hi = Math.max(x, y);
+    const lo = Math.min(x, y);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  /**
+   * The first ancestor that actually paints. A background with alpha below
+   * ~0.85 lets the layer beneath through, so it is not what the text sits on.
+   */
+  const backdrop = function (el) {
+    let node = el;
+    while (node) {
+      const value = getComputedStyle(node).backgroundColor;
+      const parts = (value || '').match(/[\\d.]+/g);
+      if (parts && (parts.length < 4 || Number(parts[3]) > 0.85)) return value;
+      node = node.parentElement;
+    }
+    return null;
+  };
+
+  const findings = [];
+  Array.from(document.querySelectorAll('body *')).forEach(function (el) {
+    // Only elements holding their own text. A wrapper inherits a colour it
+    // never paints anything with.
+    const own = Array.from(el.childNodes)
+      .filter(function (n) { return n.nodeType === 3 && n.textContent.trim(); })
+      .map(function (n) { return n.textContent.trim(); })
+      .join(' ');
+    if (!own) return;
+
+    /**
+     * A lettermark standing in for a vendor's logo is exempt: WCAG 1.4.3 does
+     * not apply to text that is part of a logo or brand name, these are
+     * \`aria-hidden\`, and the provider's name is in real text beside them.
+     * Exempted by what they are, so the exemption cannot quietly widen.
+     */
+    if (el.closest('[aria-hidden="true"]')) return;
+
+    const style = getComputedStyle(el);
+    if (style.visibility === 'hidden' || style.display === 'none') return;
+    if (Number(style.opacity) < 0.5) return;
+    const box = el.getBoundingClientRect();
+    if (box.width === 0 || box.height === 0) return;
+
+    const fg = parse(style.color);
+    const bg = parse(backdrop(el));
+    if (!fg || !bg) return;
+
+    const px = parseFloat(style.fontSize);
+    const large = px >= 24 || (px >= 18.66 && Number(style.fontWeight) >= 700);
+    const minimum = large ? 3 : 4.5;
+    const measured = ratio(fg, bg);
+
+    if (measured < minimum - 0.01) {
+      findings.push(
+        measured.toFixed(2) + ':1 (needs ' + minimum + ') ' +
+        el.tagName.toLowerCase() +
+        (el.getAttribute('data-press') ? '[' + el.getAttribute('data-press') + ']' : '') +
+        ' "' + own.slice(0, 28) + '" at ' + style.fontSize,
+      );
+    }
+  });
+  return findings;
+})()`;
+
 async function main() {
   mkdirSync(OUT, { recursive: true });
 
@@ -269,7 +386,14 @@ async function main() {
     {
       conversation_id: convo!.id,
       role: 'assistant',
-      content: '## A monotype\n\nA single impression.\n\n```js\nconst one = 1;\n```',
+      /**
+       * The code sample exercises a keyword, a string, a number, a comment and
+       * a function name on purpose. An earlier fixture had only `const one = 1`
+       * — so the contrast check ran, passed, and had never once looked at a
+       * string literal or a comment.
+       */
+      content:
+        '## A monotype\n\nA single impression.\n\n```js\n// how many impressions\nconst count = 1;\nfunction pull(name) {\n  return `one ${name}`;\n}\n```',
     },
   ]);
 
@@ -387,6 +511,55 @@ async function main() {
             `${route.name} @${viewport.name}: renders`,
             false,
             err instanceof Error ? err.message.slice(0, 100) : String(err),
+          );
+        } finally {
+          await page.close();
+        }
+      }
+
+      await context.close();
+      await anonContext.close();
+    }
+
+    /**
+     * Contrast, at one width but in BOTH schemes. Contrast does not vary with
+     * viewport width; it varies enormously between light and dark, and dark is
+     * where the one real failure lived.
+     */
+    console.log('\nContrast, as painted\n');
+
+    for (const scheme of ['light', 'dark'] as const) {
+      const context = await browser.newContext({
+        viewport: { width: 1440, height: 900 },
+        colorScheme: scheme,
+        reducedMotion: 'reduce',
+      });
+      await context.addCookies([
+        {
+          name: `sb-${projectRef}-auth-token`,
+          value: cookieValue,
+          domain: new URL(BASE_URL).hostname,
+          path: '/',
+        },
+      ]);
+      const anonContext = await browser.newContext({
+        viewport: { width: 1440, height: 900 },
+        colorScheme: scheme,
+      });
+
+      for (const route of routes) {
+        const page = await (route.anonymous ? anonContext : context).newPage();
+        try {
+          await page.goto(`${BASE_URL}${route.path}`, {
+            waitUntil: 'networkidle',
+            timeout: 45_000,
+          });
+          await page.waitForTimeout(400);
+          const findings = (await page.evaluate(CONTRAST_SCRIPT)) as string[];
+          check(
+            `${route.name} @${scheme}: every piece of text meets AA`,
+            findings.length === 0,
+            findings.slice(0, 3).join(' · '),
           );
         } finally {
           await page.close();
