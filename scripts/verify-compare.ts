@@ -112,6 +112,32 @@ async function main() {
       'an empty prompt is refused',
       (await post({ prompt: '   ', modelIds: [a.id, b.id] })).status === 400,
     );
+    /**
+     * The picker cannot produce this, but the route is reachable without it.
+     * Before the schema deduplicated, `[a, a]` ran the same model twice and
+     * billed for both — and since every stream event is keyed by model id, the
+     * two identical columns each received both copies of the text.
+     */
+    const usageBeforeDuplicate = await admin
+      .from('usage_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    const duplicate = await post({ prompt: 'hi', modelIds: [a.id, a.id] });
+    check(
+      'the same model twice is one model, and refused as one',
+      duplicate.status === 400,
+      `got ${duplicate.status}`,
+    );
+    const usageAfterDuplicate = await admin
+      .from('usage_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    check(
+      'and it was refused before spending anything',
+      (usageAfterDuplicate.count ?? 0) === (usageBeforeDuplicate.count ?? 0),
+      `${usageBeforeDuplicate.count} → ${usageAfterDuplicate.count}`,
+    );
+
     check(
       'an unknown model is refused with 409, not silently dropped',
       (
