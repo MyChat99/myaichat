@@ -473,17 +473,18 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
   color: var(--primary);
   text-wrap: balance;
 }
+/* The second ink, at display size.
+   No `mix-blend-mode: multiply` — multiply leaves the backdrop untouched
+   wherever the ink is lighter than the stock, so on Blueprint's deep blue paper
+   the marked words simply vanished. Overprinting is a nice effect on pale stock
+   and a bug on everything else. */
 [data-press='headline'] mark {
   background: none;
-  color: var(--primary);
-  mix-blend-mode: multiply;
+  color: var(--display-ink);
 }
-/* Same reason as the wordmark: pink on pink is not two inks. */
+/* The headline's first ink. */
 .dark [data-press='headline'] {
   color: var(--foreground);
-}
-.dark [data-press='headline'] mark {
-  mix-blend-mode: normal;
 }
 [data-press='standfirst'] {
   font-size: 16.5px;

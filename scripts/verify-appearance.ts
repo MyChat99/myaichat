@@ -133,7 +133,7 @@ async function main() {
     // Write a distinctive set, then prove the SERVER renders it.
     const wanted = {
       theme: 'dark' as const,
-      preset_theme: 'ocean',
+      preset_theme: 'blueprint',
       accent_color: '#7c3aed',
       font_size: 'lg' as const,
       bubble_style: 'flat' as const,
@@ -148,24 +148,24 @@ async function main() {
     const html = await fetch(`${BASE_URL}/`, { headers: { cookie } }).then((r) => r.text());
 
     check('server renders the dark class (no flash)', /<html[^>]*class="[^"]*\bdark\b/.test(html));
-    check('server renders the chosen preset', html.includes('data-theme="ocean"'));
+    check('server renders the chosen preset', html.includes('data-theme="blueprint"'));
     check('server renders the bubble style', html.includes('data-bubble="flat"'));
     check('server renders the font size', /font-size:\s*18px/.test(html));
 
-    const ocean = getTheme('ocean');
+    const chosen = getTheme('blueprint');
     check(
       'the theme stylesheet is inlined in the document',
-      html.includes('id="theme-tokens"') && html.includes(ocean.dark.background),
+      html.includes('id="theme-tokens"') && html.includes(chosen.dark.background),
       'token block missing',
     );
     check(
       'the custom accent overrides the preset accent',
-      html.includes('#7c3aed') && !html.includes(`--primary:${ocean.dark.accent}`),
+      html.includes('#7c3aed') && !html.includes(`--primary:${chosen.dark.accent}`),
     );
 
     // A second request is a different device as far as the server is concerned.
     const second = await fetch(`${BASE_URL}/`, { headers: { cookie } }).then((r) => r.text());
-    check('preferences persist across requests', second.includes('data-theme="ocean"'));
+    check('preferences persist across requests', second.includes('data-theme="blueprint"'));
 
     /**
      * The signed-out visitor, in full.

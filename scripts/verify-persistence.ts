@@ -174,7 +174,7 @@ async function main() {
     console.log('\nSelecting a theme and navigating away immediately\n');
 
     await page.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
-    await page.locator('button[aria-pressed]', { hasText: 'Ocean' }).first().click();
+    await page.locator('button[aria-pressed]', { hasText: 'Blueprint' }).first().click();
     await page.waitForTimeout(400);
     const previewed = await painted(page);
     console.log(`      while still on settings   ${describe(previewed)}`);

@@ -55,6 +55,7 @@ const MAP: Record<string, keyof ThemeTokens> = {
   // second ink and an overprint, and every palette must answer for both.
   '--accent-alt': 'accentAlt',
   '--accent-alt-foreground': 'accentAltForeground',
+  '--display-ink': 'display',
   '--overprint': 'overprint',
   '--overprint-foreground': 'overprintForeground',
 };

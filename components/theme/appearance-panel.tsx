@@ -233,10 +233,11 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
         <div>
           <h2 className="text-sm font-medium">Theme</h2>
           <p className="text-muted-foreground text-xs">
-            Every theme meets WCAG AA contrast in both light and dark.
+            Colour only — every palette renders the same layout. Each swatch shows the stock, a rule
+            in its ink, both inks and the muted text. All meet WCAG AA in light and dark.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-4">
           {THEMES.map((theme) => {
             const swatch = draft.theme === 'dark' ? theme.dark : theme.light;
             const selected = draft.presetTheme === theme.id;
@@ -250,14 +251,33 @@ export function AppearancePanel({ initial }: { initial: Appearance }) {
                   selected ? 'ring-ring border-transparent ring-2' : ''
                 }`}
               >
-                <span className="flex gap-1" aria-hidden>
-                  {[swatch.background, swatch.surfaceHover, swatch.accent].map((c, i) => (
+                {/* A miniature of the thing itself, rather than three loose
+                    chips. The old preview showed background, hover and accent —
+                    three near-identical pale squares for most palettes, which
+                    is exactly why they all looked like one theme slightly
+                    tinted. This shows every role a palette fills: the stock it
+                    is printed on, a rule drawn in the ink, both inks, and the
+                    muted text, in the arrangement the app uses them. */}
+                <span
+                  className="flex flex-col gap-1 p-2"
+                  aria-hidden
+                  style={{ background: swatch.background, border: `2px solid ${swatch.border}` }}
+                >
+                  <span className="flex items-center gap-1">
                     <span
-                      key={i}
-                      className="border-border size-5 rounded border"
-                      style={{ backgroundColor: c }}
+                      className="h-3 w-8"
+                      style={{ background: swatch.accent }}
+                      title="First ink"
                     />
-                  ))}
+                    <span
+                      className="h-3 w-4"
+                      style={{ background: swatch.accentAlt }}
+                      title="Second ink"
+                    />
+                    <span className="h-[2px] flex-1" style={{ background: swatch.border }} />
+                  </span>
+                  <span className="h-[6px] w-full" style={{ background: swatch.surface }} />
+                  <span className="h-[3px] w-2/3" style={{ background: swatch.textMuted }} />
                 </span>
                 <span className="flex items-center justify-between text-xs">
                   {theme.label}

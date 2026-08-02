@@ -22,7 +22,7 @@ export default async function AppearanceSettingsPage() {
         <header>
           <h1 className="text-xl font-semibold">Appearance</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Changes preview instantly. They apply to every device once saved.
+            Changes apply as you make them, on every device.
           </p>
         </header>
 
