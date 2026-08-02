@@ -150,6 +150,7 @@ you.
 | 9 | **The sign-in page** now carries the masthead and says what the product is | Helps every visitor: the first page anyone sees looked like a scaffold and named nothing | Merged (PR #58) | USER-VISIBLE |
 | 10 | The **selected** conversation card was 1.43:1 in dark; code comments 4.14:1 in light | Helps anyone using dark mode: the one item on screen you are looking at was nearly invisible | Merged (PR #60) | CORRECTNESS |
 | 11 | Contrast now measured in all 7 palettes, both modes — and the cycle-10 defect was worse than I reported | Protects every palette from the same class of pairing bug, not just the default one | Merged (PR #62) | CORRECTNESS |
+| 12 | Focus visibility checked on all **218** tab stops across ten pages, instead of on one button | Protects anyone using a keyboard: nothing found, and it is now one careless `outline: none` away from being caught | Merged (PR #63) | CORRECTNESS |
 
 ### Detail
 
@@ -250,9 +251,9 @@ Written to be read in three minutes, before the sections above.
 
 ### What happened
 
-**Eleven pull requests, all merged, all with CI green on the exact commit.**
+**Sixteen pull requests, all merged, all with CI green on the exact commit.**
 Zero regressions: the suite went from 25 suites / 1,176 assertions to **29
-suites / 1,536 assertions**, and every run since has passed with shared state
+suites / 1,591 assertions**, and every run since has passed with shared state
 unchanged.
 
 Two features shipped complete, as briefed — **Ask the presses** and **cost
