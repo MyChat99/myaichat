@@ -183,15 +183,77 @@ async function main() {
       `got ${anonDownload.status}`,
     );
 
-    // Capability refusal — a text-only model must refuse an image rather than
-    // silently dropping it.
-    const { data: model } = await admin
-      .from('models')
-      .select('id, display_name')
-      .eq('supports_vision', false)
-      .eq('enabled', true)
-      .limit(1)
-      .maybeSingle();
+    /**
+     * Capability refusal — a text-only model must refuse an image rather than
+     * silently dropping it.
+     *
+     * The model has to be one the app would actually OFFER. Selecting any
+     * enabled non-vision row picked a provider with no key, whose model no
+     * longer resolves, so the route fell back to a different model and the test
+     * stopped testing capability refusal while still passing for a while.
+     */
+    const { listAvailableModels } = await import('../lib/providers/registry');
+    const offered = await listAvailableModels();
+    const model = offered.find((m) => !m.supportsVision) ?? null;
+
+    if (!model) {
+      console.log(
+        '  skip  no configured model is text-only, so capability refusal cannot be exercised',
+      );
+    }
+
+    /**
+     * An attachment whose object is not in the bucket.
+     *
+     * Reachable in real use: an object that expired or was deleted, or a key a
+     * client held after a failed upload. It used to throw out of `fetchObject`
+     * and surface as a bare 500 with a vendor stack in the log — nothing the
+     * user could act on, and the storage path (which contains their user id) in
+     * the server error.
+     */
+    {
+      const { data: convo } = await admin
+        .from('conversations')
+        .insert({ user_id: created.user.id, title: 'missing object' })
+        .select('id')
+        .single();
+
+      const res = await fetch(`${BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie },
+        body: JSON.stringify({
+          conversationId: convo!.id,
+          message: 'what is this?',
+          attachments: [
+            {
+              key: `chat/${created.user.id}/never-uploaded.png`,
+              name: 'holiday.png',
+              mimeType: 'image/png',
+              sizeBytes: 100,
+              kind: 'image',
+            },
+          ],
+        }),
+        redirect: 'manual',
+      });
+      const body = await res.text();
+
+      check(
+        'an attachment missing from storage is a 400, not a 500',
+        res.status === 400,
+        `got ${res.status}`,
+      );
+      check(
+        'and the message names the file so the user can act on it',
+        body.includes('holiday.png') && /attach it again/i.test(body),
+        body.slice(0, 120),
+      );
+      check(
+        'and it does not leak the storage path',
+        !body.includes(created.user.id) && !body.includes('never-uploaded'),
+        body.slice(0, 120),
+      );
+    }
 
     if (model) {
       const { data: convo } = await admin
