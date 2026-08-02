@@ -9,6 +9,33 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 ## Entry format
 
 ```
+### DEC-NNN — Short title
+**Date:** YYYY-MM-DD | **Phase:** N | **Status:** Active | Superseded by DEC-NNN
+**Decision:** What was chosen.
+**Why:** The reasoning, and what was rejected.
+**Tradeoff:** What this costs us.
+```
+
+---
+
+### DEC-022 — An answer's price is stored, linked, and never inferred
+
+**Date:** 2026-08-02 | **Phase:** 7 | **Status:** Active
+
+**Decision:** `usage_logs.message_id`, nullable, `on delete set null`. Existing rows are not backfilled, and the displayed price is read from the stored `estimated_cost` rather than recomputed from current model rates.
+
+**Why three separate calls, each of which could have gone the other way:**
+
+- **`set null`, not `cascade`.** Deleting a conversation must not erase what it cost. Billing history a user can delete is not billing history — the link is cleared and the record kept.
+- **No backfill.** The obvious backfill correlates old usage rows to answers by timestamp. It would be right most of the time and silently wrong the rest, and nothing downstream could tell which. An unpriced answer now renders **no price**, not `$0.00` — a confident zero on an answer that cost real money is worse than saying nothing.
+- **Read the stored cost, don't recompute.** A rate change must not retroactively rewrite what last month's answers cost. The row holds the price as charged, which is the only version that stays true.
+
+**Tradeoff:** Answers written before 2026-08-02 will never show a price. The conversation total still counts them as unpriced rather than pretending they were free.
+
+**Boundary note:** `usage_logs` is service-role only, so `loadConversationCost` runs on a client that bypasses RLS and scopes every query to an authenticated user id. That scope is the *entire* authorization boundary for this feature — `verify:costs` asserts it and was confirmed to fail when the scope is removed.
+
+---
+
 ### DEC-021 — Overnight P4: build "Ask the presses" and per-message cost
 
 **Date:** 2026-08-02
@@ -38,6 +65,10 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 **How I will prove they work:** an NDJSON contract test asserting each model streams independently and one failing does not kill the others; a budget test proving a comparison is refused *before* spending when the daily limit would be exceeded; usage rows written per model so analytics stay accurate; Playwright screenshots at 1440px and 360px.
 
 **The strongest argument against (a):** it multiplies spend by the number of models selected, on an app whose own README makes a point of cost control. Chosen anyway because the spend is explicit, bounded by the existing budget, refused up front rather than mid-run, and *visible in the result itself* — the feature's output is what it cost. A cost-control story is better served by a feature that shows costs than by not building it.
+
+**Outcome:** both shipped and merged — (a) PR #48, (b) PR #49. Mechanics of (b) are [DEC-022](#dec-022).
+
+---
 
 ### DEC-020 — Every palette gets two inks and its own stock
 

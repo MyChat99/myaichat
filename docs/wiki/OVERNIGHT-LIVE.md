@@ -21,6 +21,11 @@ assertions · Playwright verified working (screenshot taken before any work).
   summary underneath names the cheapest and the first to answer. This is the one
   thing in the app that no single-vendor chat product can copy.
   → `docs/screenshots/compare/desktop-result.png`, `mobile-result.png`
+- **See what an answer cost you.** Every reply now carries its price, and the
+  masthead runs a total — this conversation, and this month to date. The app was
+  already recording every token and every dollar and showing you none of it:
+  spend lived on an admin dashboard, in aggregate, which the person spending the
+  money cannot open. → `docs/screenshots/cost/thread-light.png`, `thread-dark.png`
 - **Send a message with a stale attachment and get told what to do**, instead of
   a blank failure. An attachment whose file is no longer in storage used to
   return a 500 with a vendor stack in the server log; it now says
@@ -52,6 +57,7 @@ Ordered. Everything here is blocked on something only you can reach.
 | 0 | Pre-flight: merged PR #46, baselined suite, verified Playwright | — | 25 suites green, 1,176 assertions | — |
 | 2 | **Ask the presses** — one prompt to up to four models, side by side, with cost, tokens and time-to-first-token | Helps you (demo) and any visitor: they can see four vendors answer the same question and what each cost, which needs the abstraction and our per-message token data | Merged | USER-VISIBLE |
 | 1 | Unconfigured providers offered models that could not answer; missing attachment returned 500 | Helps anyone on the live site: they stop being offered models that fail on send, and a stale attachment tells them what to do | Merged | CORRECTNESS |
+| 3 | **Cost transparency** — what each answer and each conversation cost, plus a running month total | Helps you and every user: the app charged for tokens and showed the number only to admins. Needs our per-message token rows, which a wrapper around one vendor's API does not have | Merged (PR #49) | USER-VISIBLE |
 
 ### Detail
 
@@ -78,6 +84,30 @@ the server error. Reachable in real use by an object that expired or was
 deleted, or a key a client kept after a failed upload. Now a **400** naming the
 file and telling the user to re-attach it, with three assertions covering the
 status, the message, and that the storage path does not leak.
+
+**Cycle 3 — the price goes where the money is spent.** Three calls, recorded in
+[DEC-022](DECISIONS.md#dec-022): the answer→usage link is `on delete set null`
+rather than `cascade`, because billing history a user can delete is not billing
+history; old rows are **not** backfilled, because correlating them by timestamp
+would be right most of the time and silently wrong the rest; and the displayed
+price is read from the stored cost rather than recomputed, so a rate change
+cannot rewrite what last month cost. An answer that cannot be priced shows no
+price — never `$0.00`.
+
+`usage_logs` is service-role only, so the loader bypasses RLS and scopes every
+query to an authenticated user id. **That scope is the whole authorization
+boundary**, so `verify:costs` was run with it deliberately removed: a stranger
+then read `$0.000515` and one priced message. Restored, it reads nothing.
+
+**Two checks in that suite open a browser, and they earned their place.** The
+first run of this feature had the price present in the DOM and *not visible* —
+every arithmetic assertion passed while nothing appeared on screen. Confirmed
+non-vacuous by setting `display: none` on the stamp and watching the suite fail.
+
+One consequence logged rather than fixed: [ISSUE-039](ISSUES.md#issue-039)
+(Perplexity bills per search as well as per token) was a reporting gap on an
+admin dashboard and is now a number shown to a user. It stays Low only because
+no Perplexity key is configured here; it must be fixed before one is.
 
 That suite's capability check was also selecting any enabled non-vision model,
 which after this change was one the app would never offer — so it had quietly
