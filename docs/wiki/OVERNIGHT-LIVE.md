@@ -44,6 +44,11 @@ assertions · Playwright verified working (screenshot taken before any work).
   fields in the composer's mono rail, and says "Multi-provider AI chat", which
   nothing on that page said before.
   → `docs/screenshots/login/gate-light.png`, `gate-dark.png`
+- **Read the conversation you are in, at night.** The selected card in the
+  sidebar was painted in one ink and lettered in another that belonged to a
+  different pair — **1.43:1**, effectively invisible in dark mode, on the single
+  item you are looking at. Now 12.9:1. Code comments were also under AA in light
+  mode.
 - **Be told what to do when you are suspended.** The banner said you could read
   but not send. It now also says who to ask to have it lifted.
 - **Send a message with a stale attachment and get told what to do**, instead of
@@ -140,6 +145,7 @@ you.
 | 7 | `/api/compare` accepted the same model twice — billed twice, rendered both answers into both columns | Protects anyone using the comparison: a crafted request cost double for one answer | Merged (PR #55) | SECURITY |
 | 8 | ARCHITECTURE gained the comparison path and the cost link; SHOWCASE's numbers were a week stale | Helps you demo it and anyone read it — the route that best shows off the abstraction was undocumented | Merged (PR #56) | DOCS |
 | 9 | **The sign-in page** now carries the masthead and says what the product is | Helps every visitor: the first page anyone sees looked like a scaffold and named nothing | Merged (PR #58) | USER-VISIBLE |
+| 10 | The **selected** conversation card was 1.43:1 in dark; code comments 4.14:1 in light | Helps anyone using dark mode: the one item on screen you are looking at was nearly invisible | Merged (PR #60) | CORRECTNESS |
 
 ### Detail
 
@@ -289,6 +295,16 @@ no control was weakened to make anything pass.
 1440 in Chromium only — not on iOS Safari, which has its own opinions about
 `dvh` and safe areas. The sign-in redesign is taste, and you may disagree with
 it; it is one file and one CSS block, and reverting it costs nothing.
+
+**The one to read if you read only one.** Measuring contrast, my own maths was
+wrong before it was right. `getComputedStyle().color` returns `oklch(...)` for
+anything built with `color-mix()`, and my parser read the first three numbers as
+RGB — so `oklch(0.83 0.115 350)` came through as RGB(0.83, 0.115, 350). It
+invented a 2.85:1 failure for a colour that actually measures 5.97:1, **and I
+had already written a change to the syntax highlighting on the strength of it**
+before I stopped to check why light mode moved and dark mode did not. The change
+was discarded; the real defect was somewhere else entirely. A measuring
+instrument gets checked before its readings do.
 
 **Where I was wrong tonight, and corrected it in the open.** Three of the new
 suite's own checks were wrong before they were right, and I only know that
