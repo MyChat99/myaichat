@@ -92,7 +92,44 @@ test and fail this one.
 | [types.ts](types.ts) | The contract: `ChatProvider`, message/event shapes, `ProviderError` |
 | [anthropic.ts](anthropic.ts) | Anthropic adapter — the only file that knows Anthropic's API |
 | [openai.ts](openai.ts) | OpenAI adapter — the only file that knows OpenAI's API |
+| [openai-compatible.ts](openai-compatible.ts) | Shared body for providers that speak OpenAI's format at another base URL |
+| [groq.ts](groq.ts) | Groq — configuration over `openai-compatible.ts` |
+| [perplexity.ts](perplexity.ts) | Perplexity — configuration over `openai-compatible.ts` |
 | [registry.ts](registry.ts) | Name → adapter map, and DB rows → `ResolvedModel` |
+
+### If the provider is OpenAI-compatible
+
+Most new providers are. Do **not** copy `openai.ts` — build on
+`openai-compatible.ts`, which holds the stream parsing, usage extraction and
+abort handling once:
+
+```ts
+export function createMistralProvider(apiKey: string): ChatProvider {
+  return createOpenAICompatibleProvider(apiKey, {
+    name: MISTRAL_PROVIDER_NAME,
+    label: 'Mistral',
+    baseURL: 'https://api.mistral.ai/v1',
+    probeModel: '…',                     // cheapest; validateKey generates with it
+    models: { source: 'endpoint' },      // or { source: 'static', list: [...] }
+  });
+}
+```
+
+"OpenAI-compatible" is a claim rather than a guarantee, and the config exposes
+exactly the parts that are not: `outputTokenParam` (OpenAI renamed `max_tokens`
+to `max_completion_tokens`; some took the new name, some reject it),
+`requestUsageInStream` (providers that always send usage may reject the
+parameter and fail every request), and whether `GET /models` exists at all.
+
+`openai.ts` deliberately does not use it: it is the reference implementation and
+carries OpenAI-specific handling that would be noise in the shared file.
+
+### Test it without a key
+
+`npm run verify:adapters` stands a fake provider on localhost and makes it
+return 401, 403, 402, 429, `insufficient_quota`, a context-length rejection and
+a 500. Those are the paths a working key cannot reach, and they are where a new
+adapter is most likely to be wrong. It needs no credential and costs nothing.
 
 `app/api/chat/route.ts` asks the registry for a model, gets an adapter, and
 streams. It names no vendor.

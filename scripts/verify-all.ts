@@ -63,6 +63,7 @@ const SUITES: Suite[] = [
   { script: 'verify:headers', needs: 'nothing' },
   { script: 'verify:attachments', needs: 'nothing' },
   { script: 'verify:theme', needs: 'nothing' },
+  { script: 'verify:adapters', needs: 'nothing' },
 
   { script: 'verify:email', needs: 'nothing' },
 

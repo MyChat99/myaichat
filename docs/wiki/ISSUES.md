@@ -33,6 +33,14 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 **Resolution:** A new nullable `usage_logs.source` column (migration `20260801120000`); demo rows set it, cleanup deletes on it, and the guard checks both tables. The loop is now driven by the pool, so each template is used exactly once and no title can repeat — the pool size *is* the amount of data. Pool expanded from 6 to 24 threads.
 **Proven:** 366 → 395 → 366 across `--demo` / `--clean-demo`, and 24 conversations with 24 unique titles. Pre-existing untagged rows are [ISSUE-031](#issue-031).
 
+### ISSUE-039 — Perplexity spend is under-reported: search fees are not tokens
+
+**Status:** Open — known limitation | **Severity:** Low | **Phase:** 3 | **Opened:** 2026-08-02
+**Problem:** Perplexity's Sonar models bill per *search request* as well as per token, and `usage_logs` records only input and output tokens. Analytics and the daily token budget will therefore understate Perplexity spend by whatever the search component costs.
+**Why it is not a bug:** every other provider bills purely per token, and the cost model was built for that. Adding a per-request fee column would be a schema change, a migration, and a change to every aggregation — for one provider, on a deployment that has no Perplexity key configured.
+**Mitigated:** `sonar-deep-research`, whose search and citation fees dominate its cost, is deliberately not seeded — see the note in `lib/providers/perplexity.ts`.
+**Revisit** if Perplexity is actually used in anger, or if a second provider with non-token billing is added.
+
 ### ISSUE-038 — Browser uploads were blocked by our own CSP, not by CORS
 
 **Status:** Resolved | **Severity:** High | **Phase:** 6 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-02

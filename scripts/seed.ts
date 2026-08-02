@@ -51,11 +51,20 @@ const DEFAULT_SETTINGS: {
 type SeedModel = {
   model_id: string;
   display_name: string;
+  /**
+   * The per-request OUTPUT cap, not the context window — the column is what
+   * gets sent as `max_tokens`. Held at 8192 across the catalogue: several of
+   * these models will emit far more if asked, and an interactive chat that can
+   * bill 32k of output per turn is a bill nobody agreed to.
+   */
   max_tokens: number;
   default_temperature: number;
   input_cost_per_1k: number;
   output_cost_per_1k: number;
   enabled: boolean;
+  /** Attachments are offered per model, so this must be true only where it is. */
+  supports_vision?: boolean;
+  supports_documents?: boolean;
 };
 
 const CATALOGUE: { provider: string; models: SeedModel[] }[] = [
@@ -78,6 +87,109 @@ const CATALOGUE: { provider: string; models: SeedModel[] }[] = [
         default_temperature: 1.0,
         input_cost_per_1k: 0.001,
         output_cost_per_1k: 0.005,
+        enabled: true,
+      },
+    ],
+  },
+  {
+    /**
+     * Groq — open-weight models on their own inference hardware.
+     *
+     * Ids, context windows and prices from console.groq.com/docs/models and
+     * groq.com/pricing, read 2026-08-02. Prices there are per MILLION tokens;
+     * this column is per THOUSAND, hence the factor of 1000.
+     *
+     * None are flagged for vision: Groq's production text catalogue does not
+     * document image input for these ids, and guessing true would offer users a
+     * paperclip that fails on send.
+     */
+    provider: 'groq',
+    models: [
+      {
+        // 131,072 context · 32,768 max output · $0.59/$0.79 per 1M
+        model_id: 'llama-3.3-70b-versatile',
+        display_name: 'Llama 3.3 70B',
+        max_tokens: 8192,
+        default_temperature: 1.0,
+        input_cost_per_1k: 0.00059,
+        output_cost_per_1k: 0.00079,
+        enabled: true,
+      },
+      {
+        // 131,072 context · 131,072 max output · $0.05/$0.08 per 1M
+        model_id: 'llama-3.1-8b-instant',
+        display_name: 'Llama 3.1 8B Instant',
+        max_tokens: 8192,
+        default_temperature: 1.0,
+        input_cost_per_1k: 0.00005,
+        output_cost_per_1k: 0.00008,
+        enabled: true,
+      },
+      {
+        // 131,072 context · 65,536 max output · $0.15/$0.60 per 1M
+        model_id: 'openai/gpt-oss-120b',
+        display_name: 'GPT-OSS 120B',
+        max_tokens: 8192,
+        default_temperature: 1.0,
+        input_cost_per_1k: 0.00015,
+        output_cost_per_1k: 0.0006,
+        enabled: true,
+      },
+      {
+        // 131,072 context · 65,536 max output · $0.075/$0.30 per 1M
+        model_id: 'openai/gpt-oss-20b',
+        display_name: 'GPT-OSS 20B',
+        max_tokens: 8192,
+        default_temperature: 1.0,
+        input_cost_per_1k: 0.000075,
+        output_cost_per_1k: 0.0003,
+        enabled: true,
+      },
+    ],
+  },
+  {
+    /**
+     * Perplexity — search-grounded answers.
+     *
+     * Prices from docs.perplexity.ai/getting-started/pricing, read 2026-08-02,
+     * per MILLION tokens and divided by 1000 here.
+     *
+     * ⚠️ Sonar bills per search request as well as per token, and this app
+     * records only tokens. Analytics will therefore UNDERSTATE Perplexity spend.
+     * That is a known limitation rather than an oversight — logged in ISSUES.md
+     * — and it is why `sonar-deep-research`, whose search fees dominate its
+     * cost, is not seeded at all.
+     */
+    provider: 'perplexity',
+    models: [
+      {
+        // $1.00 / $1.00 per 1M
+        model_id: 'sonar',
+        display_name: 'Sonar',
+        max_tokens: 4096,
+        default_temperature: 1.0,
+        input_cost_per_1k: 0.001,
+        output_cost_per_1k: 0.001,
+        enabled: true,
+      },
+      {
+        // $3.00 / $15.00 per 1M
+        model_id: 'sonar-pro',
+        display_name: 'Sonar Pro',
+        max_tokens: 4096,
+        default_temperature: 1.0,
+        input_cost_per_1k: 0.003,
+        output_cost_per_1k: 0.015,
+        enabled: true,
+      },
+      {
+        // $2.00 / $8.00 per 1M
+        model_id: 'sonar-reasoning-pro',
+        display_name: 'Sonar Reasoning Pro',
+        max_tokens: 4096,
+        default_temperature: 1.0,
+        input_cost_per_1k: 0.002,
+        output_cost_per_1k: 0.008,
         enabled: true,
       },
     ],

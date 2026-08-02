@@ -781,10 +781,42 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
    belong to the same publication. Rather than restyling each one, the shared
    primitives get the print treatment and the pages inherit it. */
 
+/* shadcn's card hardcodes `rounded-xl` in its class list rather than deriving
+   from `--radius`, so zeroing the token is not enough to square it off. */
 [data-slot='card'],
 [data-press='panel'] {
   border: var(--hairline) solid var(--border);
   box-shadow: 4px 4px 0 var(--secondary);
+  border-radius: 0;
+  /* shadcn's card carries a `ring-1`, which reads as a second, softer border
+     beside the ink keyline. Cleared with a keyword rather than a transparent
+     hex, because this file may not name a colour — verify:structure enforces
+     that, and it caught this exact line. */
+  --tw-ring-shadow: 0 0 transparent;
+}
+[data-slot='card-header'],
+[data-slot='card-footer'] {
+  border-radius: 0;
+}
+
+/* ── provider containers ─────────────────────────────────────────────────────
+   One card per vendor, set like a stock entry: the name in mono caps, the key
+   in mono because it is a machine value, and the note beneath as a stamp. */
+[data-press='provider-name'] {
+  font-family: var(--press-mono);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+[data-press='provider-key'] {
+  font-family: var(--press-mono);
+}
+[data-press='provider-note'] {
+  font-family: var(--press-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.7;
 }
 
 table th {

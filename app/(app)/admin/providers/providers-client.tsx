@@ -99,7 +99,7 @@ function ProviderRow({ provider }: { provider: ProviderCard }) {
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
-        <CardTitle className="flex items-center gap-2 text-base">
+        <CardTitle className="flex items-center gap-2 text-base" data-press="provider-name">
           <ProviderLogo provider={provider.name} />
           {provider.name}
           {!provider.hasAdapter ? (
@@ -134,7 +134,7 @@ function ProviderRow({ provider }: { provider: ProviderCard }) {
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-muted-foreground text-xs">API key</p>
-            <p className="font-mono text-sm">
+            <p className="font-mono text-sm" data-press="provider-key">
               {provider.last4 ? `••••••••${provider.last4}` : 'Not set'}
             </p>
           </div>
@@ -266,7 +266,7 @@ function ProviderRow({ provider }: { provider: ProviderCard }) {
           ) : null}
         </div>
 
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-xs" data-press="provider-note">
           Test connection performs a real one-token generation. A key with no credit authenticates
           and lists models perfectly well — only generating proves it works.
         </p>
