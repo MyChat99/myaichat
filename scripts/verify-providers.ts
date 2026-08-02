@@ -167,7 +167,7 @@ async function main() {
   );
 
   // --- adapters ------------------------------------------------------------
-  const { getAdapter } = await import('../lib/providers/registry');
+  const { getAdapter, configuredProviderNames } = await import('../lib/providers/registry');
 
   /**
    * A provider with no key is SKIPPED, not failed.
@@ -196,6 +196,36 @@ async function main() {
       unconfigured.push(provider);
       console.log(`  skip  ${provider}: no API key configured in this environment`);
     }
+  }
+
+  /**
+   * An adapter without a key must not put models in front of a user.
+   *
+   * Registering a provider and seeding its catalogue is not the same as having
+   * paid for it. Before this was enforced, a freshly-seeded deployment offered
+   * every model of every provider it had no key for — the picker listed them,
+   * the empty state counted them, and choosing one failed only after the user
+   * had typed a message and pressed send.
+   */
+  const offeredProviders = new Set(models.map((m) => m.providerName));
+  const configured = new Set(await configuredProviderNames());
+
+  check(
+    'every OFFERED model comes from a provider that holds a key',
+    [...offeredProviders].every((p) => configured.has(p)),
+    `offered: ${[...offeredProviders].join(', ')} · configured: ${[...configured].join(', ')}`,
+  );
+
+  const registeredButUnconfigured = registeredProviderNames().filter((p) => !configured.has(p));
+  check(
+    'a registered provider with no key offers nothing',
+    registeredButUnconfigured.every((p) => !offeredProviders.has(p)),
+    registeredButUnconfigured.join(', ') || 'all providers are configured',
+  );
+  if (registeredButUnconfigured.length > 0) {
+    console.log(
+      `        ↳ registered but unconfigured, correctly hidden: ${registeredButUnconfigured.join(', ')}`,
+    );
   }
 
   check(

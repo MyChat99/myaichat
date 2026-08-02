@@ -58,6 +58,29 @@ export function registeredProviderNames(): string[] {
   return Object.keys(ADAPTERS);
 }
 
+/**
+ * Whether a provider has a key from either source.
+ *
+ * Presence only — this deliberately never decrypts, so it is safe to call while
+ * building a list. Whether the key WORKS is a different question, answered by
+ * `validateKey()` and the admin panel's Test connection.
+ */
+function hasUsableKey(name: string, keyLast4: string | null): boolean {
+  if (keyLast4) return true;
+  const envVar = ENV_FALLBACK[name];
+  return Boolean(envVar && process.env[envVar]);
+}
+
+/** Provider names that are registered AND hold a key. */
+export async function configuredProviderNames(): Promise<string[]> {
+  const admin = createAdminClient();
+  const { data } = await admin.from('providers').select('name, key_last4');
+  return (data ?? [])
+    .filter((row) => ADAPTERS[row.name] !== undefined)
+    .filter((row) => hasUsableKey(row.name, row.key_last4))
+    .map((row) => row.name);
+}
+
 export function isRegisteredProvider(name: string): boolean {
   return ADAPTERS[name] !== undefined;
 }
@@ -122,7 +145,7 @@ export async function listAvailableModels(): Promise<ResolvedModel[]> {
   const { data, error } = await admin
     .from('models')
     .select(
-      'id, model_id, display_name, max_tokens, input_cost_per_1k, output_cost_per_1k, supports_vision, supports_documents, providers!inner(name, enabled)',
+      'id, model_id, display_name, max_tokens, input_cost_per_1k, output_cost_per_1k, supports_vision, supports_documents, providers!inner(name, enabled, key_last4)',
     )
     .eq('enabled', true)
     .eq('providers.enabled', true)
@@ -130,21 +153,42 @@ export async function listAvailableModels(): Promise<ResolvedModel[]> {
 
   if (error) throw new ProviderError('provider', 'Could not load models.', true);
 
-  type Row = (typeof data)[number] & { providers: { name: string; enabled: boolean } };
+  type Row = (typeof data)[number] & {
+    providers: { name: string; enabled: boolean; key_last4: string | null };
+  };
 
-  return (data as Row[])
-    .filter((row) => ADAPTERS[row.providers.name] !== undefined)
-    .map((row) => ({
-      id: row.id,
-      modelId: row.model_id,
-      displayName: row.display_name,
-      maxTokens: row.max_tokens,
-      inputCostPer1k: Number(row.input_cost_per_1k),
-      outputCostPer1k: Number(row.output_cost_per_1k),
-      providerName: row.providers.name,
-      supportsVision: row.supports_vision,
-      supportsDocuments: row.supports_documents,
-    }));
+  return (
+    (data as Row[])
+      .filter((row) => ADAPTERS[row.providers.name] !== undefined)
+      /**
+       * A model is only OFFERED if its provider can actually be called.
+       *
+       * Registering an adapter and seeding its models is not the same as having
+       * paid for the service. Without this, a freshly-seeded deployment lists
+       * every model of every provider it has no key for: the picker offers them,
+       * the empty state counts them ("11 models are inked and ready" when four
+       * were), and choosing one fails at send with an error the user cannot act
+       * on — `getAdapter()` throws by design, but by then the user has typed a
+       * message and waited.
+       *
+       * `key_last4` is written and cleared with the key itself, so it is an exact
+       * presence test that never brings ciphertext into memory. The env fallback
+       * still counts, because a fresh checkout with keys in `.env.local` and
+       * nothing in the admin panel is a supported way to run this.
+       */
+      .filter((row) => hasUsableKey(row.providers.name, row.providers.key_last4))
+      .map((row) => ({
+        id: row.id,
+        modelId: row.model_id,
+        displayName: row.display_name,
+        maxTokens: row.max_tokens,
+        inputCostPer1k: Number(row.input_cost_per_1k),
+        outputCostPer1k: Number(row.output_cost_per_1k),
+        providerName: row.providers.name,
+        supportsVision: row.supports_vision,
+        supportsDocuments: row.supports_documents,
+      }))
+  );
 }
 
 /** Resolves one model by its DB id, or null when it is missing or disabled. */

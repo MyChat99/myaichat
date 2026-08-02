@@ -292,19 +292,50 @@ export async function POST(request: NextRequest) {
   if (attachments?.length && messages.length > 0) {
     const last = messages[messages.length - 1];
     if (last.role === 'user') {
-      const hydrated = await Promise.all(
-        attachments
-          .filter((a) => a.kind !== 'text')
-          .map(async (a) => {
-            const object = await fetchObject(a.key);
-            return {
-              kind: a.kind as 'image' | 'document',
-              mimeType: object.mimeType || a.mimeType,
-              base64: object.base64,
-              name: a.name,
-            };
-          }),
-      );
+      /**
+       * A missing object is a 400, not a 500.
+       *
+       * `fetchObject` throws if the key is not in the bucket — an object that
+       * was deleted, expired, or a key the client held on to after the upload
+       * failed. Unhandled, that surfaced as a bare 500 with a vendor stack in
+       * the server log and nothing the user could act on. It is a bad request:
+       * the attachment they are sending does not exist, and telling them to
+       * remove and re-attach it is something they can actually do.
+       */
+      let missing: string | null = null;
+      const hydrated = (
+        await Promise.all(
+          attachments
+            .filter((a) => a.kind !== 'text')
+            .map(async (a) => {
+              try {
+                const object = await fetchObject(a.key);
+                return {
+                  kind: a.kind as 'image' | 'document',
+                  mimeType: object.mimeType || a.mimeType,
+                  base64: object.base64,
+                  name: a.name,
+                };
+              } catch {
+                // The NAME, never the key: the key is a storage path containing
+                // the owner's user id.
+                missing = a.name;
+                return null;
+              }
+            }),
+        )
+      ).filter((a): a is NonNullable<typeof a> => a !== null);
+
+      if (missing) {
+        return NextResponse.json(
+          {
+            error: `"${missing}" could not be read from storage. Remove it and attach it again.`,
+            retryable: false,
+          },
+          { status: 400 },
+        );
+      }
+
       if (hydrated.length) last.attachments = hydrated;
     }
   }
