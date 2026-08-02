@@ -25,6 +25,7 @@ import { createClient } from '@supabase/supabase-js';
 import { chromium, type Page } from 'playwright';
 
 import type { Database } from '../lib/db/types';
+import { THEMES } from '../lib/theme/presets';
 import { PUBLISHABLE_KEY, SECRET_KEY, SUPABASE_URL } from './_env';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
@@ -568,6 +569,76 @@ async function main() {
 
       await context.close();
       await anonContext.close();
+    }
+
+    /**
+     * And then every palette, on the page with the most colour on it.
+     *
+     * The default palette passing says nothing about the other six. The defect
+     * this pass was written for — a card painted in one ink and lettered in
+     * another belonging to a different pair — is a *pairing* mistake in CSS,
+     * and it shows up only in whichever palette happens to put those two
+     * colours far apart. It was invisible in light and 1.43:1 in dark; another
+     * palette could hide the same shape of bug somewhere else.
+     */
+    console.log('\nContrast, every palette\n');
+
+    const { data: preferenceRow } = await admin
+      .from('user_preferences')
+      .select('preset_theme, theme, accent_color')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    try {
+      for (const theme of THEMES) {
+        for (const mode of ['light', 'dark'] as const) {
+          await admin.from('user_preferences').upsert(
+            {
+              user_id: userId,
+              preset_theme: theme.id,
+              theme: mode,
+              accent_color: 'theme',
+            },
+            { onConflict: 'user_id' },
+          );
+
+          const context = await browser.newContext({
+            viewport: { width: 1440, height: 900 },
+            colorScheme: mode,
+            reducedMotion: 'reduce',
+          });
+          await context.addCookies([
+            {
+              name: `sb-${projectRef}-auth-token`,
+              value: cookieValue,
+              domain: new URL(BASE_URL).hostname,
+              path: '/',
+            },
+          ]);
+          const page = await context.newPage();
+          try {
+            await page.goto(`${BASE_URL}/c/${convo!.id}`, {
+              waitUntil: 'networkidle',
+              timeout: 45_000,
+            });
+            await page.waitForTimeout(350);
+            const findings = (await page.evaluate(CONTRAST_SCRIPT)) as string[];
+            check(
+              `${theme.label}/${mode}: every piece of text meets AA`,
+              findings.length === 0,
+              findings.slice(0, 3).join(' · '),
+            );
+          } finally {
+            await page.close();
+            await context.close();
+          }
+        }
+      }
+    } finally {
+      // Restored even on failure — the next suite in the chain reads this row.
+      if (preferenceRow) {
+        await admin.from('user_preferences').update(preferenceRow).eq('user_id', userId);
+      }
     }
 
     /**

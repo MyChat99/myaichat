@@ -44,11 +44,14 @@ assertions · Playwright verified working (screenshot taken before any work).
   fields in the composer's mono rail, and says "Multi-provider AI chat", which
   nothing on that page said before.
   → `docs/screenshots/login/gate-light.png`, `gate-dark.png`
-- **Read the conversation you are in, at night.** The selected card in the
-  sidebar was painted in one ink and lettered in another that belonged to a
-  different pair — **1.43:1**, effectively invisible in dark mode, on the single
-  item you are looking at. Now 12.9:1. Code comments were also under AA in light
-  mode.
+- **Read the conversation you are in.** The selected card in the sidebar was
+  painted in one ink and lettered in another that belonged to a different pair —
+  effectively invisible on the single item you are looking at. It affected
+  **8 of the 14 palette-and-mode combinations**: every palette in dark, worst at
+  1.30:1, and Blueprint in light as well. (Cycle 10 reported this as a dark-mode
+  defect. That was measured on the default palette only, and it was wrong —
+  corrected here rather than edited above.) Code comments were also under AA in
+  light mode.
 - **Be told what to do when you are suspended.** The banner said you could read
   but not send. It now also says who to ask to have it lifted.
 - **Send a message with a stale attachment and get told what to do**, instead of
@@ -146,6 +149,7 @@ you.
 | 8 | ARCHITECTURE gained the comparison path and the cost link; SHOWCASE's numbers were a week stale | Helps you demo it and anyone read it — the route that best shows off the abstraction was undocumented | Merged (PR #56) | DOCS |
 | 9 | **The sign-in page** now carries the masthead and says what the product is | Helps every visitor: the first page anyone sees looked like a scaffold and named nothing | Merged (PR #58) | USER-VISIBLE |
 | 10 | The **selected** conversation card was 1.43:1 in dark; code comments 4.14:1 in light | Helps anyone using dark mode: the one item on screen you are looking at was nearly invisible | Merged (PR #60) | CORRECTNESS |
+| 11 | Contrast now measured in all 7 palettes, both modes — and the cycle-10 defect was worse than I reported | Protects every palette from the same class of pairing bug, not just the default one | Merged (PR #62) | CORRECTNESS |
 
 ### Detail
 
