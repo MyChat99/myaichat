@@ -141,6 +141,78 @@ losing the question. The `usage_logs` row is written after completion, which is
 why the daily budget is a ceiling rather than an exact meter — see
 `lib/security/token-budget.ts`.
 
+### A comparison
+
+`/api/compare` is the one route that exists because of the abstraction rather
+than in spite of it: one prompt, up to four vendors, at once.
+
+```mermaid
+sequenceDiagram
+    participant U as Browser
+    participant R as /api/compare
+    participant S as lib/security
+    participant G as registry
+    participant P as Provider APIs
+    participant D as Postgres
+
+    U->>R: POST {prompt, modelIds[2..4]}
+    R->>R: deduplicate ids, then count them
+    R->>S: suspended? rate limit? budget already spent?
+    R->>D: resolve every id against the offered catalogue
+    alt any id is unknown or unavailable
+        R-->>U: 409 — reload and pick again
+    else worst case would cross the daily budget
+        R-->>U: 429, naming how much room is left
+    else allowed
+        par one per model, independently
+            R->>G: adapter for this model
+            G->>P: stream request
+            P-->>R: deltas
+            R-->>U: {"type":"text","modelId":...}\n
+            R->>D: usage_logs row for this model
+            R-->>U: {"type":"model_done","modelId":...,"costUsd":...}\n
+        end
+    end
+```
+
+**It is a separate route, not a mode on `/api/chat`.** A conversation owns
+history, titles, truncation and a stored message; a comparison is one turn and
+several answers kept only long enough to read. Adding a flag would put a branch
+through all of that machinery for a request that uses none of it.
+
+**It refuses before spending, not partway through.** The ordinary budget check
+asks whether the user has *already* exceeded the limit. That is the wrong
+question for a request that commits N turns at once, so this route also refuses
+when `models.length × MAX_TOKENS` would cross the line. A comparison that starts
+inside the budget and ends outside it is precisely the failure a spend ceiling
+exists to prevent.
+
+**Ids are deduplicated before they are counted.** `[a, a]` used to pass the
+two-model minimum and bill twice for one answer.
+
+**One vendor failing costs the user only that column.** Each model settles on
+its own; a rejection is a `model_error` event on that column, not a failure of
+the request.
+
+### What an answer cost
+
+`usage_logs.message_id` links a usage row to the answer it paid for. Three
+deliberate choices, all in [DEC-022](wiki/DECISIONS.md#dec-022):
+
+- **`on delete set null`, not `cascade`** — deleting a conversation must not
+  erase what it cost. Billing history a user can delete is not billing history.
+- **No backfill** — rows written before the link exist, and correlating them to
+  answers by timestamp would be right most of the time and silently wrong the
+  rest. An answer that cannot be priced shows no price, never `$0.00`.
+- **The stored cost is read, never recomputed** — a rate change must not
+  retroactively rewrite what last month's answers cost.
+
+`usage_logs` is one of the three service-role-only tables, so `loadConversationCost`
+runs on a client that bypasses RLS and scopes every query to an already
+authenticated user id. **That scope is the entire authorization boundary for the
+feature**, which is why `verify:costs` asserts it directly and was run with the
+scope removed to prove the assertion is not vacuous.
+
 ### Signing in
 
 ```mermaid
@@ -314,11 +386,25 @@ actually hit were not the kind a mocked unit test catches.
 | `verify:security` | throttling, password rules, rate limit, token budget | DB |
 | `verify:chat` | a real streamed completion end to end | DB + keys |
 | `verify:email` | email templates render and meet contrast | — |
+| `verify:compare` | one prompt to N models: refusals happen *before* spend | DB + keys |
+| `verify:costs` | an answer's price is stored, linked, and not readable by anyone else | DB + keys |
+| `verify:pages` | **every route rendered at 360/768/1440** — overflow, a11y, keyboard | DB + server |
+| `verify:failures` | six induced failures, read off the screen a user sees | DB + server |
 | `security:audit` | secret-shaped strings, advisories, RLS from the **pg catalog** | DB |
 | `smoke` | a *running deployment*: headers as served, gates, assets | server |
 
-The pattern worth copying: **assert stored state, not response shape**. Several
-real bugs here produced responses indistinguishable from success.
+Two patterns worth copying.
+
+**Assert stored state, not response shape.** Several real bugs here produced
+responses indistinguishable from success.
+
+**Something has to open a page.** The four suites above the audit line are all
+"does the value exist" checks, and 1,176 of them passed while the navigation was
+unreachable on a phone — clipped away by an `overflow: hidden` with no scrollbar
+to hint at it. A suite that renders is the only kind that can see that, and its
+checks need breaking on purpose before they are believed: the obvious
+horizontal-overflow test never fires in this layout, and finding that out took
+deliberately widening an element to 2200px and watching the suite stay green.
 
 ---
 
