@@ -38,6 +38,7 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 **Status:** Open — known limitation | **Severity:** Low | **Phase:** 3 | **Opened:** 2026-08-02
 **Problem:** Perplexity's Sonar models bill per *search request* as well as per token, and `usage_logs` records only input and output tokens. Analytics and the daily token budget will therefore understate Perplexity spend by whatever the search component costs.
 **Why it is not a bug:** every other provider bills purely per token, and the cost model was built for that. Adding a per-request fee column would be a schema change, a migration, and a change to every aggregation — for one provider, on a deployment that has no Perplexity key configured.
+**Raised from cosmetic to user-facing on 2026-08-02.** Per-answer prices are now shown to the user (PR #49). An understated number on an admin dashboard is a reporting gap; the same number printed under a user's answer is a claim to them about what they were charged. Severity stays Low only because no Perplexity key is configured on this deployment, so no such price can currently be displayed. **If a Perplexity key is ever added, this becomes High and must be fixed before that provider is enabled.**
 **Mitigated:** `sonar-deep-research`, whose search and citation fees dominate its cost, is deliberately not seeded — see the note in `lib/providers/perplexity.ts`.
 **Revisit** if Perplexity is actually used in anger, or if a second provider with non-token billing is added.
 
