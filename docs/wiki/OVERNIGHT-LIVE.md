@@ -276,6 +276,21 @@ the word "Loading".
 If you take one thing from tonight: the gap was never in how much was tested. It
 was that nothing looked.
 
+### It is already live
+
+Checked at the end of the session, not assumed. Railway deployed from `main` on
+its own, and the served HTML carries tonight's sign-in page:
+
+```
+$ npm run smoke -- --url https://myaichat-production.up.railway.app
+All 19 smoke checks passed
+$ curl -s .../login | grep 'Multi-provider AI chat'   # present
+```
+
+The health endpoint reports `database: ok, encryption: ok`. Uploads and email
+are still off there — that is item 1 in § WHAT I NEED FROM YOU, and it is the
+only thing standing between the live site and everything this app can do.
+
 ### What I would want you to check first
 
 1. **Open the live site on your phone.** That is the fix I am least able to
