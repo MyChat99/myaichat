@@ -49,18 +49,74 @@ assertions · Playwright verified working (screenshot taken before any work).
 
 ## § WHAT I NEED FROM YOU
 
-Ordered. Everything here is blocked on something only you can reach.
+Ordered by what it unlocks. Each one is a single sitting — I have written them
+as steps rather than as problems, because every one of them is blocked on
+something only you can reach, not on a decision I owe you.
 
-1. **Add the R2 and Resend variables in Railway.** Uploads, avatars and email
-   are built, tested locally end-to-end, and disabled in production purely
-   because the credentials are not there. The seven names are in
-   `PHASE-6-CHECKLIST.md` A4. Expected result afterwards: the paperclip in the
-   composer is enabled on the live site, and `npm run verify:upload -- --base=https://myaichat-production.up.railway.app`
-   passes.
-2. **Nothing else is blocking.** Everything below in EVERYTHING ELSE was
-   completed without you.
+### 1. Turn uploads and email on — 10 minutes, unblocks two finished features
 
----
+Uploads, avatars and email are **built and tested locally end to end.** They are
+disabled in production for one reason: the credentials are not in Railway.
+
+Railway → your service → **Variables** → add six:
+
+```
+R2_ACCOUNT_ID=            # Cloudflare → R2 → Account ID, right sidebar
+R2_ACCESS_KEY_ID=         # the R2 API token
+R2_SECRET_ACCESS_KEY=     # shown once, at creation
+R2_BUCKET_NAME=myaichat   # must match the bucket name exactly
+RESEND_API_KEY=re_...
+RESEND_FROM_EMAIL=onboarding@resend.dev   # until a domain is verified
+```
+
+`isStorageConfigured()` requires **all four** R2 values — three of four leaves
+the paperclip greyed out with no error anywhere, which is the usual way this
+half-works.
+
+**How you will know it worked:** the paperclip in the composer is enabled on the
+live site, and this passes:
+
+```
+npm run verify:upload -- --base=https://myaichat-production.up.railway.app
+```
+
+Full detail: `PHASE-6-CHECKLIST.md` A4. This closes ISSUE-016, ISSUE-017 and
+ISSUE-003 together — they are three entries for one missing set of variables.
+
+### 2. Decide about 366 untagged demo rows — 2 minutes, your call not mine
+
+`--demo` once wrote fabricated `usage_logs` rows with nothing marking them as
+fabricated. That is fixed going forward, but the rows written before the fix are
+still in your analytics and are indistinguishable from real usage *by the same
+argument that caused the bug*.
+
+There is a defensible discriminator — the first commit is 2026-07-30, so
+anything older is necessarily fabricated — but acting on it means deleting
+analytics data on my inference. **Say the word and I will do it; I will not do
+it unasked.**
+
+```sql
+select count(*) from usage_logs where created_at < '2026-07-30' and source is null;
+-- then, only if the count looks right:
+delete from usage_logs where created_at < '2026-07-30' and source is null;
+```
+
+(ISSUE-031.)
+
+### 3. Two things you can safely say "no" to
+
+Listed so they are not invisible, not because I think you should do them.
+
+- **Gate the Railway deploy on CI** (ISSUE-027). Branch protection already means
+  `main` cannot receive a commit that failed CI, so every deploy is already from
+  a green commit. The remaining gap is a minute or two where production runs a
+  commit whose CI has not finished. Steps are written out if you want them.
+- **Three identifiers in the public repo** (ISSUE-022). The history is clean —
+  zero credential hits across every commit. What remains is your own name, email
+  and Supabase project ref, which are ordinary things to have in a public repo.
+
+Nothing else is waiting on you. Everything in EVERYTHING ELSE was done without
+you.
 
 ## § EVERYTHING ELSE
 
