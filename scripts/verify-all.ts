@@ -63,7 +63,7 @@ const SUITES: Suite[] = [
   { script: 'verify:headers', needs: 'nothing' },
   { script: 'verify:attachments', needs: 'nothing' },
   { script: 'verify:theme', needs: 'nothing' },
-  { script: 'verify:riso', needs: 'nothing' },
+
   { script: 'verify:email', needs: 'nothing' },
 
   { script: 'verify:schema', needs: 'database' },
@@ -74,6 +74,7 @@ const SUITES: Suite[] = [
   { script: 'verify:gates', needs: 'server' },
   { script: 'verify:appearance', needs: 'server' },
   { script: 'verify:persistence', needs: 'server' },
+  { script: 'verify:structure', needs: 'server' },
   { script: 'verify:api', needs: 'server' },
   { script: 'verify:storage', needs: 'server' },
   { script: 'verify:chat', needs: 'server' },

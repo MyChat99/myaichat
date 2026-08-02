@@ -1,122 +1,49 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   RISO — the print treatment
+   THE PRESS — the application's layout
 
-   Every other theme in this app is a palette: swap eight colour tokens and the
-   layout is untouched. Riso is a design system, because the mockup it comes
-   from (docs/mockups/05-riso.html) is not a recolour — it is printed matter.
-   Ink rules instead of hairlines, offset shadows instead of soft elevation,
-   mono stamps instead of sentence-case labels, a masthead instead of a brand
-   in a navbar.
+   This is the layout, permanently, for every theme and every page. It came
+   from the risograph mockup (docs/mockups/05-riso.html), but it is no longer
+   Riso's: ink rules instead of hairlines, offset shadows instead of soft
+   elevation, mono stamps instead of sentence-case labels, a masthead instead
+   of a brand in a navbar, and no rounded corners anywhere.
 
    ── The one invariant ───────────────────────────────────────────────────────
-   EVERY selector in this file begins with `html[data-theme='riso']`.
+   NOTHING IN THIS FILE MAY REFERENCE A THEME.
 
-   That is what makes "this look applies only when Riso is active" a checkable
-   property rather than a promise. `npm run verify:riso` parses this file and
-   fails the build on any rule that does not, so the other seven presets cannot
-   be damaged from here even by accident.
+   No `[data-theme=…]` selectors, and no colour literals. Every colour comes
+   from a role the palette fills — `--border` is the ink, `--card` is the
+   heavier stock, `--primary` is the first ink, `--accent-alt` the second,
+   `--overprint` where they overlap.
 
-   ── Why there are no visibility rules here ──────────────────────────────────
-   An earlier version rendered BOTH the plain and the printed wording and hid
-   one with a stylesheet. The moment that stylesheet did not apply — a dev
-   server that had not picked up a newly imported file, a cache, a build that
-   ordered things differently — the page read "New chat Start a page" and
-   "myaichatmyaichat". A theme that degrades into duplicated words is worse
-   than one that degrades into plain words.
+   That is what makes "Rose is this newspaper in rose inks, not a different
+   design" true rather than intended. `verify:structure` parses this file and
+   fails the build on a theme selector or a hex literal, and then measures the
+   real thing in a browser: it loads every palette in both modes and asserts
+   that border widths, radii, shadows, fonts and spacing are IDENTICAL across
+   all of them, and that only colours differ.
 
-   Copy is now chosen on the server from the stored preference, so only one
-   variant is ever in the document. This file styles what is there; it never
-   decides what exists.
+   ── Why the roles, and not more tokens ─────────────────────────────────────
+   A palette answers five questions and no others: what is the paper, what is
+   the ink, what is the first accent, what is the second, and what is muted.
+   Everything else here is a constant — 2px is 2px in Rose as in Mono, because
+   the rule weight is the design and not a preference.
 
-   ── On the mockup's colours ─────────────────────────────────────────────────
-   The mockup is a static page with no contrast obligations. This is an
-   application, so two of its choices could not survive as-is:
-
-     • `.draft` was fluorescent pink under paper-coloured text at 2.65:1. The
-       primary action of the whole sidebar cannot be the least legible thing on
-       screen. Light mode uses the darkened pink (4.52:1); dark mode keeps the
-       fluorescent, where it sits on near-black and passes comfortably.
-     • The muted stamp colour moved with the token, for the same reason.
-
-   Everything else — the yellow ticket, the two inks, the black keylines — is
-   the mockup's, unchanged.
-
-   ── Dark mode ──────────────────────────────────────────────────────────────
-   The mockup says, correctly, that paper has no dark mode. The app does, so
-   "riso at night" keeps the entire structure and inverts the stock: the ink
-   becomes light, the fluorescent pink moves from a warning colour to the
-   accent, and the offset shadows become a lighter grey so they still read as
-   a second impression rather than disappearing into the page.
+   The one thing a palette MUST get right is that its `border` is a true ink:
+   dark enough in light mode, light enough in dark mode, for a 2px keyline and
+   a solid offset shadow to read as deliberate rather than as a rendering
+   artefact. `verify:theme` holds every palette to that.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-html[data-theme='riso'] {
+:root {
   /* Hard edges everywhere. One variable, because globals.css derives every
      other radius from it — so this is the whole of "no rounded-soft look". */
   --radius: 0rem;
 
-  --riso-ink: #1d2230;
-  --riso-paper-2: #e8e4d5;
-  --riso-paper-3: #dedac9;
-
-  /* The third ink, used exactly once — on the model ticket. */
-  --riso-yellow: #ffe800;
-  --riso-yellow-ink: #1d2230;
-
-  /* Fluorescent Pink, exactly as the mockup prints it.
-     The mockup sets paper-coloured text on this, which is 2.65:1 — below AA,
-     and not something an application can ship on its primary action. The INK
-     is what makes the theme, so the ink is kept and the text on it is dark
-     instead: #1d2230 on #ff48b0 is 6.4:1. The button still reads as
-     fluorescent pink, because it is. */
-  --riso-pink: #ff48b0;
-  --riso-pink-ink: #1d2230;
-
-  /* Blue + pink, multiplied — what the two plates make where they overlap.
-     Used for the chosen slip, which the mockup overprints rather than tints. */
-  --riso-overprint: #3d3d6e;
-
-  /* ── the pink, three ways ──────────────────────────────────────────────────
-     A background carries no contrast obligation; text does. So the ink stays
-     exactly as the mockup prints it wherever it is a FILL — the action button,
-     the rules, the standfirst's edge — and is darkened only where it becomes
-     TEXT on paper, by the minimum each size actually requires:
-
-       fill      #ff48b0   the mockup's Fluorescent Pink, untouched
-       display   #ed43a4   7% darker  → 3.04:1, clears AA for large text
-       text      #bd3582   26% darker → 4.52:1, clears AA for normal text
-
-     Darkening everything to the strictest of the three would have dulled the
-     one colour the theme is named for, to satisfy a rule that does not apply
-     to most of the places it appears. */
-  --riso-pink-display: #ed43a4;
-  --riso-pink-text: #bd3582;
-
-  --riso-rule: 2px;
-  --riso-hairline: 1.5px;
-  --riso-shadow: var(--riso-ink);
-  --riso-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
-  --riso-ease: cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-html[data-theme='riso'].dark {
-  --riso-ink: #f1eee2;
-  --riso-paper-2: #1e1e24;
-  --riso-paper-3: #26262e;
-
-  --riso-yellow: #ffe800;
-  --riso-yellow-ink: #16161a;
-
-  /* At night the fluorescent ink is the accent, and it glows. */
-  --riso-pink: #ff48b0;
-  --riso-pink-ink: #16161a;
-  --riso-overprint: #2f2f57;
-  /* On near-black the fluorescent needs no help — it is 5.85:1 as it is. */
-  --riso-pink-display: #ff48b0;
-  --riso-pink-text: #ff48b0;
-
-  /* A light shadow on a dark page. The ink colour itself would be nearly the
-     same value as the paper and the offset would vanish. */
-  --riso-shadow: #3a3a46;
+  /* Structure. Constants, not preferences: these do not vary by palette. */
+  --rule: 2px;
+  --hairline: 1.5px;
+  --press-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+  --press-ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ── paper ───────────────────────────────────────────────────────────────────
@@ -126,7 +53,7 @@ html[data-theme='riso'].dark {
 
    `pointer-events: none` matters more than it looks — this sits above the
    entire application. */
-html[data-theme='riso']:not(.dark) body::after {
+html:not(.dark) body::after {
   content: '';
   position: fixed;
   inset: 0;
@@ -137,32 +64,32 @@ html[data-theme='riso']:not(.dark) body::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)' opacity='0.42'/%3E%3C/svg%3E");
 }
 
-html[data-theme='riso'] :focus-visible {
-  outline: 2px solid var(--riso-pink);
+:focus-visible {
+  outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
 
 /* ═══════════════════════════════════════════════════ the slips (sidebar) */
 
-html[data-theme='riso'] aside {
-  background: var(--riso-paper-2);
-  border-right-width: var(--riso-rule);
-  border-right-color: var(--riso-ink);
+aside {
+  background: var(--card);
+  border-right-width: var(--rule);
+  border-right-color: var(--border);
   /* 236px in the mockup. The app's default 288px leaves the slips floating in
      a column too wide for them, and the printed page wants the margin on the
      text, not on the furniture. */
   width: 236px;
 }
 
-html[data-theme='riso'] [data-riso='masthead'] {
+[data-press='masthead'] {
   padding: 18px 16px 14px;
-  border-bottom: var(--riso-rule) solid var(--riso-ink);
+  border-bottom: var(--rule) solid var(--border);
 }
 
 /* The registration moment: a second plate that slides into alignment, the way
    a two-colour print does when the paper is fed slightly off. It runs once, on
    load, and is the only animation this theme adds. */
-html[data-theme='riso'] [data-riso='wordmark'] {
+[data-press='wordmark'] {
   position: relative;
   display: inline-block;
   font-size: 27px;
@@ -171,27 +98,27 @@ html[data-theme='riso'] [data-riso='wordmark'] {
   line-height: 1;
   color: var(--primary);
 }
-html[data-theme='riso'] [data-riso='wordmark'] span {
+[data-press='wordmark'] span {
   position: absolute;
   inset: 0;
-  color: var(--riso-pink);
+  color: var(--primary);
   mix-blend-mode: multiply;
-  animation: riso-register 1.5s 0.25s var(--riso-ease) both;
+  animation: press-register 1.5s 0.25s var(--press-ease) both;
 }
 /* At night the accent IS the fluorescent pink, so a wordmark printed in
    `--primary` with a pink second plate is one colour twice — the registration
    moment lands and nothing appears to move. The first plate becomes the paper
    colour instead, which restores two distinguishable inks. */
-html[data-theme='riso'].dark [data-riso='wordmark'] {
+.dark [data-press='wordmark'] {
   color: var(--foreground);
 }
-html[data-theme='riso'].dark [data-riso='wordmark'] span {
+.dark [data-press='wordmark'] span {
   /* Multiply on a dark page erases the plate instead of overprinting it. */
   mix-blend-mode: screen;
   opacity: 0.75;
 }
 
-@keyframes riso-register {
+@keyframes press-register {
   0% {
     transform: translate(7px, -5px) rotate(1.4deg);
     opacity: 0;
@@ -204,10 +131,10 @@ html[data-theme='riso'].dark [data-riso='wordmark'] span {
   }
 }
 
-html[data-theme='riso'] [data-riso='issue'] {
+[data-press='issue'] {
   margin-top: 5px;
   color: var(--muted-foreground);
-  font-family: var(--riso-mono);
+  font-family: var(--press-mono);
   font-size: 9.5px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -217,27 +144,27 @@ html[data-theme='riso'] [data-riso='issue'] {
    The sidebar's primary action, and the one element that carries a full 4px
    offset. Pressing it moves the button INTO the shadow rather than shrinking
    it, which is what makes it feel like a stamp. */
-html[data-theme='riso'] [data-riso='draft'] {
+[data-press='draft'] {
   position: relative;
   width: 100%;
   justify-content: space-between;
   padding: 12px 14px;
   height: auto;
-  background: var(--riso-pink) !important;
-  color: var(--riso-pink-ink) !important;
-  border: var(--riso-rule) solid var(--riso-ink);
-  box-shadow: 4px 4px 0 var(--riso-shadow);
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border: var(--rule) solid var(--border);
+  box-shadow: 4px 4px 0 var(--border);
   font-weight: 700;
   font-size: 14px;
   overflow: hidden;
   transition:
-    transform 0.16s var(--riso-ease),
-    box-shadow 0.16s var(--riso-ease);
+    transform 0.16s var(--press-ease),
+    box-shadow 0.16s var(--press-ease);
 }
 
-/* The halftone screen. A riso ink field is not flat — it is a dot screen, and
+/* The halftone screen. An ink field is not flat — it is a dot screen, and
    at this size the dots are visible. Printed over the pink only. */
-html[data-theme='riso'] [data-riso='draft']::before {
+[data-press='draft']::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -251,24 +178,24 @@ html[data-theme='riso'] [data-riso='draft']::before {
   mix-blend-mode: screen;
   opacity: 0.5;
 }
-html[data-theme='riso'] [data-riso='draft']:hover {
+[data-press='draft']:hover {
   transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0 var(--riso-shadow);
+  box-shadow: 6px 6px 0 var(--border);
 }
-html[data-theme='riso'] [data-riso='draft']:active {
+[data-press='draft']:active {
   transform: translate(4px, 4px);
-  box-shadow: 0 0 0 var(--riso-shadow);
+  box-shadow: 0 0 0 var(--border);
 }
-html[data-theme='riso'] [data-riso='shortcut'] {
+[data-press='shortcut'] {
   margin-left: auto;
-  font-family: var(--riso-mono);
+  font-family: var(--press-mono);
   font-weight: 400;
   font-size: 10px;
   opacity: 0.9;
 }
 
-html[data-theme='riso'] aside input {
-  border: var(--riso-hairline) solid var(--riso-ink);
+aside input {
+  border: var(--hairline) solid var(--border);
   background: var(--background);
 }
 
@@ -276,35 +203,35 @@ html[data-theme='riso'] aside input {
    The app's default padding is 8px, and a 4px offset plus a 2px keyline needs
    more than that — the shadows were being clipped by the sidebar's own border,
    which reads as a rendering fault rather than as a print effect. */
-html[data-theme='riso'] [data-riso='actions'] {
+[data-press='actions'] {
   padding: 14px 18px 12px 14px;
 }
-html[data-theme='riso'] aside nav {
+aside nav {
   padding-left: 14px;
   padding-right: 18px;
 }
-html[data-theme='riso'] aside > div:has(input) {
+aside > div:has(input) {
   padding-left: 14px;
   padding-right: 18px;
 }
 
 /* ── section rules ── */
-html[data-theme='riso'] [data-riso='divider'] {
+[data-press='divider'] {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 16px 0 9px;
   color: var(--muted-foreground);
-  font-family: var(--riso-mono);
+  font-family: var(--press-mono);
   font-size: 9.5px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
-html[data-theme='riso'] [data-riso='divider']::after {
+[data-press='divider']::after {
   content: '';
   flex: 1;
   height: 2px;
-  background: var(--riso-paper-3);
+  background: var(--secondary);
 }
 
 /* ── the slips themselves ─────────────────────────────────────────────────────
@@ -318,20 +245,20 @@ html[data-theme='riso'] [data-riso='divider']::after {
    matched `hover:bg-accent/60`, so every conversation rendered as the selected
    one. A state that is styled from a class name is a state that changes
    whenever someone adjusts a hover colour. */
-html[data-theme='riso'] [data-riso='slip'] {
+[data-press='slip'] {
   position: relative;
   margin-bottom: 8px;
   background: var(--background);
-  border: var(--riso-rule) solid var(--riso-ink);
+  border: var(--rule) solid var(--border);
   transition:
-    transform 0.18s var(--riso-ease),
-    box-shadow 0.18s var(--riso-ease);
+    transform 0.18s var(--press-ease),
+    box-shadow 0.18s var(--press-ease);
 }
-html[data-theme='riso'] [data-riso='slip']:hover {
+[data-press='slip']:hover {
   transform: translate(-2px, -2px);
   box-shadow: 4px 4px 0 var(--primary);
 }
-html[data-theme='riso'] [data-riso='slip'] > a {
+[data-press='slip'] > a {
   display: block;
   padding: 10px 11px 0;
   background: transparent;
@@ -341,7 +268,7 @@ html[data-theme='riso'] [data-riso='slip'] > a {
   font-weight: 600;
   line-height: 1.35;
 }
-html[data-theme='riso'] [data-riso='slip'] > a:hover {
+[data-press='slip'] > a:hover {
   background: transparent;
 }
 
@@ -350,34 +277,34 @@ html[data-theme='riso'] [data-riso='slip'] > a:hover {
 /* Overprinted, not tinted: the first ink laid down, then the second on top of
    it. The mockup does this with a multiply layer; the composite is the same
    colour and one fewer paint layer. */
-html[data-theme='riso'] [data-riso='slip'][data-active='true'] {
-  background: var(--riso-overprint);
-  box-shadow: 4px 4px 0 var(--riso-shadow);
+[data-press='slip'][data-active='true'] {
+  background: var(--overprint);
+  box-shadow: 4px 4px 0 var(--border);
 }
-html[data-theme='riso'] [data-riso='slip'][data-active='true'] > a,
-html[data-theme='riso'] [data-riso='slip'][data-active='true'] [data-riso='stamp'] {
+[data-press='slip'][data-active='true'] > a,
+[data-press='slip'][data-active='true'] [data-press='stamp'] {
   color: var(--primary-foreground);
 }
-html[data-theme='riso'] [data-riso='slip'][data-active='true'] [data-riso='stamp'] {
+[data-press='slip'][data-active='true'] [data-press='stamp'] {
   opacity: 0.78;
 }
 
-html[data-theme='riso'] [data-riso='stamp'] {
+[data-press='stamp'] {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 5px 11px 10px;
-  font-family: var(--riso-mono);
+  font-family: var(--press-mono);
   font-size: 9.5px;
   color: var(--muted-foreground);
 }
-html[data-theme='riso'] [data-riso='square'] {
+[data-press='square'] {
   width: 7px;
   height: 7px;
   flex: none;
   border: 1px solid currentColor;
 }
-html[data-theme='riso'] [data-riso='square'][data-filled='true'] {
+[data-press='square'][data-filled='true'] {
   background: currentColor;
 }
 
@@ -391,18 +318,18 @@ html[data-theme='riso'] [data-riso='square'][data-filled='true'] {
 /* The shell's own bar, targeted by attribute rather than by element.
    `header` alone also matched the <header> that settings, profile and admin use
    for their page titles, and painted each of them as a masthead. */
-html[data-theme='riso'] [data-riso='masthead-bar'] {
+[data-press='masthead-bar'] {
   background: var(--background);
-  border-bottom-width: var(--riso-rule);
-  border-bottom-color: var(--riso-ink);
+  border-bottom-width: var(--rule);
+  border-bottom-color: var(--border);
 }
-html[data-theme='riso'] [data-riso='masthead-bar'] a[href='/'] {
+[data-press='masthead-bar'] a[href='/'] {
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
 /* Navigation as section tabs, underscored in the second ink on hover. */
-html[data-theme='riso'] [data-riso='masthead-bar'] nav a {
+[data-press='masthead-bar'] nav a {
   font-size: 13px;
   padding-bottom: 2px;
   border-bottom: 2.5px solid transparent;
@@ -411,9 +338,9 @@ html[data-theme='riso'] [data-riso='masthead-bar'] nav a {
     color 0.18s,
     border-color 0.18s;
 }
-html[data-theme='riso'] [data-riso='masthead-bar'] nav a:hover {
+[data-press='masthead-bar'] nav a:hover {
   color: var(--primary);
-  border-bottom-color: var(--riso-pink);
+  border-bottom-color: var(--primary);
   text-decoration: none;
 }
 
@@ -430,21 +357,19 @@ html[data-theme='riso'] [data-riso='masthead-bar'] nav a:hover {
 
    ⚠️ The condition is the TABS, not the rule bar. Those are different claims:
    the rule bar exists on every chat page, but it only carries navigation when
-   the SERVER rendered it with riso=true. `data-theme` lives in the DOM and the
-   appearance panel's live preview writes to it directly, so it can say `riso`
-   over markup the server built with riso=false — and hiding the header on that
-   evidence removed Profile, Appearance, Admin and Sign out with nothing in
-   their place and no way back.
+   the server actually rendered it with them. Hiding the header on the weaker
+   evidence — that a rule bar exists at all — once removed Profile, Appearance,
+   Admin and Sign out with nothing in their place and no way back.
 
    Keyed on the replacement itself, the failure cannot happen: no tabs, no
    hiding. */
-html[data-theme='riso'] body:has([data-riso='tabs']) [data-riso='masthead-bar'] {
+body:has([data-press='tabs']) [data-press='masthead-bar'] {
   display: none;
 }
 
-html[data-theme='riso'] [data-riso='rule'] {
-  border-bottom-width: var(--riso-rule);
-  border-bottom-color: var(--riso-ink);
+[data-press='rule'] {
+  border-bottom-width: var(--rule);
+  border-bottom-color: var(--border);
   background: var(--background);
   /* Folio and ticket left, sections right. */
   justify-content: flex-start;
@@ -452,13 +377,13 @@ html[data-theme='riso'] [data-riso='rule'] {
   padding: 13px 26px;
 }
 
-html[data-theme='riso'] [data-riso='tabs'] {
+[data-press='tabs'] {
   display: flex;
   align-items: center;
   gap: 22px;
   margin-left: auto;
 }
-html[data-theme='riso'] [data-riso='tab'] {
+[data-press='tab'] {
   font-size: 13px;
   color: var(--muted-foreground);
   padding-bottom: 2px;
@@ -470,15 +395,15 @@ html[data-theme='riso'] [data-riso='tab'] {
     color 0.18s,
     border-color 0.18s;
 }
-html[data-theme='riso'] [data-riso='tab']:hover {
+[data-press='tab']:hover {
   color: var(--foreground);
 }
 /* The section you are in takes the first ink, underscored in the second. */
-html[data-theme='riso'] [data-riso='tab'][data-on='true'] {
+[data-press='tab'][data-on='true'] {
   color: var(--primary);
-  border-bottom-color: var(--riso-pink);
+  border-bottom-color: var(--primary);
 }
-html[data-theme='riso'] [data-riso='folio'] {
+[data-press='folio'] {
   font-weight: 700;
   font-size: 15px;
   letter-spacing: -0.02em;
@@ -492,27 +417,27 @@ html[data-theme='riso'] [data-riso='folio'] {
    The third ink, used once. Yellow is the highest-luminance colour here, so it
    takes the dark ink for text in BOTH modes — an inverted ticket at night
    would be a different colour, not the same one at night. */
-html[data-theme='riso'] [data-riso='ticket'] {
-  border: var(--riso-hairline) solid var(--riso-ink);
-  background: var(--riso-yellow) !important;
-  color: var(--riso-yellow-ink) !important;
-  font-family: var(--riso-mono);
+[data-press='ticket'] {
+  border: var(--hairline) solid var(--border);
+  background: var(--accent-alt) !important;
+  color: var(--accent-alt-foreground) !important;
+  font-family: var(--press-mono);
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 4px 9px;
   height: auto;
   transition:
-    transform 0.16s var(--riso-ease),
+    transform 0.16s var(--press-ease),
     box-shadow 0.16s;
 }
-html[data-theme='riso'] [data-riso='ticket']:hover {
+[data-press='ticket']:hover {
   transform: translate(-1.5px, -1.5px);
-  box-shadow: 3px 3px 0 var(--riso-ink);
+  box-shadow: 3px 3px 0 var(--border);
 }
 
 /* ── the opening spread ── */
-html[data-theme='riso'] [data-riso='spread'] {
+[data-press='spread'] {
   /* An editorial page is set from the top, not centred in the window. */
   justify-content: flex-start;
   align-items: stretch;
@@ -528,18 +453,18 @@ html[data-theme='riso'] [data-riso='spread'] {
   height: auto;
   min-height: 100%;
 }
-html[data-theme='riso'] [data-riso='lede'] {
+[data-press='lede'] {
   text-align: left;
 }
-html[data-theme='riso'] [data-riso='lede-num'] {
-  font-family: var(--riso-mono);
+[data-press='lede-num'] {
+  font-family: var(--press-mono);
   font-size: 10px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--riso-pink-text);
+  color: var(--primary);
   margin-bottom: 14px;
 }
-html[data-theme='riso'] [data-riso='headline'] {
+[data-press='headline'] {
   font-size: clamp(34px, 5.2vw, 54px);
   font-weight: 800;
   letter-spacing: -0.045em;
@@ -548,19 +473,19 @@ html[data-theme='riso'] [data-riso='headline'] {
   color: var(--primary);
   text-wrap: balance;
 }
-html[data-theme='riso'] [data-riso='headline'] mark {
+[data-press='headline'] mark {
   background: none;
-  color: var(--riso-pink-display);
+  color: var(--primary);
   mix-blend-mode: multiply;
 }
 /* Same reason as the wordmark: pink on pink is not two inks. */
-html[data-theme='riso'].dark [data-riso='headline'] {
+.dark [data-press='headline'] {
   color: var(--foreground);
 }
-html[data-theme='riso'].dark [data-riso='headline'] mark {
+.dark [data-press='headline'] mark {
   mix-blend-mode: normal;
 }
-html[data-theme='riso'] [data-riso='standfirst'] {
+[data-press='standfirst'] {
   font-size: 16.5px;
   line-height: 1.55;
   color: var(--foreground);
@@ -568,62 +493,62 @@ html[data-theme='riso'] [data-riso='standfirst'] {
   max-width: 46ch;
   margin: 0 0 26px;
   padding-left: 14px;
-  border-left: 3px solid var(--riso-pink);
+  border-left: 3px solid var(--primary);
   text-align: left;
 }
 
 /* ── numbered picks ── */
-html[data-theme='riso'] [data-riso='picks'] {
+[data-press='picks'] {
   display: grid;
   grid-template-columns: 1fr;
   gap: 9px;
 }
-html[data-theme='riso'] [data-riso='pick'] {
+[data-press='pick'] {
   display: flex;
   align-items: flex-start;
   gap: 16px;
   padding: 13px 16px;
   background: var(--background);
-  border: var(--riso-rule) solid var(--riso-ink);
+  border: var(--rule) solid var(--border);
   font-size: 15px;
   font-weight: 600;
   transition:
-    transform 0.2s var(--riso-ease),
-    box-shadow 0.2s var(--riso-ease),
+    transform 0.2s var(--press-ease),
+    box-shadow 0.2s var(--press-ease),
     background 0.2s;
 }
-html[data-theme='riso'] [data-riso='pick']:hover {
+[data-press='pick']:hover {
   transform: translate(-3px, -3px);
   box-shadow: 6px 6px 0 var(--primary);
-  background: var(--riso-paper-2);
+  background: var(--card);
 }
-html[data-theme='riso'] [data-riso='pick']:hover [data-riso='pick-n'] {
-  background: var(--riso-pink);
-  color: var(--riso-pink-ink);
+[data-press='pick']:hover [data-press='pick-n'] {
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
-html[data-theme='riso'] [data-riso='pick-body'] {
+[data-press='pick-body'] {
   min-width: 0;
   line-height: 1.5;
 }
 /* Inline, so the note continues the title on the same line and wraps with it —
    one sentence set in two weights, which is how the mockup reads. */
-html[data-theme='riso'] [data-riso='pick-t'] {
+[data-press='pick-t'] {
   font-size: 15px;
   font-weight: 700;
 }
-html[data-theme='riso'] [data-riso='pick-d'] {
+[data-press='pick-d'] {
   font-size: 15px;
   font-weight: 400;
   color: var(--muted-foreground);
 }
-html[data-theme='riso'] [data-riso='pick-n'] {
+[data-press='pick-n'] {
   flex: none;
   width: 32px;
   height: 32px;
   display: grid;
   place-items: center;
-  border: var(--riso-rule) solid var(--riso-ink);
-  font-family: var(--riso-mono);
+  border: var(--rule) solid var(--border);
+  font-family: var(--press-mono);
   font-size: 12px;
   font-weight: 700;
   transition:
@@ -636,13 +561,13 @@ html[data-theme='riso'] [data-riso='pick-n'] {
    a tinted field with a rule in the first ink down its edge — which is what
    the mockup does, and it also survives the Document bubble style, where the
    question loses its block and position alone stops distinguishing them. */
-html[data-theme='riso'] [data-message='assistant'] {
-  background: var(--riso-paper-2);
+[data-message='assistant'] {
+  background: var(--card);
   border-left: 3px solid var(--primary);
   padding: 14px 16px;
 }
-html[data-theme='riso'] [data-message='user'] {
-  border: var(--riso-hairline) solid var(--riso-ink);
+[data-message='user'] {
+  border: var(--hairline) solid var(--border);
 }
 
 /* ── colophon ────────────────────────────────────────────────────────────────
@@ -650,29 +575,29 @@ html[data-theme='riso'] [data-message='user'] {
    figures. The 2px outer keyline and 1.5px inner ones are the mockup's, and
    the difference between them is deliberate — the box is the object, the
    divisions are inside it. */
-html[data-theme='riso'] [data-riso='colophon'] {
+[data-press='colophon'] {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border: var(--riso-rule) solid var(--riso-ink);
-  background: var(--riso-paper-2);
+  border: var(--rule) solid var(--border);
+  background: var(--card);
   width: 100%;
   margin-top: 26px;
 }
-html[data-theme='riso'] [data-riso='col-c'] {
+[data-press='col-c'] {
   padding: 10px 14px;
-  border-right: var(--riso-hairline) solid var(--riso-ink);
+  border-right: var(--hairline) solid var(--border);
 }
-html[data-theme='riso'] [data-riso='col-c']:last-child {
+[data-press='col-c']:last-child {
   border-right: 0;
 }
-html[data-theme='riso'] [data-riso='col-l'] {
-  font-family: var(--riso-mono);
+[data-press='col-l'] {
+  font-family: var(--press-mono);
   font-size: 9px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
-html[data-theme='riso'] [data-riso='col-v'] {
+[data-press='col-v'] {
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.03em;
@@ -682,41 +607,41 @@ html[data-theme='riso'] [data-riso='col-v'] {
 
 /* ═══════════════════════════════════════════════════ the coupon (composer) */
 
-html[data-theme='riso'] [data-riso='coupon-wrap'] {
+[data-press='coupon-wrap'] {
   border-top: 0;
   padding: 8px 26px 22px;
 }
-html[data-theme='riso'] [data-riso='coupon'] {
+[data-press='coupon'] {
   background: var(--background);
-  border: var(--riso-rule) solid var(--riso-ink);
+  border: var(--rule) solid var(--border);
   box-shadow: 5px 5px 0 var(--primary);
   padding: 0;
   transition:
-    box-shadow 0.22s var(--riso-ease),
-    transform 0.22s var(--riso-ease);
+    box-shadow 0.22s var(--press-ease),
+    transform 0.22s var(--press-ease);
 }
-html[data-theme='riso'] [data-riso='coupon']:hover,
-html[data-theme='riso'] [data-riso='coupon']:focus-within {
-  box-shadow: 5px 5px 0 var(--riso-pink);
+[data-press='coupon']:hover,
+[data-press='coupon']:focus-within {
+  box-shadow: 5px 5px 0 var(--primary);
   transform: translate(-1px, -1px);
 }
-html[data-theme='riso'] [data-riso='coupon-l'] {
+[data-press='coupon-l'] {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 7px 12px;
-  border-bottom: var(--riso-hairline) dashed var(--riso-paper-3);
-  font-family: var(--riso-mono);
+  border-bottom: var(--hairline) dashed var(--secondary);
+  font-family: var(--press-mono);
   font-size: 9.5px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
 /* The field: full width, no chrome of its own — the panel is the chrome. */
-html[data-theme='riso'] [data-riso='coupon-f'] {
+[data-press='coupon-f'] {
   padding: 14px 16px;
 }
-html[data-theme='riso'] [data-riso='coupon-f'] textarea {
+[data-press='coupon-f'] textarea {
   border: 0;
   background: transparent;
   padding: 0;
@@ -726,55 +651,55 @@ html[data-theme='riso'] [data-riso='coupon-f'] textarea {
 
 /* The action rail, ruled off from the field in solid ink — where the label
    rail above is dashed, as on a perforated coupon. */
-html[data-theme='riso'] [data-riso='coupon-b'] {
+[data-press='coupon-b'] {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 9px 12px 10px 14px;
-  border-top: var(--riso-hairline) solid var(--riso-ink);
+  border-top: var(--hairline) solid var(--border);
 }
-html[data-theme='riso'] [data-riso='rail-left'] {
+[data-press='rail-left'] {
   display: inline-flex;
   align-items: center;
   gap: 10px;
 }
 /* Which press is set. Named, not just coloured. */
-html[data-theme='riso'] [data-riso='setting'] {
+[data-press='setting'] {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   padding: 4px 9px;
-  border: var(--riso-hairline) solid var(--riso-ink);
-  font-family: var(--riso-mono);
+  border: var(--hairline) solid var(--border);
+  font-family: var(--press-mono);
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-html[data-theme='riso'] [data-riso='quill'] {
-  border: var(--riso-hairline) solid var(--riso-ink);
+[data-press='quill'] {
+  border: var(--hairline) solid var(--border);
   background: var(--primary);
   color: var(--primary-foreground);
   height: auto;
   padding: 7px 13px;
-  box-shadow: 3px 3px 0 var(--riso-ink);
+  box-shadow: 3px 3px 0 var(--border);
   transition:
-    transform 0.16s var(--riso-ease),
+    transform 0.16s var(--press-ease),
     box-shadow 0.16s;
 }
-html[data-theme='riso'] [data-riso='quill-label'] {
-  font-family: var(--sans);
+[data-press='quill-label'] {
+  font-family: var(--font-sans);
   font-weight: 700;
   font-size: 12px;
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
-html[data-theme='riso'] [data-riso='quill']:hover:not(:disabled) {
+[data-press='quill']:hover:not(:disabled) {
   transform: translate(-2px, -2px);
-  box-shadow: 5px 5px 0 var(--riso-ink);
+  box-shadow: 5px 5px 0 var(--border);
 }
-html[data-theme='riso'] [data-riso='quill']:active:not(:disabled) {
+[data-press='quill']:active:not(:disabled) {
   transform: translate(1px, 1px);
   box-shadow: none;
 }
@@ -785,31 +710,31 @@ html[data-theme='riso'] [data-riso='quill']:active:not(:disabled) {
    belong to the same publication. Rather than restyling each one, the shared
    primitives get the print treatment and the pages inherit it. */
 
-html[data-theme='riso'] [data-slot='card'],
-html[data-theme='riso'] [data-riso='panel'] {
-  border: var(--riso-hairline) solid var(--riso-ink);
-  box-shadow: 4px 4px 0 var(--riso-paper-3);
+[data-slot='card'],
+[data-press='panel'] {
+  border: var(--hairline) solid var(--border);
+  box-shadow: 4px 4px 0 var(--secondary);
 }
 
-html[data-theme='riso'] table th {
-  font-family: var(--riso-mono);
+table th {
+  font-family: var(--press-mono);
   font-size: 9.5px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
 }
 
-html[data-theme='riso'] main h2 {
+main h2 {
   letter-spacing: -0.02em;
 }
 
 /* ── motion ──────────────────────────────────────────────────────────────────
    globals.css already collapses every animation and transition under
    prefers-reduced-motion. The one thing it cannot do is undo an animation's
-   starting state: `riso-register` begins at `opacity: 0` with `both`, so at a
+   starting state: `press-register` begins at `opacity: 0` with `both`, so at a
    0.01ms duration it would still flash. Held explicitly at the finished frame
    instead. */
 @media (prefers-reduced-motion: reduce) {
-  html[data-theme='riso'] [data-riso='wordmark'] span {
+  [data-press='wordmark'] span {
     animation: none;
     opacity: 1;
     transform: none;

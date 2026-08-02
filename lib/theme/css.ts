@@ -50,6 +50,13 @@ const MAP: Record<string, keyof ThemeTokens> = {
   '--sidebar-accent-foreground': 'text',
   '--sidebar-border': 'border',
   '--sidebar-ring': 'accent',
+
+  // The layout's own roles. These are not shadcn's — the press design needs a
+  // second ink and an overprint, and every palette must answer for both.
+  '--accent-alt': 'accentAlt',
+  '--accent-alt-foreground': 'accentAltForeground',
+  '--overprint': 'overprint',
+  '--overprint-foreground': 'overprintForeground',
 };
 
 function block(tokens: ThemeTokens): string {

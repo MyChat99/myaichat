@@ -39,28 +39,12 @@ export type SidebarConversation = {
 
 export type SidebarIssue = { number: number; date: string };
 
-/**
- * `riso` selects the printed treatment's COPY, not its styling.
- *
- * Styling is still pure CSS. This exists because the previous approach
- * rendered both the plain and the printed wording and hid one with a
- * stylesheet — so the instant that stylesheet did not apply, the page read
- * "New chat Start a page" and "myaichatmyaichat". A theme that degrades into
- * duplicated words is worse than one that degrades into plain words.
- *
- * Resolved on the server from the stored preference, so the first paint is
- * already right. The cost is that switching theme in the appearance panel
- * updates colours instantly but swaps this wording on save, when the route
- * re-renders — a fair trade for copy that cannot double.
- */
 export function Sidebar({
   conversations,
   issue,
-  riso = false,
 }: {
   conversations: SidebarConversation[];
   issue?: SidebarIssue;
-  riso?: boolean;
 }) {
   const params = useParams<{ id?: string }>();
   const [query, setQuery] = useState('');
@@ -128,37 +112,33 @@ export function Sidebar({
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Riso prints a masthead here; every other theme keeps its wordmark
-            in the page header. The doubled word is the second ink plate, laid
-            over the first — it only reads as a duplicate if the stylesheet
-            that positions it is missing, which is why it is not rendered at
-            all unless Riso is active. */}
-        {riso ? (
-          <div data-riso="masthead">
-            <div data-riso="wordmark">
-              myaichat
-              <span aria-hidden="true">myaichat</span>
-            </div>
-            {issue ? (
-              <div data-riso="issue">
-                No. {issue.number} · {issue.date}
-              </div>
-            ) : null}
+        {/* The masthead. The doubled word is the second ink plate laid over the
+            first — it reads as a duplicate only if the stylesheet that
+            positions it is missing. */}
+        <div data-press="masthead">
+          <div data-press="wordmark">
+            myaichat
+            <span aria-hidden="true">myaichat</span>
           </div>
-        ) : null}
+          {issue ? (
+            <div data-press="issue">
+              No. {issue.number} · {issue.date}
+            </div>
+          ) : null}
+        </div>
 
-        <div className="flex items-center gap-2 p-3" data-riso="actions">
+        <div className="flex items-center gap-2 p-3" data-press="actions">
           <form action={createConversation} className="flex-1">
             <Button
               type="submit"
               className="w-full justify-start"
               variant="outline"
               size="sm"
-              data-riso="draft"
+              data-press="draft"
             >
               <MessageSquarePlus className="mr-2 size-4" />
-              {riso ? 'Start a page' : 'New chat'}
-              {riso ? <small data-riso="shortcut">⌘K</small> : null}
+              Start a page
+              <small data-press="shortcut">⌘K</small>
             </Button>
           </form>
           <Button
@@ -199,14 +179,14 @@ export function Sidebar({
                      it — nested inside, it sat within the card's border and
                      read as part of the first conversation. */
                   <Fragment key={c.id}>
-                    {riso && heading ? (
-                      <li data-riso="divider" role="presentation">
+                    {heading ? (
+                      <li data-press="divider" role="presentation">
                         {heading}
                       </li>
                     ) : null}
                     <li
                       className="group relative"
-                      data-riso="slip"
+                      data-press="slip"
                       data-active={active ? 'true' : 'false'}
                     >
                       {editingId === c.id ? (
@@ -250,21 +230,18 @@ export function Sidebar({
                           </Link>
 
                           {/* The slip's stamp line: which press set it, and how
-                              long it ran. Riso-only — every other theme keeps
-                              the single-line list it was designed around. */}
-                          {riso ? (
-                            <div data-riso="stamp">
-                              <span
-                                data-riso="square"
-                                data-filled={(c.pressSlot ?? 0) % 2 === 0 ? 'true' : 'false'}
-                              />
-                              {c.modelName ?? 'No model'}
-                              {' · '}
-                              {c.messageCount
-                                ? `${c.messageCount} note${c.messageCount === 1 ? '' : 's'}`
-                                : 'blank'}
-                            </div>
-                          ) : null}
+                              long it ran. */}
+                          <div data-press="stamp">
+                            <span
+                              data-press="square"
+                              data-filled={(c.pressSlot ?? 0) % 2 === 0 ? 'true' : 'false'}
+                            />
+                            {c.modelName ?? 'No model'}
+                            {' · '}
+                            {c.messageCount
+                              ? `${c.messageCount} note${c.messageCount === 1 ? '' : 's'}`
+                              : 'blank'}
+                          </div>
 
                           <div className="absolute top-1/2 right-1 flex -translate-y-1/2 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
                             <Button

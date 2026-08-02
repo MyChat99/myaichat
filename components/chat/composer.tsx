@@ -1,6 +1,5 @@
 'use client';
 
-import { ArrowUp, Square } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
 import { AttachButton, AttachmentTray, DropOverlay } from '@/components/chat/attachments';
@@ -28,9 +27,7 @@ type Props = {
   storageEnabled?: boolean;
   /** Blocks send while a file is still going up. */
   uploading?: boolean;
-  /** Selects the printed treatment's copy. Styling stays in CSS. */
-  riso?: boolean;
-  /** Printed on Riso's bottom rail, where the mockup names the press. */
+  /** Printed on the action rail: which press is set. */
   modelLabel?: string | null;
 };
 
@@ -50,7 +47,6 @@ export function Composer({
   dropHandlers,
   storageEnabled = false,
   uploading = false,
-  riso = false,
   modelLabel = null,
 }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -91,89 +87,38 @@ export function Composer({
   const canSend = Boolean(value.trim()) || ready.length > 0;
 
   return (
-    <div className="border-border bg-background border-t p-4" data-riso="coupon-wrap">
-      <div className="relative mx-auto max-w-3xl" {...dropHandlers} data-riso="coupon">
-        {/* The boxed COMPOSE panel's label rail. Riso-only: every other theme
-            already says this once, under the field — rendering both is how the
-            page ended up reading "ComposeEnter to send". */}
-        {riso ? (
-          <div data-riso="coupon-l">
-            <span>Compose</span>
-            <span>Enter to set · Shift+Enter for a new line</span>
-          </div>
-        ) : null}
+    <div className="border-border bg-background border-t p-4" data-press="coupon-wrap">
+      <div className="relative mx-auto max-w-3xl" {...dropHandlers} data-press="coupon">
+        {/* The panel's label rail. The mono line on the right says how to send,
+            which is why nothing repeats it under the field. */}
+        <div data-press="coupon-l">
+          <span>Compose</span>
+          <span>Enter to set · Shift+Enter for a new line</span>
+        </div>
         <DropOverlay active={dragging} />
 
         {onRemoveAttachment ? (
           <AttachmentTray items={attachments} onRemove={onRemoveAttachment} />
         ) : null}
 
-        {/* Riso sets the panel as three zones — label rail, field, action rail
-            — the way the mockup does. Every other theme keeps the single row it
-            was designed with, so this branch changes nothing for them. */}
-        {riso ? (
-          <>
-            <div data-riso="coupon-f">
-              <textarea
-                ref={ref}
-                rows={1}
-                value={value}
-                disabled={disabled}
-                onChange={(e) => onChange(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-                placeholder="Write here…"
-                aria-label="Message"
-                className="max-h-[200px] w-full resize-none text-sm focus-visible:outline-none disabled:opacity-50"
-              />
-            </div>
+        {/* Three zones: label rail, field, action rail. */}
+        <div data-press="coupon-f">
+          <textarea
+            ref={ref}
+            rows={1}
+            value={value}
+            disabled={disabled}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            placeholder="Write here…"
+            aria-label="Message"
+            className="max-h-[200px] w-full resize-none text-sm focus-visible:outline-none disabled:opacity-50"
+          />
+        </div>
 
-            <div data-riso="coupon-b">
-              <span data-riso="rail-left">
-                {onAddFiles ? (
-                  <AttachButton
-                    onFiles={onAddFiles}
-                    disabled={disabled || streaming}
-                    storageEnabled={storageEnabled}
-                  />
-                ) : null}
-                {modelLabel ? (
-                  <span data-riso="setting">
-                    <span data-riso="square" data-filled="true" />
-                    {modelLabel}
-                  </span>
-                ) : null}
-              </span>
-
-              {streaming ? (
-                <Button
-                  type="button"
-                  onClick={onStop}
-                  variant="outline"
-                  size="sm"
-                  aria-label="Stop generating"
-                  data-riso="quill"
-                >
-                  <span data-riso="quill-label">Stop</span>
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  onClick={onSubmit}
-                  disabled={disabled || uploading || !canSend}
-                  size="sm"
-                  aria-label={
-                    uploading ? 'Waiting for attachments to finish uploading' : 'Send message'
-                  }
-                  data-riso="quill"
-                >
-                  <span data-riso="quill-label">Set it ⏎</span>
-                </Button>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex items-end gap-2">
+        <div data-press="coupon-b">
+          <span data-press="rail-left">
             {onAddFiles ? (
               <AttachButton
                 onFiles={onAddFiles}
@@ -181,57 +126,45 @@ export function Composer({
                 storageEnabled={storageEnabled}
               />
             ) : null}
+            {modelLabel ? (
+              <span data-press="setting">
+                <span data-press="square" data-filled="true" />
+                {modelLabel}
+              </span>
+            ) : null}
+          </span>
 
-            <textarea
-              ref={ref}
-              rows={1}
-              value={value}
-              disabled={disabled}
-              onChange={(e) => onChange(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              placeholder="Send a message…"
-              aria-label="Message"
-              className="border-input bg-background focus-visible:ring-ring max-h-[200px] flex-1 resize-none rounded-lg border px-3 py-2.5 text-sm focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
-            />
-
-            {streaming ? (
-              <Button
-                type="button"
-                onClick={onStop}
-                variant="outline"
-                size="icon"
-                aria-label="Stop generating"
-              >
-                <Square className="size-4" />
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                onClick={onSubmit}
-                disabled={disabled || uploading || !canSend}
-                size="icon"
-                aria-label={
-                  uploading ? 'Waiting for attachments to finish uploading' : 'Send message'
-                }
-              >
-                <ArrowUp className="size-4" />
-              </Button>
-            )}
-          </div>
-        )}
+          {streaming ? (
+            <Button
+              type="button"
+              onClick={onStop}
+              variant="outline"
+              size="sm"
+              aria-label="Stop generating"
+              data-press="quill"
+            >
+              <span data-press="quill-label">Stop</span>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={onSubmit}
+              disabled={disabled || uploading || !canSend}
+              size="sm"
+              aria-label={
+                uploading ? 'Waiting for attachments to finish uploading' : 'Send message'
+              }
+              data-press="quill"
+            >
+              <span data-press="quill-label">Set it ⏎</span>
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Riso says this on the COMPOSE rail above the field instead, so saying
-          it here too would be the same sentence twice. */}
-      {riso ? null : (
-        <p className="text-muted-foreground mx-auto mt-2 max-w-3xl text-center text-xs">
-          {uploading
-            ? 'Waiting for attachments to finish uploading…'
-            : 'Enter to send · Shift+Enter for a new line'}
-        </p>
-      )}
-      {riso && uploading ? (
+      {/* The COMPOSE rail above the field already says how to send, so the only
+          thing left to announce here is an upload still in flight. */}
+      {uploading ? (
         <p className="text-muted-foreground mx-auto mt-2 max-w-3xl text-center text-xs">
           Waiting for attachments to finish uploading…
         </p>

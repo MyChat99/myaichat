@@ -9,7 +9,7 @@ import { createConversationForMessage } from '@/app/(app)/conversations/actions'
 import { useAttachments } from '@/components/chat/attachments';
 import { CommandPalette } from '@/components/command/command-palette';
 import { Composer } from '@/components/chat/composer';
-import { RisoTabs } from '@/components/chat/riso-tabs';
+import { SectionTabs } from '@/components/chat/section-tabs';
 import { MessageList, type UiMessage } from '@/components/chat/message-list';
 import { ModelSelector, type SelectableModel } from '@/components/chat/model-selector';
 import { Button } from '@/components/ui/button';
@@ -25,8 +25,6 @@ type Props = {
   /** False until R2 credentials exist; disables the paperclip with a reason. */
   storageEnabled?: boolean;
   maxUploadMb?: number;
-  /** Selects the printed treatment's copy. Styling stays in CSS. */
-  riso?: boolean;
   /** Figures for Riso's opening spread. Absent on every other theme. */
   colophon?: { notes: number; spendUsd: number; presses: number };
   /** Riso moves navigation into the rule bar, so it needs to know. */
@@ -69,7 +67,6 @@ export function ChatThread({
   conversations = [],
   storageEnabled = false,
   maxUploadMb,
-  riso = false,
   colophon,
   isAdmin = false,
   lede,
@@ -291,16 +288,14 @@ export function ChatThread({
 
       <div
         className="border-border flex items-center justify-end gap-1 border-b px-4 py-1.5"
-        data-riso="rule"
+        data-press="rule"
       >
         {/* The mockup's rule bar leads with the folio — the page you are on —
             and sets the model ticket beside it. Without it the band is an
             empty rule with one control pushed to the far edge. */}
-        {riso ? (
-          <span data-riso="folio">
-            {conversations.find((c) => c.id === activeId)?.title ?? 'New page'}
-          </span>
-        ) : null}
+        <span data-press="folio">
+          {conversations.find((c) => c.id === activeId)?.title ?? 'New page'}
+        </span>
         {activeId ? (
           <>
             {/* Plain anchors, not fetch + Blob: the browser already knows how
@@ -334,55 +329,45 @@ export function ChatThread({
 
         {/* Sections live in this bar under Riso, so the page has one top rule
             rather than two stacked bands. See RisoTabs. */}
-        {riso ? <RisoTabs isAdmin={isAdmin} /> : null}
+        <SectionTabs isAdmin={isAdmin} />
       </div>
 
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
         {empty ? (
           <div
             className="mx-auto flex h-full max-w-3xl flex-col items-center justify-center gap-6 px-4"
-            data-riso="spread"
+            data-press="spread"
           >
             {/* One opening or the other, never both. Riso prints an editorial
                 spread; every other theme keeps the plain prompt. */}
-            <div className="text-center" data-riso="lede">
-              {riso && lede ? <div data-riso="lede-num">{lede}</div> : null}
-              <h1 className="text-2xl font-semibold" data-riso="headline">
-                {riso ? (
-                  <>
-                    A quiet place
-                    <br />
-                    to <mark>think out loud</mark>.
-                  </>
-                ) : (
-                  'How can I help?'
-                )}
+            <div className="text-center" data-press="lede">
+              {lede ? <div data-press="lede-num">{lede}</div> : null}
+              <h1 className="text-2xl font-semibold" data-press="headline">
+                A quiet place
+                <br />
+                to <mark>think out loud</mark>.
               </h1>
-              <p className="text-muted-foreground mt-1 text-sm" data-riso="standfirst">
-                {riso
-                  ? `${models.length} model${models.length === 1 ? ' is' : 's are'} inked and ready. Ask something badly, change your mind halfway through, and start again — nothing here is precious.`
-                  : 'Pick a prompt or write your own.'}
+              <p className="text-muted-foreground mt-1 text-sm" data-press="standfirst">
+                {`${models.length} model${models.length === 1 ? ' is' : 's are'} inked and ready. Ask something badly, change your mind halfway through, and start again — nothing here is precious.`}
               </p>
             </div>
-            <div className="grid w-full gap-2 sm:grid-cols-2" data-riso="picks">
+            <div className="grid w-full gap-2 sm:grid-cols-2" data-press="picks">
               {STARTERS.map(({ prompt, note }, i) => (
                 <button
                   key={prompt}
                   type="button"
                   onClick={() => send(prompt)}
                   className="border-border hover:bg-accent rounded-lg border p-3 text-left text-sm transition"
-                  data-riso="pick"
+                  data-press="pick"
                 >
-                  {riso ? (
-                    <span data-riso="pick-n" aria-hidden="true">
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                  ) : null}
-                  <span data-riso="pick-body">
-                    <span data-riso="pick-t">{prompt}</span>
+                  <span data-press="pick-n" aria-hidden="true">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span data-press="pick-body">
+                    <span data-press="pick-t">{prompt}</span>
                     {/* Inline, not stacked: in the mockup the note continues
                         the title on the same line and wraps with it. */}
-                    {riso ? <span data-riso="pick-d"> {note}</span> : null}
+                    <span data-press="pick-d"> {note}</span>
                   </span>
                 </button>
               ))}
@@ -390,24 +375,24 @@ export function ChatThread({
 
             {/* The foot of the spread: the reader's own figures, not invented
                 ones. Printed only when Riso asked for them. */}
-            {riso && colophon ? (
-              <div data-riso="colophon">
-                <div data-riso="col-c">
-                  <div data-riso="col-l">Notes set</div>
-                  <div data-riso="col-v">{colophon.notes.toLocaleString()}</div>
+            {colophon ? (
+              <div data-press="colophon">
+                <div data-press="col-c">
+                  <div data-press="col-l">Notes set</div>
+                  <div data-press="col-v">{colophon.notes.toLocaleString()}</div>
                 </div>
-                <div data-riso="col-c">
-                  <div data-riso="col-l">Ink used</div>
-                  <div data-riso="col-v">
+                <div data-press="col-c">
+                  <div data-press="col-l">Ink used</div>
+                  <div data-press="col-v">
                     $
                     {colophon.spendUsd < 0.01 && colophon.spendUsd > 0
                       ? '<0.01'
                       : colophon.spendUsd.toFixed(2)}
                   </div>
                 </div>
-                <div data-riso="col-c">
-                  <div data-riso="col-l">Presses</div>
-                  <div data-riso="col-v">
+                <div data-press="col-c">
+                  <div data-press="col-l">Presses</div>
+                  <div data-press="col-v">
                     {colophon.presses} / {colophon.presses}
                   </div>
                 </div>
@@ -450,7 +435,6 @@ export function ChatThread({
         dropHandlers={attachments.dropHandlers}
         storageEnabled={storageEnabled}
         uploading={attachments.uploading}
-        riso={riso}
         modelLabel={models.find((m) => m.id === modelId)?.displayName ?? null}
       />
     </div>

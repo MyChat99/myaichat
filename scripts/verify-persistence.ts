@@ -50,7 +50,7 @@ type Painted = {
   dark: boolean;
   background: string;
   primary: string;
-  /** Whether Riso's own furniture is present, i.e. the SERVER agreed. */
+  /** The layout is permanent, so this must be true on every step of the walk. */
   masthead: boolean;
 };
 
@@ -64,7 +64,7 @@ async function painted(page: Page): Promise<Painted> {
       dark: root.classList.contains('dark'),
       background: cs.getPropertyValue('--background').trim(),
       primary: cs.getPropertyValue('--primary').trim(),
-      masthead: !!document.querySelector('[data-riso="masthead"]'),
+      masthead: !!document.querySelector('[data-press="masthead"]'),
     };
   })()`)) as Painted;
 }
@@ -222,10 +222,20 @@ async function main() {
 
     check('selecting Riso applied Riso', first.dataTheme === 'riso', first.dataTheme);
     check('choosing Light beat the OS dark preference', first.dark === false, describe(first));
+    /**
+     * The layout does not belong to a theme.
+     *
+     * Checked on EVERY step including the first, which is rendered before any
+     * theme has been chosen — if the masthead only appears once a particular
+     * palette is selected, the structure has been tied to a theme again.
+     */
     check(
-      'the server rendered Riso structure too, not just colour',
-      steps.slice(2).every((s) => s.state.masthead),
-      'the masthead is missing on at least one step',
+      'the masthead renders on every step, whatever the palette',
+      steps.every((s) => s.state.masthead),
+      steps
+        .filter((s) => !s.state.masthead)
+        .map((s) => s.label)
+        .join(', '),
     );
     check('no navigation took longer than 2s', slowest < 2000, `slowest ${slowest}ms`);
 
