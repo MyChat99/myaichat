@@ -1118,3 +1118,16 @@ main h2 {
     transform: none;
   }
 }
+
+/* The primitives shadcn hardcodes a radius on, squared like the card above.
+   `--radius: 0` cannot reach them: `rounded-lg` is a literal class in their
+   own class list, so the token never gets a say.
+
+   Found by rendering the login page — the first thing any visitor sees, and
+   the one page no suite had ever opened. Its card was square with an offset
+   shadow and its fields and button were rounded, so the page read as two
+   designs stacked on each other. */
+[data-slot='input'],
+[data-slot='button'] {
+  border-radius: 0;
+}
