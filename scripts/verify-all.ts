@@ -80,6 +80,7 @@ const SUITES: Suite[] = [
   { script: 'verify:storage', needs: 'server' },
   { script: 'verify:chat', needs: 'server' },
   { script: 'verify:compare', needs: 'server' },
+  { script: 'verify:costs', needs: 'server' },
   { script: 'verify:providers', needs: 'server' },
 
   // ── mutating, last, in this order ──

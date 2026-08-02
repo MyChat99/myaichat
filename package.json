@@ -45,7 +45,8 @@
     "verify:structure": "tsx scripts/verify-structure.ts",
     "verify:upload": "tsx scripts/verify-upload.ts",
     "verify:adapters": "tsx --conditions=react-server scripts/verify-adapters.ts",
-    "verify:compare": "tsx --conditions=react-server scripts/verify-compare.ts"
+    "verify:compare": "tsx --conditions=react-server scripts/verify-compare.ts",
+    "verify:costs": "tsx --conditions=react-server scripts/verify-costs.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

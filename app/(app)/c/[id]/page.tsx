@@ -7,6 +7,7 @@ import { createClient } from '@/lib/db/server';
 import { listAvailableModels } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
 import { listConversationTitles } from '@/lib/db/conversations';
+import { loadConversationCost, loadMonthToDateSpend } from '@/lib/db/costs';
 import { isStorageConfigured } from '@/lib/r2/storage';
 import { maxUploadMb } from '@/lib/db/settings';
 
@@ -42,11 +43,21 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     // timestamp, and a tie would render them in arbitrary order.
     .order('seq', { ascending: true });
 
+  // What this conversation, and each answer in it, actually cost.
+  const cost = await loadConversationCost(id, user.id);
+
   const initialMessages: UiMessage[] = (messages ?? [])
     .filter(
       (m): m is { id: string; role: 'user' | 'assistant'; content: string } => m.role !== 'system',
     )
-    .map((m) => ({ id: m.id, role: m.role, content: m.content }));
+    .map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      cost: cost.byMessage.get(m.id)?.costUsd,
+      inputTokens: cost.byMessage.get(m.id)?.inputTokens,
+      outputTokens: cost.byMessage.get(m.id)?.outputTokens,
+    }));
 
   // Keyed by id so navigating between conversations remounts with fresh state
   // rather than needing a prop-to-state sync effect.
@@ -67,6 +78,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
       isAdmin={user.role === 'admin'}
       avatarKey={user.avatarUrl}
       email={user.email}
+      spend={{ conversationUsd: cost.totalUsd, monthUsd: await loadMonthToDateSpend(user.id) }}
     />
   );
 }

@@ -705,6 +705,55 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
   box-shadow: none;
 }
 
+/* ── the ledger ──────────────────────────────────────────────────────────────
+   What an answer cost, set as a stamp under it, and the running totals in the
+   folio rule. Deliberately quiet: this is a number you glance at, not a claim
+   the page is making. */
+[data-press='answer-cost'] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+  font-family: var(--press-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+[data-press='answer-cost'] span:first-child {
+  color: var(--foreground);
+  font-weight: 700;
+}
+
+[data-press='ledger'] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  font-family: var(--press-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+[data-press='ledger-value'] {
+  color: var(--foreground);
+  font-weight: 700;
+}
+[data-press='ledger-sep'] {
+  opacity: 0.5;
+}
+
+/* The ledger is the first thing to go when the bar runs out of room — the tabs
+   are navigation and must survive; a number you can also read on the answer
+   itself is not. */
+@media (max-width: 900px) {
+  [data-press='ledger'] {
+    display: none;
+  }
+}
+
 /* ── ask the presses ─────────────────────────────────────────────────────────
    A comparison is a spread: one setup panel across the top, then a column per
    press, each its own bordered sheet. The columns are created before any answer

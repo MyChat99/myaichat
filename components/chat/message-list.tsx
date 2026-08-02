@@ -5,12 +5,23 @@ import { useState } from 'react';
 
 import { Markdown } from '@/components/chat/markdown';
 import { MessageEntrance, useHydrated } from '@/components/motion/motion';
+import { formatUsd } from '@/lib/theme/money';
 import { Button } from '@/components/ui/button';
 
 export type UiMessage = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  /**
+   * What this answer cost, read from the usage row that paid for it.
+   *
+   * Undefined rather than zero when unknown — answers generated before usage
+   * rows were linked to messages genuinely have no price, and showing $0.00
+   * would be a lie in the one place the number has to be trustworthy.
+   */
+  cost?: number;
+  inputTokens?: number;
+  outputTokens?: number;
 };
 
 type Props = {
@@ -193,6 +204,18 @@ export function MessageList({ messages, streaming, onRegenerate, onEdit }: Props
             data-message="assistant"
           >
             <Markdown content={message.content} />
+
+            {/* What this answer cost. Rendered only when it is known — an
+                answer from before usage rows were linked to messages has no
+                price, and $0.00 would be a lie in the one place the number has
+                to be trustworthy. */}
+            {message.cost !== undefined ? (
+              <p data-press="answer-cost">
+                <span>{formatUsd(message.cost)}</span>
+                <span>{message.inputTokens ?? 0} in</span>
+                <span>{message.outputTokens ?? 0} out</span>
+              </p>
+            ) : null}
 
             {isStreamingThis ? (
               <span

@@ -3,6 +3,7 @@ import { listAvailableModels } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
 import { listConversationTitles } from '@/lib/db/conversations';
 import { loadColophon } from '@/lib/db/colophon';
+import { loadMonthToDateSpend } from '@/lib/db/costs';
 import { isStorageConfigured } from '@/lib/r2/storage';
 import { maxUploadMb } from '@/lib/db/settings';
 
@@ -36,6 +37,7 @@ export default async function NewChatPage() {
       avatarKey={user.avatarUrl}
       email={user.email}
       colophon={await loadColophon(presses)}
+      spend={{ conversationUsd: 0, monthUsd: await loadMonthToDateSpend(user.id) }}
       lede={{ now: new Date().toISOString(), presses }}
     />
   );
