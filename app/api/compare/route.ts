@@ -51,7 +51,21 @@ const MAX_TOKENS = 1024;
 
 const bodySchema = z.object({
   prompt: z.string().trim().min(1).max(8000),
-  modelIds: z.array(z.string().uuid()).min(MIN_MODELS).max(MAX_MODELS),
+  /**
+   * Distinct, and checked after de-duplication.
+   *
+   * The picker cannot select a model twice, but the route is reachable without
+   * it, and `[a, a]` was accepted: the same model ran twice, was billed twice,
+   * and — because every stream event is keyed by model id — both columns
+   * received both copies of the text. Deduplicating before the count means
+   * `[a, a]` is a one-model comparison and refused as one, rather than a
+   * two-model comparison that costs double and reads like a rendering bug.
+   */
+  modelIds: z
+    .array(z.string().uuid())
+    .max(MAX_MODELS)
+    .transform((ids) => [...new Set(ids)])
+    .refine((ids) => ids.length >= MIN_MODELS && ids.length <= MAX_MODELS),
 });
 
 function ndjson(value: unknown): Uint8Array {
