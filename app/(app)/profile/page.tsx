@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { LocalTime } from '@/components/ui/local-time';
 import { ProfileForm } from '@/components/profile/profile-form';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,17 +20,9 @@ export default async function ProfilePage() {
     .eq('id', user.id)
     .maybeSingle();
 
-  // Fixed locale and UTC: the server renders this, and letting it follow the
-  // server's locale would make the markup differ from what the browser would
-  // produce and trip a hydration mismatch.
-  const joined = profile?.created_at
-    ? new Date(profile.created_at).toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        timeZone: 'UTC',
-      })
-    : null;
+  // The instant, not a formatting of it — <LocalTime> renders it in the
+  // reader's own zone once the browser can say what that is.
+  const joined = profile?.created_at ?? null;
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
@@ -60,7 +53,9 @@ export default async function ProfilePage() {
               {joined ? (
                 <div>
                   <dt className="text-muted-foreground text-xs">Member since</dt>
-                  <dd className="mt-0.5">{joined}</dd>
+                  <dd className="mt-0.5">
+                    <LocalTime iso={joined} style="dateShort" />
+                  </dd>
                 </div>
               ) : null}
               <div>

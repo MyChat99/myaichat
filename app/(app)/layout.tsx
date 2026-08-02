@@ -3,28 +3,12 @@ import Link from 'next/link';
 import { Sidebar, type SidebarConversation } from '@/components/chat/sidebar';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/db/server';
+import { AvatarMark } from '@/components/ui/avatar-mark';
+import { dayGroup } from '@/lib/time';
 import { registeredProviderNames } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
 
 import { signOut } from '../(auth)/actions';
-
-/**
- * Which masthead section a conversation belongs under.
- *
- * Riso renders these as printed section rules — TODAY / YESTERDAY / BACK
- * ISSUES. Every other theme ignores the value entirely, so the vocabulary is
- * deliberately generic in the data and only becomes editorial in the CSS.
- */
-function groupFor(updatedAt: string): string {
-  const day = 24 * 60 * 60 * 1000;
-  const now = new Date();
-  const startOfToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const at = new Date(updatedAt).getTime();
-
-  if (at >= startOfToday) return 'Today';
-  if (at >= startOfToday - day) return 'Yesterday';
-  return 'Back issues';
-}
 
 /**
  * Protected shell. Middleware already redirects anonymous visitors, but this
@@ -41,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Press slots, so the sidebar can distinguish two providers without naming
   // either. Registry order is stable, so a conversation keeps its mark.
   const pressSlots = new Map(registeredProviderNames().map((name, i) => [name, i]));
+  const now = new Date();
 
   // RLS scopes this to the signed-in user; no explicit user_id filter needed.
   //
@@ -67,7 +52,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // Grouped on the server so every visitor sees the same buckets. Doing it in
     // the browser would classify by the reader's clock, which is arguably more
     // correct and definitely a hydration mismatch.
-    group: groupFor(c.updated_at),
+    // Bucketed in UTC for the first paint; the sidebar re-buckets in the
+    // reader's own zone once it hydrates. See dayGroup().
+    group: dayGroup(c.updated_at, now, true),
   }));
 
   return (
@@ -91,13 +78,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex h-dvh overflow-hidden">
       <Sidebar
         conversations={conversations}
-        /* Formatted on the server. `new Date()` in a client component renders
-           one string on the server and another in the browser whenever the two
-           disagree about the locale or the day, which is a hydration error. */
-        issue={{
-          number: conversations.length,
-          date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }),
-        }}
+        issue={{ since: user.createdAt, now: now.toISOString() }}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -137,6 +118,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             ) : null}
 
             {/* Show the email when the display name would duplicate the nav link. */}
+            <AvatarMark avatarKey={user.avatarUrl} label={user.email ?? 'You'} />
+
             <span
               className="text-muted-foreground hidden text-sm sm:inline"
               title={user.email ?? ''}

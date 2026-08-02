@@ -1,3 +1,4 @@
+import { LocalTime } from '@/components/ui/local-time';
 import { Download } from 'lucide-react';
 import Link from 'next/link';
 
@@ -111,7 +112,7 @@ export default async function AuditPage({
               {(logs ?? []).map((log) => (
                 <tr key={log.id} className="border-t">
                   <td className="text-muted-foreground px-3 py-2 whitespace-nowrap">
-                    {log.created_at.slice(0, 19).replace('T', ' ')}
+                    <LocalTime iso={log.created_at} style="dateTime" />
                   </td>
                   <td className="px-3 py-2">
                     {log.actor_id ? (emailById.get(log.actor_id) ?? log.actor_id.slice(0, 8)) : '—'}

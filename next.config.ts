@@ -18,8 +18,30 @@ import type { NextConfig } from 'next';
  */
 export function contentSecurityPolicy(dev = process.env.NODE_ENV !== 'production'): string {
   const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-  const r2 = process.env.R2_ACCOUNT_ID
-    ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
+
+  /**
+   * BOTH R2 hosts, and the bucket-scoped one is the one that matters.
+   *
+   * The SDK's endpoint is `<account>.r2.cloudflarestorage.com`, but the URL it
+   * signs is virtual-hosted — `<bucket>.<account>.r2.cloudflarestorage.com`.
+   * CSP host matching is exact, so allowing only the account host let every
+   * browser upload fail with `Refused to connect`, while the server-side round
+   * trip (which has no CSP) passed perfectly. That combination is why this
+   * looked like a bucket CORS problem for as long as it did.
+   *
+   * Listed explicitly rather than as `*.r2.cloudflarestorage.com`: a wildcard
+   * would also permit every other tenant's bucket on Cloudflare's shared
+   * domain, which is a strictly larger hole than this needs.
+   */
+  const account = process.env.R2_ACCOUNT_ID;
+  const bucket = process.env.R2_BUCKET_NAME;
+  const r2 = account
+    ? [
+        `https://${account}.r2.cloudflarestorage.com`,
+        bucket ? `https://${bucket}.${account}.r2.cloudflarestorage.com` : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
     : '';
 
   /**

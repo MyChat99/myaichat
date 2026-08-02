@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { signOut } from '@/app/(auth)/actions';
+import { AvatarMark } from '@/components/ui/avatar-mark';
 
 /**
  * Section tabs, set in the folio rule beside the page title.
@@ -22,7 +23,15 @@ import { signOut } from '@/app/(auth)/actions';
  * cannot hide the header on a page that has no replacement for it — settings,
  * profile and admin keep their header, styled as the same tabs.
  */
-export function SectionTabs({ isAdmin }: { isAdmin: boolean }) {
+export function SectionTabs({
+  isAdmin,
+  avatarKey = null,
+  email = null,
+}: {
+  isAdmin: boolean;
+  avatarKey?: string | null;
+  email?: string | null;
+}) {
   const pathname = usePathname();
 
   const tabs = [
@@ -46,6 +55,10 @@ export function SectionTabs({ isAdmin }: { isAdmin: boolean }) {
           {tab.label}
         </Link>
       ))}
+      {/* The chat pages hide the shell's bar, so the portrait belongs here or
+          it appears nowhere the reader actually is. */}
+      <AvatarMark avatarKey={avatarKey} label={email ?? 'You'} />
+
       {/* A server action invoked from a client component — the form posts, so
           signing out still works with JavaScript disabled. */}
       <form action={signOut}>

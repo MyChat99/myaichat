@@ -10,6 +10,7 @@ import { useAttachments } from '@/components/chat/attachments';
 import { CommandPalette } from '@/components/command/command-palette';
 import { Composer } from '@/components/chat/composer';
 import { SectionTabs } from '@/components/chat/section-tabs';
+import { LocalTime } from '@/components/ui/local-time';
 import { MessageList, type UiMessage } from '@/components/chat/message-list';
 import { ModelSelector, type SelectableModel } from '@/components/chat/model-selector';
 import { Button } from '@/components/ui/button';
@@ -27,10 +28,12 @@ type Props = {
   maxUploadMb?: number;
   /** Figures for Riso's opening spread. Absent on every other theme. */
   colophon?: { notes: number; spendUsd: number; presses: number };
-  /** Riso moves navigation into the rule bar, so it needs to know. */
+  /** The rule bar carries the navigation, so it needs these. */
   isAdmin?: boolean;
-  /** Riso's dateline. Formatted on the server to keep hydration stable. */
-  lede?: string;
+  avatarKey?: string | null;
+  email?: string | null;
+  /** The dateline, as an instant — formatted in the reader's own zone. */
+  lede?: { now: string; presses: number };
 };
 
 /**
@@ -69,6 +72,8 @@ export function ChatThread({
   maxUploadMb,
   colophon,
   isAdmin = false,
+  avatarKey = null,
+  email = null,
   lede,
 }: Props) {
   const router = useRouter();
@@ -329,7 +334,7 @@ export function ChatThread({
 
         {/* Sections live in this bar under Riso, so the page has one top rule
             rather than two stacked bands. See RisoTabs. */}
-        <SectionTabs isAdmin={isAdmin} />
+        <SectionTabs isAdmin={isAdmin} avatarKey={avatarKey} email={email} />
       </div>
 
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
@@ -341,7 +346,12 @@ export function ChatThread({
             {/* One opening or the other, never both. Riso prints an editorial
                 spread; every other theme keeps the plain prompt. */}
             <div className="text-center" data-press="lede">
-              {lede ? <div data-press="lede-num">{lede}</div> : null}
+              {lede ? (
+                <div data-press="lede-num">
+                  <LocalTime iso={lede.now} style="date" uppercase /> · {lede.presses} press
+                  {lede.presses === 1 ? '' : 'es'} running
+                </div>
+              ) : null}
               <h1 className="text-2xl font-semibold" data-press="headline">
                 A quiet place
                 <br />

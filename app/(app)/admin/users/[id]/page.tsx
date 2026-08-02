@@ -23,6 +23,10 @@ function when(iso: string | null): string {
   if (days === 0) return 'today';
   if (days === 1) return 'yesterday';
   if (days < 30) return `${days} days ago`;
+  // Relative for the recent past, absolute beyond that. The absolute form is
+  // pinned to UTC so the server's markup is deterministic; it is a coarse
+  // "3 Aug 2026" where a day either way does not change the meaning, unlike
+  // the masthead and the audit log, which are rendered in the reader's zone.
   return new Date(iso).toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',

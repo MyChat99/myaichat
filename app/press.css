@@ -705,6 +705,76 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
   box-shadow: none;
 }
 
+/* ── portrait ────────────────────────────────────────────────────────────────
+   Square, keylined and offset. A circular avatar is the one shape this design
+   has no vocabulary for — everything else on the page is a rectangle with a
+   hard edge, and a soft disc reads as an import from a different application. */
+[data-press='portrait'] {
+  border: var(--hairline) solid var(--border);
+  border-radius: 0 !important;
+  box-shadow: 2px 2px 0 var(--border);
+}
+[data-press='portrait'] img {
+  border-radius: 0;
+}
+
+/* ── attachments ─────────────────────────────────────────────────────────────
+   Chips are small bordered cards with the same offset the rest of the design
+   uses, so an attached file reads as a physical thing clipped to the page
+   rather than as a rounded pill from another interface. */
+[data-press='tray'] {
+  padding: 0 14px;
+  margin-top: 12px;
+}
+[data-press='chip'] {
+  border: var(--hairline) solid var(--border);
+  box-shadow: 3px 3px 0 var(--border);
+  background: var(--card);
+  padding: 5px 6px 5px 7px;
+  gap: 8px;
+  transition:
+    transform 0.16s var(--press-ease),
+    box-shadow 0.16s var(--press-ease);
+}
+[data-press='chip']:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--border);
+}
+/* A failed upload keeps its place — dropping the chip would look like the file
+   had been attached — so it is marked rather than removed. */
+[data-press='chip'][data-failed='true'] {
+  border-color: var(--destructive);
+  box-shadow: 3px 3px 0 var(--destructive);
+}
+[data-press='chip-thumb'] {
+  border: 1px solid var(--border);
+  border-radius: 0;
+}
+
+/* The drop target: a bordered panel with a mono instruction, not a tinted
+   rectangle. Dashed, because it is a place a thing is about to go. */
+[data-press='drop'] {
+  border: var(--rule) dashed var(--border);
+  background: var(--card);
+}
+[data-press='drop-label'] {
+  font-family: var(--press-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--foreground);
+}
+
+/* The paperclip, squared off to match the rail it sits on. */
+[data-press='clip'] {
+  border: var(--hairline) solid var(--border);
+  width: 30px;
+  height: 30px;
+}
+[data-press='clip']:disabled {
+  opacity: 0.45;
+}
+
 /* ═══════════════════════════════════════════════════ everything else
 
    The panels the mockup never drew — settings, admin, profile — still have to

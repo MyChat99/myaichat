@@ -65,6 +65,8 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
       storageEnabled={isStorageConfigured()}
       maxUploadMb={await maxUploadMb()}
       isAdmin={user.role === 'admin'}
+      avatarKey={user.avatarUrl}
+      email={user.email}
     />
   );
 }

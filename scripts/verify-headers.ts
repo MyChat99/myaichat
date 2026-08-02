@@ -124,6 +124,38 @@ async function main() {
     !(directives.get('script-src') ?? '').includes('*'),
     directives.get('script-src'),
   );
+  /**
+   * The CSP must name the BUCKET-scoped R2 host, not only the account one.
+   *
+   * The SDK's endpoint is `<account>.r2.cloudflarestorage.com`, but the URL it
+   * SIGNS is virtual-hosted: `<bucket>.<account>.r2.cloudflarestorage.com`. CSP
+   * host matching is exact, so a policy naming only the account host blocked
+   * every browser upload — while the server-side round trip, which has no CSP,
+   * passed perfectly. That combination reads exactly like a bucket CORS problem
+   * and is not one.
+   *
+   * Exercised with stand-in values rather than the real ones: this script runs
+   * credential-free in CI, so `contentSecurityPolicy()` would otherwise emit no
+   * R2 host at all and the check would pass by being vacuous.
+   */
+  {
+    const saved = [process.env.R2_ACCOUNT_ID, process.env.R2_BUCKET_NAME];
+    process.env.R2_ACCOUNT_ID = 'acct';
+    process.env.R2_BUCKET_NAME = 'bkt';
+    const withR2 = contentSecurityPolicy(false);
+    [process.env.R2_ACCOUNT_ID, process.env.R2_BUCKET_NAME] = saved as [string, string];
+
+    check(
+      'connect-src names the bucket-scoped R2 host',
+      withR2.includes('https://bkt.acct.r2.cloudflarestorage.com'),
+      withR2.match(/connect-src[^;]*/)?.[0],
+    );
+    check(
+      'connect-src still names the account R2 host',
+      withR2.includes('https://acct.r2.cloudflarestorage.com'),
+    );
+  }
+
   check(
     "connect-src does not allow '*'",
     !(directives.get('connect-src') ?? '').split(/\s+/).includes('*'),

@@ -5,6 +5,10 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Fragment, useMemo, useState, useTransition } from 'react';
 
+import { LocalTime } from '@/components/ui/local-time';
+import { dayGroup, issueNumber } from '@/lib/time';
+import { useHydrated } from '@/lib/hooks/use-hydrated';
+
 import {
   createConversation,
   deleteConversation,
@@ -37,7 +41,15 @@ export type SidebarConversation = {
   group?: string;
 };
 
-export type SidebarIssue = { number: number; date: string };
+/**
+ * The masthead's issue line, as instants rather than formatted strings.
+ *
+ * `since` is when the account was created; the issue NUMBER is how many days it
+ * has been publishing. That reads like a periodical and is actually true of the
+ * reader, where the previous value — a raw count of their conversations — was
+ * a number that looked meaningful and was not. Day one is No. 1.
+ */
+export type SidebarIssue = { since: string; now: string };
 
 export function Sidebar({
   conversations,
@@ -52,6 +64,16 @@ export function Sidebar({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [, startTransition] = useTransition();
+
+  /**
+   * Section headings are re-bucketed in the reader's own zone once hydrated.
+   *
+   * The server can only bucket in UTC, which puts an evening conversation in
+   * the Americas under tomorrow's heading. Before hydration this uses exactly
+   * what the server sent, so the two agree; afterwards it uses the local day
+   * boundary and a heading may move.
+   */
+  const hydrated = useHydrated();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -74,16 +96,18 @@ export function Sidebar({
    * pinned items sort to the top and simply carry their own heading with them.
    */
   const headings = useMemo(() => {
+    const now = new Date();
     const at = new Map<string, string>();
     let previous: string | undefined;
     for (const c of filtered) {
-      if (c.group && c.group !== previous) {
-        at.set(c.id, c.group);
-        previous = c.group;
+      const group = hydrated ? dayGroup(c.updated_at, now, false) : c.group;
+      if (group && group !== previous) {
+        at.set(c.id, group);
+        previous = group;
       }
     }
     return at;
-  }, [filtered]);
+  }, [filtered, hydrated]);
 
   return (
     <>
@@ -122,7 +146,8 @@ export function Sidebar({
           </div>
           {issue ? (
             <div data-press="issue">
-              No. {issue.number} · {issue.date}
+              No. {issueNumber(issue.since, issue.now, !hydrated)} ·{' '}
+              <LocalTime iso={issue.now} style="dateShort" uppercase />
             </div>
           ) : null}
         </div>

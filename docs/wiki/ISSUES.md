@@ -33,6 +33,34 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 **Resolution:** A new nullable `usage_logs.source` column (migration `20260801120000`); demo rows set it, cleanup deletes on it, and the guard checks both tables. The loop is now driven by the pool, so each template is used exactly once and no title can repeat — the pool size *is* the amount of data. Pool expanded from 6 to 24 threads.
 **Proven:** 366 → 395 → 366 across `--demo` / `--clean-demo`, and 24 conversations with 24 unique titles. Pre-existing untagged rows are [ISSUE-031](#issue-031).
 
+### ISSUE-038 — Browser uploads were blocked by our own CSP, not by CORS
+
+**Status:** Resolved | **Severity:** High | **Phase:** 6 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-02
+**This is Phase 6 human check #1, finally performed — by a script.** It failed, and my first diagnosis was wrong.
+**Problem:** the browser's `PUT` to R2 never left the page and the attachment chip sat on "Uploading…" forever.
+**Misdiagnosed as CORS.** The browser's summary — `Fetch API cannot load https://myaichat.<account>.r2.cloudflarestorage.com/…` — reads exactly like a CORS refusal, and the owner re-saved the bucket policy on that advice. It was not the cause. An `OPTIONS` preflight sent straight at the bucket answered correctly all along: `Access-Control-Allow-Origin: http://localhost:3000`, `Allow-Headers: content-type`, `Allow-Methods: PUT, GET, HEAD`.
+**Actual cause — our own Content Security Policy.** The full console message, which my harness was truncating, said:
+
+> `violates the following CSP directive: "connect-src 'self' … https://<account>.r2.cloudflarestorage.com"`
+
+The SDK's endpoint is `<account>.r2.cloudflarestorage.com`, but the URL it *signs* is virtual-hosted: `<bucket>.<account>.r2.cloudflarestorage.com`. CSP host matching is exact, so the browser refused to connect. The server-side round trip has no CSP, which is why `verify:storage` passed throughout — and that combination is precisely what made it look like a bucket problem.
+**Resolution:** `next.config.ts` now emits both hosts. Listed explicitly rather than as `*.r2.cloudflarestorage.com`, which would also permit every other tenant's bucket on Cloudflare's shared domain.
+**Now guarded:** `verify:headers` builds the policy with stand-in account/bucket values and asserts the bucket-scoped host is present — stand-ins because that suite runs credential-free in CI, where the real check would pass by being vacuous. Proven to fail before the fix.
+**Lesson:** a truncated error message cost the owner a round trip to a dashboard for a problem that was in this repository. The harness now prints the whole thing.
+**Fix (Cloudflare → R2 → bucket → Settings → CORS policy):**
+```json
+[{
+  "AllowedOrigins": ["http://localhost:3000", "https://myaichat-production.up.railway.app"],
+  "AllowedMethods": ["PUT", "GET", "HEAD"],
+  "AllowedHeaders": ["content-type"],
+  "ExposeHeaders": ["ETag"],
+  "MaxAgeSeconds": 3600
+}]
+```
+`content-type` is required in `AllowedHeaders`: the client sends it on the PUT because it is part of what was signed, so a policy without it fails the preflight. The policy must be on the **S3 API** bucket endpoint shown in the error, not the public `r2.dev` domain.
+**How to confirm:** `npm run verify:upload` — it attaches a file in a real browser, waits for the upload, sends, and asserts against the database that the message stored the attachment. It prints this policy when it detects a CORS refusal.
+**Deliberately not in `verify:all`:** it depends on infrastructure outside the repository, and a suite that cannot go green without a dashboard change stops being a signal.
+
 ### ISSUE-037 — The layout was tied to one theme
 
 **Status:** Resolved | **Severity:** High | **Phase:** 5 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01
