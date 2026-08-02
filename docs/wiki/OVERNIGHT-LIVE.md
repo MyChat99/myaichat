@@ -251,10 +251,13 @@ Written to be read in three minutes, before the sections above.
 
 ### What happened
 
-**Sixteen pull requests, all merged, all with CI green on the exact commit.**
-Zero regressions: the suite went from 25 suites / 1,176 assertions to **29
-suites / 1,591 assertions**, and every run since has passed with shared state
-unchanged.
+**Nineteen pull requests (#47–#65), all merged, all with CI green on the exact
+commit** — twelve of work, seven keeping this report and the wiki current. Zero
+regressions: the suite went from 25 suites / 1,176 assertions to **29 suites /
+1,591 assertions**, and every run since has passed with shared state unchanged.
+
+(An earlier draft of this line said sixteen. I counted the work cycles and
+forgot the wiki PRs; corrected here rather than above.)
 
 Two features shipped complete, as briefed — **Ask the presses** and **cost
 transparency** — and then the night turned into something I did not plan.
