@@ -282,7 +282,10 @@ async function reportDuplication(page: Page): Promise<boolean> {
  * repo could see it.
  */
 async function reportThemeLeak(page: Page): Promise<boolean> {
-  if (THEME === 'riso') return false;
+  // The structure is permanent now — see verify:structure, which asserts every
+  // palette renders it identically. Nothing is theme-only to leak.
+  return false;
+  // eslint-disable-next-line no-unreachable
 
   const RISO_ONLY = [
     'masthead',

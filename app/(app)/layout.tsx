@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/db/server';
 import { registeredProviderNames } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
-import { loadAppearance } from '@/lib/theme/preferences';
 
 import { signOut } from '../(auth)/actions';
 
@@ -38,8 +37,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Resolved here so the printed treatment's COPY is server-rendered rather
   // than revealed by CSS. `loadAppearance` is request-cached, so this shares
   // the read the root layout already did.
-  const { presetTheme } = await loadAppearance();
-  const riso = presetTheme === 'riso';
 
   // Press slots, so the sidebar can distinguish two providers without naming
   // either. Registry order is stable, so a conversation keeps its mark.
@@ -93,7 +90,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
      */
     <div className="flex h-dvh overflow-hidden">
       <Sidebar
-        riso={riso}
         conversations={conversations}
         /* Formatted on the server. `new Date()` in a client component renders
            one string on the server and another in the browser whenever the two
@@ -106,7 +102,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header
-          data-riso="masthead-bar"
+          data-press="masthead-bar"
           className="border-border flex items-center justify-between border-b py-3 pr-4 pl-14 md:pl-4"
         >
           <Link href="/" className="font-semibold">

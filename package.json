@@ -40,9 +40,9 @@
     "security:audit": "tsx scripts/security-audit.ts",
     "audit:report": "tsx scripts/audit-report.ts",
     "smoke": "tsx scripts/smoke.ts",
-    "verify:riso": "tsx scripts/verify-riso.ts",
     "shoot": "tsx scripts/shoot.ts",
-    "verify:persistence": "tsx scripts/verify-persistence.ts"
+    "verify:persistence": "tsx scripts/verify-persistence.ts",
+    "verify:structure": "tsx scripts/verify-structure.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

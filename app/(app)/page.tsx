@@ -1,7 +1,6 @@
 import { ChatThread } from '@/components/chat/chat-thread';
 import { listAvailableModels } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
-import { loadAppearance } from '@/lib/theme/preferences';
 import { listConversationTitles } from '@/lib/db/conversations';
 import { loadColophon } from '@/lib/db/colophon';
 import { isStorageConfigured } from '@/lib/r2/storage';
@@ -15,8 +14,6 @@ export default async function NewChatPage() {
   const user = await requireUser();
 
   const models = await listAvailableModels();
-  const { presetTheme } = await loadAppearance();
-  const riso = presetTheme === 'riso';
 
   // A "press" is a provider, not a model — the mockup's colophon reads 2 / 2
   // with two vendors configured, however many models each of them offers.
@@ -35,22 +32,17 @@ export default async function NewChatPage() {
       conversations={await listConversationTitles()}
       storageEnabled={isStorageConfigured()}
       maxUploadMb={await maxUploadMb()}
-      riso={riso}
       isAdmin={user.role === 'admin'}
-      /* Only Riso prints a colophon, so only Riso pays for the queries. */
-      colophon={riso ? await loadColophon(presses) : undefined}
+      colophon={await loadColophon(presses)}
       /* Formatted on the server: `new Date()` in a client component renders one
          string on the server and another in the browser. */
-      lede={
-        riso
-          ? `${new Date()
-              .toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
-              .replace(
-                /(\d+) /,
-                '$1 ',
-              )} · ${models.length} press${models.length === 1 ? '' : 'es'} running`
-          : undefined
-      }
+      /* Formatted on the server: `new Date()` in a client component renders one
+         string on the server and another in the browser. */
+      lede={[
+        new Date().toLocaleDateString('en-GB', { weekday: 'long' }),
+        new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }),
+        `${presses} press${presses === 1 ? '' : 'es'} running`,
+      ].join(' · ')}
     />
   );
 }

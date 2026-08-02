@@ -33,6 +33,14 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 **Resolution:** A new nullable `usage_logs.source` column (migration `20260801120000`); demo rows set it, cleanup deletes on it, and the guard checks both tables. The loop is now driven by the pool, so each template is used exactly once and no title can repeat — the pool size *is* the amount of data. Pool expanded from 6 to 24 threads.
 **Proven:** 366 → 395 → 366 across `--demo` / `--clean-demo`, and 24 conversations with 24 unique titles. Pre-existing untagged rows are [ISSUE-031](#issue-031).
 
+### ISSUE-037 — The layout was tied to one theme
+
+**Status:** Resolved | **Severity:** High | **Phase:** 5 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01
+**Problem:** Reported by the owner: selecting Rose (or any palette other than Riso) reverted the entire application to the old generic UI — rounded corners, no keylines, no offset shadows, no masthead, a plain list instead of conversation cards. Selecting a theme changed the design, not the colours.
+**Cause:** the structure lived in a stylesheet scoped to `[data-theme='riso']`, and the markup that carried it was gated on a server-resolved `riso` boolean. Deliberate at the time, and wrong: it made two designs behind one setting.
+**Resolution:** `app/riso.css` → `app/press.css`, unscoped; the `riso` gate removed so every structural element always renders; `--riso-*` colour variables replaced by theme roles. All eight palettes reworked as palettes for THIS layout, with `border` promoted to a true ink held to 3:1 against paper and stock — every dark palette failed that when first measured and was lightened along its own hue.
+**Now guarded:** `verify:structure` fails on a theme selector or a colour literal in press.css, then renders all eight palettes in both modes and compares computed borders, radii, shadows, fonts and spacing across seventeen elements. 16 renders, identical.
+
 ### ISSUE-036 — Choosing a theme did not choose it
 
 **Status:** Resolved | **Severity:** High | **Phase:** 5 | **Opened:** 2026-08-01 | **Resolved:** 2026-08-01

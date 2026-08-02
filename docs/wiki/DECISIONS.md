@@ -9,6 +9,26 @@ Stack choices already fixed by [CLAUDE.md](../../CLAUDE.md) (Next.js, Supabase, 
 ## Entry format
 
 ```
+### DEC-019 — The layout is permanent; a theme is colour and nothing else
+
+**Date:** 2026-08-01 · **Supersedes the containment half of [DEC-017](#dec-017)**
+
+**Decision:** the print layout — masthead, ink keylines, offset shadows, zero radius, conversation cards, mono section rules, numbered picks, the boxed COMPOSE panel — is the application's only layout, for every palette and every page. A palette answers five questions and no others: paper, ink, first accent, second accent, muted.
+
+**Why the previous arrangement was wrong:** the structure was scoped to `[data-theme='riso']`, so selecting Rose did not render the newspaper in rose inks — it swapped the newspaper for a different application. Two designs behind one setting is not a theme system; it is a fork with a dropdown.
+
+**How it is enforced.** `app/press.css` may not name a theme or a colour: `verify:structure` fails the build on a `[data-theme=…]` selector or a hex literal, then loads all eight palettes in both modes and compares computed border widths, radii, shadows, fonts, spacing and display across seventeen structural elements. Sixteen renders, all identical.
+
+**Two token roles were added**, because the design needs them and every palette must therefore answer for them:
+- `accentAlt` — the second plate, used once, on the model pill. A press sheet with one ink is a memo.
+- `overprint` — where the two inks overlap: the selected conversation card, which is overprinted rather than tinted.
+
+**And one existing token changed meaning.** `border` is now the ink: it draws 2px rules and solid offset shadows, so it is held to **3:1 against both paper and stock** (WCAG 1.4.11's bar for a meaningful non-text element). Every dark palette failed that when first measured — the borders were subtle in the way a soft-UI theme wants and a printed one cannot afford — and each was lightened along its own hue until it cleared.
+
+**Cost:** eight palettes now have to be designed, not just picked. A colour that looks pleasant as a hairline may be unusable as a keyline, and the check will say so.
+
+---
+
 ### DEC-018 — The fluorescent pink is kept as a fill and darkened only as text
 
 **Date:** 2026-08-01
@@ -30,6 +50,11 @@ The mockup sets paper-coloured text on the pink action at **2.65:1**. That could
 ---
 
 ### DEC-017 — Riso is a design system, contained by a parse rather than by care
+
+> **Superseded 2026-08-01 by [DEC-019](#dec-019).** The containment was the
+> mistake: scoping the structure to one theme meant the other seven kept a
+> different design. The *technique* survives — a parse, not care — but it now
+> proves the opposite property: that no theme can change the structure.
 
 **Date:** 2026-08-01
 

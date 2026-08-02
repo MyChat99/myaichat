@@ -6,7 +6,6 @@ import type { UiMessage } from '@/components/chat/message-list';
 import { createClient } from '@/lib/db/server';
 import { listAvailableModels } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
-import { loadAppearance } from '@/lib/theme/preferences';
 import { listConversationTitles } from '@/lib/db/conversations';
 import { isStorageConfigured } from '@/lib/r2/storage';
 import { maxUploadMb } from '@/lib/db/settings';
@@ -65,7 +64,6 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
       conversations={await listConversationTitles()}
       storageEnabled={isStorageConfigured()}
       maxUploadMb={await maxUploadMb()}
-      riso={(await loadAppearance()).presetTheme === 'riso'}
       isAdmin={user.role === 'admin'}
     />
   );

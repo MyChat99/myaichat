@@ -30,6 +30,28 @@ export type ThemeTokens = {
   destructive: string;
   /** Positive confirmations: passing connection tests, saved states. */
   success: string;
+
+  /**
+   * The second ink. One highlight, used sparingly — the model pill.
+   *
+   * The layout reserves a place for a colour that is NOT the primary accent,
+   * because a press sheet with one ink is a memo. Every palette has to answer
+   * what its second plate is.
+   */
+  accentAlt: string;
+  /** Text ON accentAlt. Held to AA against it. */
+  accentAltForeground: string;
+
+  /**
+   * Where the two inks overlap: the selected conversation card.
+   *
+   * A selected item is overprinted rather than tinted, so it needs a colour of
+   * its own rather than an opacity. Dark enough in light mode, and light enough
+   * in dark mode, to reverse its label out of.
+   */
+  overprint: string;
+  /** Text ON overprint. Held to AA against it. */
+  overprintForeground: string;
 };
 
 export type ThemeDefinition = {
@@ -42,26 +64,18 @@ export type ThemeDefinition = {
 export const THEMES: ThemeDefinition[] = [
   {
     /**
-     * Riso — printed matter rather than emitted light.
+     * Riso — printed matter rather than emitted light, and the default.
      *
      * From the risograph mockup (docs/mockups/05-riso.html): newsprint stock
      * with a green undertone, two real Riso stock inks (Federal Blue and
-     * Fluorescent Pink), and hard ink rules instead of soft grey borders. The
-     * border token is deliberately near-black — the 2px black keylines ARE the
-     * look, and a polite #e4e4e7 hairline would erase it.
+     * Fluorescent Pink), and a third used exactly once (Yellow, on the model
+     * pill).
      *
-     * Three colours were darkened from the mockup to clear AA. Each moved along
-     * its own hue rather than toward neutral, so the character survives:
-     *   textMuted   #7a8094 → #606575  (21% darker, 3.38:1 → 4.56:1)
-     *   destructive #ff48b0 → #bd3582  (26% darker, 2.65:1 → 4.52:1)
+     * Three colours were darkened from the mockup to clear AA, each along its
+     * own hue rather than toward neutral, so the character survives:
+     *   textMuted   #7a8094 → #606575  (21% darker)
+     *   destructive #ff48b0 → #bd3582  (26% darker)
      *   success     #00a95c → #00753f  (31% darker, Riso Green)
-     * The fluorescent pink cannot reach 4.5:1 on paper — that is what makes it
-     * fluorescent. Darkened only until legible, and still unmistakably magenta
-     * rather than red (blue channel stays above green).
-     *
-     * Dark mode is "riso at night": the fluoro pink becomes the accent and
-     * genuinely glows against near-black, which is the one thing the ink can do
-     * on screen that it cannot do on paper. It needed no adjustment.
      */
     id: 'riso',
     label: 'Riso',
@@ -69,7 +83,6 @@ export const THEMES: ThemeDefinition[] = [
       background: '#f1eee2',
       surface: '#e8e4d5',
       surfaceHover: '#dedac9',
-      // Hard ink keyline, not a hairline. See the note above.
       border: '#1d2230',
       accent: '#3d5588',
       accentForeground: '#f1eee2',
@@ -77,214 +90,291 @@ export const THEMES: ThemeDefinition[] = [
       textMuted: '#606575',
       destructive: '#bd3582',
       success: '#00753f',
+      accentAlt: '#ffe800',
+      accentAltForeground: '#1d2230',
+      overprint: '#3d3d6e',
+      overprintForeground: '#f1eee2',
     },
     dark: {
       background: '#16161a',
       surface: '#1e1e24',
       surfaceHover: '#26262e',
-      border: '#3a3a46',
+      border: '#68687d',
       accent: '#ff48b0',
       accentForeground: '#16161a',
       text: '#f1eee2',
       textMuted: '#9a9aa8',
       destructive: '#ff48b0',
       success: '#7fa3e0',
+      accentAlt: '#ffe800',
+      accentAltForeground: '#16161a',
+      overprint: '#2f2f57',
+      overprintForeground: '#f1eee2',
     },
   },
   {
+    /** Default — the same press, neutral stock and a plain blue ink. */
     id: 'default',
     label: 'Default',
     light: {
-      background: '#ffffff',
-      surface: '#ffffff',
-      surfaceHover: '#f4f4f5',
-      border: '#e4e4e7',
-      accent: '#18181b',
-      accentForeground: '#fafafa',
-      text: '#09090b',
-      textMuted: '#52525b',
+      background: '#fafaf8',
+      surface: '#f0f0ec',
+      surfaceHover: '#e4e4de',
+      border: '#17171a',
+      accent: '#1d4ed8',
+      accentForeground: '#ffffff',
+      text: '#17171a',
+      textMuted: '#56565e',
       destructive: '#b91c1c',
-      success: '#15803d',
+      success: '#166534',
+      accentAlt: '#fcd34d',
+      accentAltForeground: '#17171a',
+      overprint: '#26264d',
+      overprintForeground: '#fafaf8',
     },
     dark: {
-      background: '#09090b',
-      surface: '#18181b',
-      surfaceHover: '#27272a',
-      border: '#2f2f33',
-      accent: '#fafafa',
-      accentForeground: '#18181b',
-      text: '#fafafa',
-      textMuted: '#a1a1aa',
-      destructive: '#f87171',
-      success: '#4ade80',
+      background: '#0b0b0d',
+      surface: '#141417',
+      surfaceHover: '#1d1d21',
+      border: '#626270',
+      accent: '#93b4ff',
+      accentForeground: '#0b0b0d',
+      text: '#f2f2f4',
+      textMuted: '#a1a1ac',
+      destructive: '#fca5a5',
+      success: '#86efac',
+      accentAlt: '#fcd34d',
+      accentAltForeground: '#0b0b0d',
+      overprint: '#2b2b52',
+      overprintForeground: '#f2f2f4',
     },
   },
   {
+    /** Midnight — indigo inks on a cool stock. */
     id: 'midnight',
     label: 'Midnight',
     light: {
-      background: '#f8fafc',
-      surface: '#ffffff',
-      surfaceHover: '#f1f5f9',
-      border: '#e2e8f0',
-      accent: '#1e40af',
-      accentForeground: '#ffffff',
-      text: '#0f172a',
-      textMuted: '#475569',
-      destructive: '#b91c1c',
-      success: '#15803d',
+      background: '#f4f5fb',
+      surface: '#e8eaf6',
+      surfaceHover: '#dcdff0',
+      border: '#14152b',
+      accent: '#3730a3',
+      accentForeground: '#f4f5fb',
+      text: '#14152b',
+      textMuted: '#54587a',
+      destructive: '#b3123c',
+      success: '#0f766e',
+      accentAlt: '#a5b4fc',
+      accentAltForeground: '#14152b',
+      overprint: '#2b2a63',
+      overprintForeground: '#f4f5fb',
     },
     dark: {
-      background: '#020617',
-      surface: '#0f172a',
-      surfaceHover: '#1e293b',
-      border: '#26364c',
-      accent: '#60a5fa',
-      accentForeground: '#020617',
-      text: '#f1f5f9',
-      textMuted: '#94a3b8',
-      destructive: '#f87171',
-      success: '#4ade80',
+      background: '#0b0b16',
+      surface: '#14142a',
+      surfaceHover: '#1c1c38',
+      border: '#5e5e9d',
+      accent: '#a5b4fc',
+      accentForeground: '#0b0b16',
+      text: '#e8e9f7',
+      textMuted: '#a0a3c0',
+      destructive: '#fb7185',
+      success: '#5eead4',
+      accentAlt: '#fcd34d',
+      accentAltForeground: '#0b0b16',
+      overprint: '#35356e',
+      overprintForeground: '#e8e9f7',
     },
   },
   {
+    /** Ocean — teal ink, warm yellow second plate. */
     id: 'ocean',
     label: 'Ocean',
     light: {
       background: '#f0fdfa',
-      surface: '#ffffff',
-      surfaceHover: '#ccfbf1',
-      border: '#99f6e4',
+      surface: '#dcf5f0',
+      surfaceHover: '#c7ece4',
+      border: '#0b2b2b',
       accent: '#0f766e',
-      accentForeground: '#ffffff',
-      text: '#042f2e',
-      textMuted: '#155e57',
-      destructive: '#b91c1c',
-      success: '#15803d',
+      accentForeground: '#f0fdfa',
+      text: '#0b2b2b',
+      textMuted: '#456663',
+      destructive: '#b3123c',
+      success: '#166534',
+      accentAlt: '#ffd166',
+      accentAltForeground: '#0b2b2b',
+      overprint: '#134445',
+      overprintForeground: '#f0fdfa',
     },
     dark: {
-      background: '#04211f',
-      surface: '#0b3330',
-      surfaceHover: '#134e4a',
-      border: '#1a5f5a',
-      accent: '#2dd4bf',
-      accentForeground: '#04211f',
-      text: '#ecfdf5',
-      textMuted: '#8fdcd0',
-      destructive: '#f87171',
-      success: '#4ade80',
+      background: '#041414',
+      surface: '#0a2222',
+      surfaceHover: '#123030',
+      border: '#3b7373',
+      accent: '#5eead4',
+      accentForeground: '#041414',
+      text: '#e0f7f3',
+      textMuted: '#8fb5b0',
+      destructive: '#fb7185',
+      success: '#86efac',
+      accentAlt: '#ffd166',
+      accentAltForeground: '#041414',
+      overprint: '#14484a',
+      overprintForeground: '#e0f7f3',
     },
   },
   {
+    /** Forest — green ink, and a teal second plate so the two never merge. */
     id: 'forest',
     label: 'Forest',
     light: {
-      background: '#f6faf6',
-      surface: '#ffffff',
-      surfaceHover: '#e7f5e7',
-      border: '#cfe8cf',
+      background: '#f4faf4',
+      surface: '#e5f1e5',
+      surfaceHover: '#d4e7d4',
+      border: '#12240f',
       accent: '#15803d',
-      accentForeground: '#ffffff',
-      text: '#0f2417',
-      textMuted: '#2f5d3f',
+      accentForeground: '#f4faf4',
+      text: '#12240f',
+      textMuted: '#4a6047',
       destructive: '#b91c1c',
-      success: '#15803d',
+      success: '#0f766e',
+      accentAlt: '#f5d547',
+      accentAltForeground: '#12240f',
+      overprint: '#1d4023',
+      overprintForeground: '#f4faf4',
     },
     dark: {
-      background: '#0b1a10',
-      surface: '#12261a',
-      surfaceHover: '#1a3626',
-      border: '#24462f',
-      accent: '#4ade80',
-      accentForeground: '#0b1a10',
-      text: '#eaf6ee',
-      textMuted: '#a0cfae',
-      destructive: '#f87171',
-      success: '#4ade80',
+      background: '#0a1209',
+      surface: '#121e10',
+      surfaceHover: '#1a2a17',
+      border: '#487143',
+      accent: '#86efac',
+      accentForeground: '#0a1209',
+      text: '#e8f5e6',
+      textMuted: '#9db89a',
+      destructive: '#fca5a5',
+      success: '#5eead4',
+      accentAlt: '#f5d547',
+      accentAltForeground: '#0a1209',
+      overprint: '#1e4526',
+      overprintForeground: '#e8f5e6',
     },
   },
   {
+    /** Sunset — burnt orange ink on warm stock. */
     id: 'sunset',
     label: 'Sunset',
     light: {
-      background: '#fffbf5',
-      surface: '#ffffff',
-      surfaceHover: '#ffedd5',
-      border: '#fed7aa',
+      background: '#fff8f0',
+      surface: '#ffecd8',
+      surfaceHover: '#ffdfc0',
+      border: '#2b1608',
       accent: '#c2410c',
-      accentForeground: '#ffffff',
-      text: '#2c1608',
-      textMuted: '#7c4a1d',
+      accentForeground: '#fff8f0',
+      text: '#2b1608',
+      textMuted: '#6a4732',
       destructive: '#b91c1c',
-      success: '#15803d',
+      success: '#166534',
+      accentAlt: '#ffd166',
+      accentAltForeground: '#2b1608',
+      overprint: '#5a2412',
+      overprintForeground: '#fff8f0',
     },
     dark: {
-      background: '#1c0f06',
-      surface: '#2a180b',
-      surfaceHover: '#3a2210',
-      border: '#4a2d15',
-      accent: '#fb923c',
-      accentForeground: '#1c0f06',
-      text: '#fff3e6',
-      textMuted: '#e5ac7c',
-      destructive: '#f87171',
-      success: '#4ade80',
+      background: '#180d05',
+      surface: '#24160b',
+      surfaceHover: '#322010',
+      border: '#8e5b31',
+      accent: '#fdba74',
+      accentForeground: '#180d05',
+      text: '#fdf0e2',
+      textMuted: '#bfa084',
+      destructive: '#fca5a5',
+      success: '#86efac',
+      accentAlt: '#ffd166',
+      accentAltForeground: '#180d05',
+      overprint: '#4d2812',
+      overprintForeground: '#fdf0e2',
     },
   },
   {
+    /** Rose — crimson ink on blush stock. The newspaper, in rose. */
     id: 'rose',
     label: 'Rose',
     light: {
       background: '#fff5f7',
-      surface: '#ffffff',
-      surfaceHover: '#ffe4e9',
-      border: '#fecdd3',
+      surface: '#ffe3ea',
+      surfaceHover: '#ffcfda',
+      border: '#2b0d16',
       accent: '#be123c',
-      accentForeground: '#ffffff',
-      text: '#2d0a14',
-      textMuted: '#7d1f37',
-      destructive: '#b91c1c',
-      success: '#15803d',
+      accentForeground: '#fff5f7',
+      text: '#2b0d16',
+      textMuted: '#6b424e',
+      destructive: '#9f1239',
+      success: '#166534',
+      accentAlt: '#ffd166',
+      accentAltForeground: '#2b0d16',
+      overprint: '#5c1730',
+      overprintForeground: '#fff5f7',
     },
     dark: {
-      background: '#1b0710',
-      surface: '#2a0d19',
-      surfaceHover: '#3d1424',
-      border: '#4d1c2e',
-      accent: '#fb7185',
-      accentForeground: '#1b0710',
-      text: '#ffeef2',
-      textMuted: '#e79db1',
-      destructive: '#f87171',
-      success: '#4ade80',
+      background: '#170811',
+      surface: '#22101a',
+      surfaceHover: '#2f1625',
+      border: '#9b496d',
+      accent: '#fda4af',
+      accentForeground: '#170811',
+      text: '#ffe9ef',
+      textMuted: '#c99aa8',
+      destructive: '#fb7185',
+      success: '#86efac',
+      accentAlt: '#ffd166',
+      accentAltForeground: '#170811',
+      overprint: '#4a1a2e',
+      overprintForeground: '#ffe9ef',
     },
   },
   {
+    /**
+     * Mono — one ink.
+     *
+     * The second plate is a grey chip rather than a colour, because a
+     * monochrome press does not suddenly find a yellow. It still has to be a
+     * distinct field with a readable label, which is what accentAlt means here.
+     */
     id: 'mono',
     label: 'Mono',
     light: {
-      background: '#ffffff',
-      surface: '#ffffff',
-      surfaceHover: '#f5f5f5',
-      border: '#d4d4d4',
+      background: '#fbfbfb',
+      surface: '#efefef',
+      surfaceHover: '#e2e2e2',
+      border: '#000000',
       accent: '#000000',
       accentForeground: '#ffffff',
-      text: '#000000',
+      text: '#0a0a0a',
       textMuted: '#525252',
-      destructive: '#b91c1c',
-      success: '#15803d',
+      destructive: '#7f1d1d',
+      success: '#14532d',
+      accentAlt: '#d4d4d4',
+      accentAltForeground: '#0a0a0a',
+      overprint: '#262626',
+      overprintForeground: '#fbfbfb',
     },
     dark: {
-      background: '#000000',
+      background: '#050505',
       surface: '#121212',
-      surfaceHover: '#1f1f1f',
-      border: '#333333',
-      accent: '#ffffff',
-      accentForeground: '#000000',
-      text: '#ffffff',
+      surfaceHover: '#1e1e1e',
+      border: '#626262',
+      accent: '#fafafa',
+      accentForeground: '#050505',
+      text: '#f5f5f5',
       textMuted: '#a3a3a3',
-      destructive: '#f87171',
-      success: '#4ade80',
+      destructive: '#fca5a5',
+      success: '#86efac',
+      accentAlt: '#3f3f3f',
+      accentAltForeground: '#f5f5f5',
+      overprint: '#2e2e2e',
+      overprintForeground: '#f5f5f5',
     },
   },
 ];

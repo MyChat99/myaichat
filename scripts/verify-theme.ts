@@ -54,6 +54,25 @@ function checkMode(themeLabel: string, mode: 'light' | 'dark', t: ThemeTokens) {
   check(`${prefix}: destructive on background`, contrastRatioHex(t.destructive, t.background));
   check(`${prefix}: success on background`, contrastRatioHex(t.success, t.background));
   check(`${prefix}: success on surface`, contrastRatioHex(t.success, t.surface));
+
+  // The layout's own roles. Both carry text, so both are held to AA.
+  check(`${prefix}: label on the second ink`, contrastRatioHex(t.accentAltForeground, t.accentAlt));
+  check(`${prefix}: label on the overprint`, contrastRatioHex(t.overprintForeground, t.overprint));
+
+  /**
+   * The ink has to read as a keyline.
+   *
+   * This layout draws 2px rules and solid offset shadows in `border`. A polite
+   * hairline that barely separates from the paper turns every card edge and
+   * every shadow into something that looks like a rendering artefact rather
+   * than a deliberate mark — which is the difference between "this newspaper in
+   * rose inks" and "a rose theme that lost its design".
+   *
+   * 3:1 is WCAG 1.4.11's bar for a non-text element that carries meaning, and a
+   * card boundary carries meaning.
+   */
+  check(`${prefix}: ink reads against the paper`, contrastRatioHex(t.border, t.background), 3);
+  check(`${prefix}: ink reads against the stock`, contrastRatioHex(t.border, t.surface), 3);
 }
 
 console.log('WCAG AA contrast — every theme, both modes\n');

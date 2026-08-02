@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { signOut } from '@/app/(auth)/actions';
 
 /**
- * Riso's section tabs, set in the folio rule beside the page title.
+ * Section tabs, set in the folio rule beside the page title.
  *
  * The mockup gives the page ONE top bar: title and model ticket on the left,
  * sections on the right. The application normally has two — a header carrying
@@ -16,13 +16,13 @@ import { signOut } from '@/app/(auth)/actions';
  * Rather than lift that state into the layout, the navigation comes down here,
  * and riso.css hides the header on any page that renders a rule bar:
  *
- *   html[data-theme='riso'] body:has([data-riso='rule']) header { display: none }
+ *   html[data-theme='riso'] body:has([data-press='rule']) header { display: none }
  *
  * `:has()` does that at first paint with no JavaScript and no flash, and it
  * cannot hide the header on a page that has no replacement for it — settings,
  * profile and admin keep their header, styled as the same tabs.
  */
-export function RisoTabs({ isAdmin }: { isAdmin: boolean }) {
+export function SectionTabs({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
 
   const tabs = [
@@ -35,12 +35,12 @@ export function RisoTabs({ isAdmin }: { isAdmin: boolean }) {
   ];
 
   return (
-    <nav data-riso="tabs">
+    <nav data-press="tabs">
       {tabs.map((tab) => (
         <Link
           key={tab.href}
           href={tab.href}
-          data-riso="tab"
+          data-press="tab"
           data-on={tab.match(pathname ?? '') ? 'true' : 'false'}
         >
           {tab.label}
@@ -49,7 +49,7 @@ export function RisoTabs({ isAdmin }: { isAdmin: boolean }) {
       {/* A server action invoked from a client component — the form posts, so
           signing out still works with JavaScript disabled. */}
       <form action={signOut}>
-        <button type="submit" data-riso="tab">
+        <button type="submit" data-press="tab">
           Sign out
         </button>
       </form>
