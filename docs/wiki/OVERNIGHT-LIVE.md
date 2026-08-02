@@ -67,7 +67,26 @@ Ordered by what it unlocks. Each one is a single sitting — I have written them
 as steps rather than as problems, because every one of them is blocked on
 something only you can reach, not on a decision I owe you.
 
-### 1. Turn uploads and email on — 10 minutes, unblocks two finished features
+### 1. ~~Turn uploads and email on~~ — **DONE 2026-08-02, and verified**
+
+You added the six variables. Verified against production, not locally:
+
+| Check | Result |
+| --- | --- |
+| `isStorageConfigured()` on the live site | **true** — the paperclip is enabled, and `/api/uploads/presign` answers 200 rather than 503 `storage_unconfigured` |
+| CSP as served | both R2 hosts present in `connect-src` |
+| `verify:upload --base=…up.railway.app` | **9/9** — presign 200, cross-origin PUT 200, message stored with attachment, model described the image, object read back |
+| `smoke --url …up.railway.app` | **19/19** |
+| Timing | presign 945ms, PUT 272ms, composer usable 4.5s after attaching |
+
+**One thing is still open, and it needs your inbox:** email *delivery*. I can
+prove the template renders and the transport is configured; I cannot prove a
+message arrived. Sign up on the live site with the address that owns the Resend
+account — it must be that address, since `onboarding@resend.dev` is an
+unverified domain and Resend delivers only to the account owner. (ISSUE-017.)
+
+<details>
+<summary>What the original item said</summary>
 
 Uploads, avatars and email are **built and tested locally end to end.** They are
 disabled in production for one reason: the credentials are not in Railway.
@@ -97,7 +116,23 @@ npm run verify:upload -- --base=https://myaichat-production.up.railway.app
 Full detail: `PHASE-6-CHECKLIST.md` A4. This closes ISSUE-016, ISSUE-017 and
 ISSUE-003 together — they are three entries for one missing set of variables.
 
-### 2. Decide about 366 untagged demo rows — 2 minutes, your call not mine
+</details>
+
+### 2. Decide about **75** untagged demo rows — 2 minutes, your call not mine
+
+**Correction:** I wrote 366 here and in the briefing. That was the size of the
+whole table, not the number of deletion candidates. Counted properly:
+
+| | rows |
+| --- | --- |
+| `usage_logs`, total | 846 |
+| tagged `source = 'demo'` (already removable) | 49 |
+| untagged, any date | 797 |
+| **untagged AND before 2026-07-30 — the candidates** | **75** |
+
+Deleting the 75 removes **23,994 tokens and $0.0779** from analytics. The other
+722 untagged rows are dated on or after the first commit and are
+indistinguishable from real usage; they stay whatever you decide.
 
 `--demo` once wrote fabricated `usage_logs` rows with nothing marking them as
 fabricated. That is fixed going forward, but the rows written before the fix are
