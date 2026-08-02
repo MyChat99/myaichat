@@ -149,7 +149,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             role="alert"
             className="border-destructive/40 bg-destructive/10 text-destructive border-b px-4 py-2 text-sm"
           >
+            {/* Says what is true, and what to do about it. Without the second
+                sentence the banner is a dead end: a suspended user can see
+                that they are blocked and has no idea who lifted the rope. */}
             Your account is suspended. You can read your history but cannot send new messages.
+            Contact an administrator to have it restored.
           </p>
         ) : null}
 
