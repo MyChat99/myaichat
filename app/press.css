@@ -281,9 +281,16 @@ aside > div:has(input) {
   background: var(--overprint);
   box-shadow: 4px 4px 0 var(--border);
 }
+/* `--overprint-foreground`, because the card is painted in `--overprint`.
+   It used to reverse out in `--primary-foreground` — a different role, which
+   happened to be legible on light stock and collapsed to **1.43:1** at night:
+   the *selected* conversation, the one thing on the page you are looking at,
+   was very nearly invisible in dark mode. Measured on the rendered page, not
+   on the tokens; `verify:theme` had always checked these two colours against
+   each other and never noticed the CSS was pairing the wrong two. */
 [data-press='slip'][data-active='true'] > a,
 [data-press='slip'][data-active='true'] [data-press='stamp'] {
-  color: var(--primary-foreground);
+  color: var(--overprint-foreground);
 }
 [data-press='slip'][data-active='true'] [data-press='stamp'] {
   opacity: 0.78;

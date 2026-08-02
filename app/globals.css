@@ -200,9 +200,15 @@
 /* highlight.js tokens, mapped onto theme variables.
    No literal hues: every colour here derives from a token, so syntax
    highlighting follows the active theme instead of fighting it. */
+/* Mixed toward `--foreground` rather than left as plain `--muted-foreground`,
+   which measured **4.14:1** on the code surface in light mode — under AA, and
+   the one syntax colour that was. Because `--foreground` is dark on light stock
+   and light on dark stock, a foreground share raises contrast in both modes at
+   once: this reads 6.8:1 light and 8.2:1 dark, and a comment is still visibly
+   quieter than the code around it. */
 .hljs-comment,
 .hljs-quote {
-  color: var(--muted-foreground);
+  color: color-mix(in oklch, var(--muted-foreground) 55%, var(--foreground));
   font-style: italic;
 }
 .hljs-keyword,
