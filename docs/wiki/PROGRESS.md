@@ -42,7 +42,7 @@
 >
 > | # | Check | Expect |
 > | --- | --- | --- |
-> | 1 | **Attach a PNG and send** | Thumbnail + size in the chip, not stuck on "Uploading…"; message sends. **This is the one that proves CORS** — credentials are already proven |
+> | 1 | ~~**Attach a PNG and send**~~ | ✅ **DONE 2026-08-02, by `npm run verify:upload`** — attaches in a real browser, PUTs to the bucket, stores the message with its attachment, reads the object back, and the model describes the image. It also found the real blocker: our CSP, not the bucket's CORS (ISSUE-038) |
 > | 2 | Cloudflare → `myaichat` → Objects | The file under `chat/<your-user-id>/` |
 > | 3 | **Attach a 30MB file** | Rejected instantly, before any network request |
 > | 4 | **Attach a `.exe`** | Rejected, message naming the accepted formats |

@@ -16,6 +16,7 @@
  *   npm run verify:upload -- --base=https://…
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { deflateSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -48,14 +49,66 @@ function check(name: string, passed: boolean, detail = '') {
   }
 }
 
-/** A tiny valid PNG, written at runtime rather than committed as a fixture. */
-function writePng(path: string) {
-  const png = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAHUlEQVQoU2NkYGD4z0AEYBxVSF' +
-      'AwGjAaMBowGjAaMBoAAJ7fA/9Ck3AhAAAAAElFTkSuQmCC',
-    'base64',
+/**
+ * A real PNG, encoded here rather than committed as a base64 blob.
+ *
+ * Size matters: a 1×1 or 8×8 image is a valid PNG that the vision endpoint
+ * refuses with "Could not process image", so a tiny fixture tests the upload
+ * and then fails the leg it was meant to prove. 256×256 is unambiguously an
+ * image. Written as an encoder because a magic base64 string is a fixture
+ * nobody can check — this one is a few lines of PNG, and its dimensions are
+ * visible in the source.
+ */
+function writePng(path: string, size = 256) {
+  const chunk = (type: string, body: Buffer) => {
+    const head = Buffer.alloc(8);
+    head.writeUInt32BE(body.length, 0);
+    head.write(type, 4, 'ascii');
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(Buffer.concat([Buffer.from(type, 'ascii'), body])) >>> 0, 0);
+    return Buffer.concat([head, body, crc]);
+  };
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(size, 0);
+  ihdr.writeUInt32BE(size, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 2; // truecolour RGB
+
+  // Diagonal bands, so the image has actual content rather than one flat field.
+  const raw = Buffer.alloc(size * (size * 3 + 1));
+  let at = 0;
+  for (let y = 0; y < size; y++) {
+    raw[at++] = 0; // filter: none
+    for (let x = 0; x < size; x++) {
+      const band = ((x + y) >> 5) % 2 === 0;
+      raw[at++] = band ? 0xf1 : 0x3d;
+      raw[at++] = band ? 0xee : 0x55;
+      raw[at++] = band ? 0xe2 : 0x88;
+    }
+  }
+
+  writeFileSync(
+    path,
+    Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      chunk('IHDR', ihdr),
+      chunk('IDAT', deflateSync(raw)),
+      chunk('IEND', Buffer.alloc(0)),
+    ]),
   );
-  writeFileSync(path, png);
+}
+
+const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+
+function crc32(buf: Buffer): number {
+  let c = 0xffffffff;
+  for (const byte of buf) c = CRC_TABLE[(c ^ byte) & 0xff]! ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
 }
 
 async function main() {
@@ -170,7 +223,7 @@ async function main() {
       bucketPuts.map((p) => p.status).join(', '),
     );
 
-    await page.fill('textarea', 'What is in this image?');
+    await page.fill('textarea', 'Describe this image in one short sentence.');
     await send.click();
 
     // Assert against stored state, not the screen.
@@ -194,7 +247,32 @@ async function main() {
       JSON.stringify(stored[0]?.attachments ?? null),
     );
 
-    await page.waitForTimeout(2500);
+    /**
+     * The model leg. Asserted from the database rather than the screen, and
+     * asserted at all because "the file uploaded" and "the model could read it"
+     * are different claims — an image the vision endpoint refuses still stores
+     * perfectly. A 1×1 fixture passed every check above and came back
+     * "Could not process image", which is why the fixture is now 256px.
+     */
+    let reply = '';
+    for (let i = 0; i < 60; i++) {
+      const { data } = await admin
+        .from('messages')
+        .select('content, role, conversations!inner(user_id)')
+        .eq('conversations.user_id', userId)
+        .eq('role', 'assistant');
+      reply = (data ?? [])[0]?.content ?? '';
+      if (reply.trim().length > 0) break;
+      await page.waitForTimeout(500);
+    }
+    check(
+      'the model answered about the attached image',
+      reply.trim().length > 0,
+      'no assistant message was stored — the provider rejected the image',
+    );
+    if (reply) console.log(`        ↳ "${reply.slice(0, 90).replace(/\s+/g, ' ')}…"`);
+
+    await page.waitForTimeout(1200);
     await page.screenshot({ path: `${OUT}/2-sent.png` });
 
     // And the object is really in the bucket, read back through the app's own
