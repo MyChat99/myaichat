@@ -351,6 +351,52 @@ const CONTRAST_SCRIPT = `(() => {
   return findings;
 })()`;
 
+/** Records how every focusable element looks BEFORE anything has focus. */
+const FOCUS_BASELINE = `(() => {
+  window.__focusBaseline = new Map();
+  window.__snap = function (el) {
+    const s = getComputedStyle(el);
+    return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor,
+            s.backgroundColor, s.color, s.textDecorationLine].join('|');
+  };
+  document.querySelectorAll('a[href], button, input, select, textarea, [tabindex]').forEach(function (el) {
+    window.__focusBaseline.set(el, window.__snap(el));
+  });
+  return true;
+})()`;
+
+/** Describes whatever currently has focus, and whether it looks any different. */
+const FOCUS_READ = `(() => {
+  const el = document.activeElement;
+  if (!el || el === document.body) return null;
+  const seen = el.hasAttribute('data-focus-walked');
+  el.setAttribute('data-focus-walked', '');
+  const before = window.__focusBaseline.get(el);
+  return {
+    seen: seen,
+    tag: el.tagName.toLowerCase(),
+    press: el.getAttribute('data-press'),
+    id: el.id || '',
+    label: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 22),
+    changed: before === undefined ? null : before !== window.__snap(el),
+    disabled: el.disabled === true,
+  };
+})()`;
+
+/** One page per shape of page. Focus styling does not vary by route content. */
+const FOCUS_ROUTES = [
+  { name: 'chat', path: '/c/:id' },
+  { name: 'compare', path: '/compare' },
+  { name: 'settings', path: '/settings' },
+  { name: 'profile', path: '/profile' },
+  { name: 'admin', path: '/admin' },
+  { name: 'admin-models', path: '/admin/models' },
+  { name: 'admin-users', path: '/admin/users' },
+  { name: 'admin-providers', path: '/admin/providers' },
+  { name: 'login', path: '/login', anonymous: true },
+  { name: 'signup', path: '/signup', anonymous: true },
+];
+
 async function main() {
   mkdirSync(OUT, { recursive: true });
 
@@ -700,22 +746,83 @@ async function main() {
       invisibleFocus ?? '',
     );
 
-    // A visible focus ring on the send button, which is the control a keyboard
-    // user most needs to find.
-    await page.focus('[data-press="quill"]');
-    const ring = (await page.evaluate(`(() => {
-      const el = document.querySelector('[data-press="quill"]');
-      if (!el) return null;
-      const style = getComputedStyle(el);
-      return { outlineWidth: style.outlineWidth, boxShadow: style.boxShadow };
-    })()`)) as { outlineWidth: string; boxShadow: string } | null;
-    check(
-      'the focused send button shows a ring',
-      Boolean(ring && (parseFloat(ring.outlineWidth) > 0 || ring.boxShadow !== 'none')),
-      JSON.stringify(ring),
-    );
-
     await context.close();
+
+    /**
+     * WCAG 2.4.7, on every stop rather than on the one control I thought of.
+     *
+     * This used to check the send button and nothing else. The rule applies to
+     * every focusable element, and a keyboard user who cannot see where they
+     * are is stuck on whichever control was missed.
+     *
+     * Tabbed for real, not focused programmatically: `:focus-visible` — which
+     * is what the styles key off — does not match an element focused by script
+     * with no prior keyboard interaction, so `el.focus()` reports every button
+     * in the app as having no indicator.
+     */
+    console.log('\nFocus is visible on every stop\n');
+
+    for (const route of FOCUS_ROUTES) {
+      const walkContext = await browser.newContext({
+        viewport: { width: 1440, height: 900 },
+        reducedMotion: 'reduce',
+      });
+      if (!route.anonymous) {
+        await walkContext.addCookies([
+          {
+            name: `sb-${projectRef}-auth-token`,
+            value: cookieValue,
+            domain: new URL(BASE_URL).hostname,
+            path: '/',
+          },
+        ]);
+      }
+      const walkPage = await walkContext.newPage();
+
+      try {
+        const path = route.path === '/c/:id' ? `/c/${convo!.id}` : route.path;
+        await walkPage.goto(`${BASE_URL}${path}`, { waitUntil: 'networkidle', timeout: 45_000 });
+        await walkPage.waitForTimeout(400);
+        await walkPage.evaluate(FOCUS_BASELINE);
+
+        const invisible: string[] = [];
+        let stops = 0;
+
+        for (let i = 0; i < 80; i++) {
+          await walkPage.keyboard.press('Tab');
+          const stop = (await walkPage.evaluate(FOCUS_READ)) as {
+            seen: boolean;
+            tag: string;
+            press: string | null;
+            id: string;
+            label: string;
+            changed: boolean | null;
+            disabled: boolean;
+          } | null;
+          if (!stop) continue;
+          // Revisits are detected on the DOM node itself. Keying on a label
+          // ended the walk after one stop on the sign-in page, where every
+          // input has empty text — it reported 1 stop where there are 5, and
+          // truncated the admin walk from 46 stops to 22.
+          if (stop.seen) break;
+          stops++;
+          if (stop.changed === false && !stop.disabled) {
+            invisible.push(
+              `${stop.tag}${stop.press ? `[${stop.press}]` : stop.id ? `#${stop.id}` : ''} "${stop.label}"`,
+            );
+          }
+        }
+
+        check(
+          `${route.name}: all ${stops} tab stops show focus`,
+          stops > 0 && invisible.length === 0,
+          stops === 0 ? 'nothing was focusable' : invisible.slice(0, 4).join(' · '),
+        );
+      } finally {
+        await walkPage.close();
+        await walkContext.close();
+      }
+    }
   } finally {
     await browser.close();
     await admin.auth.admin.deleteUser(userId).catch(() => {});
