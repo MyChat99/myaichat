@@ -208,6 +208,12 @@ export interface Database {
            * the rows `--demo` wrote.
            */
           source: string | null;
+          /**
+           * The assistant message this generation produced. NULL for rows
+           * written before migration 20260802060000 and for comparison runs,
+           * which store no message.
+           */
+          message_id: string | null;
         };
         Insert: {
           id?: string;
@@ -218,6 +224,7 @@ export interface Database {
           estimated_cost?: number;
           created_at?: string;
           source?: string | null;
+          message_id?: string | null;
         };
         Update: Partial<Database['public']['Tables']['usage_logs']['Row']>;
         Relationships: [];

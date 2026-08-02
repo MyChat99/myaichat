@@ -559,10 +559,21 @@ export async function POST(request: NextRequest) {
           input_tokens: inputTokens,
           output_tokens: outputTokens,
           estimated_cost: Number(estimatedCost.toFixed(6)),
+          // What this answer cost, attached to the answer. Without the link the
+          // app can say what today cost and never what a given reply did.
+          message_id: saved?.id ?? null,
         });
 
         controller.enqueue(
-          ndjson({ type: 'done', messageId: saved?.id ?? null, inputTokens, outputTokens }),
+          // The cost travels with the completion, so the answer carries its
+          // price the moment it finishes rather than on the next page load.
+          ndjson({
+            type: 'done',
+            messageId: saved?.id ?? null,
+            inputTokens,
+            outputTokens,
+            costUsd: Number(estimatedCost.toFixed(6)),
+          }),
         );
       }
 

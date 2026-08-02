@@ -11,6 +11,7 @@ import { CommandPalette } from '@/components/command/command-palette';
 import { Composer } from '@/components/chat/composer';
 import { SectionTabs } from '@/components/chat/section-tabs';
 import { LocalTime } from '@/components/ui/local-time';
+import { formatUsd } from '@/lib/theme/money';
 import { MessageList, type UiMessage } from '@/components/chat/message-list';
 import { ModelSelector, type SelectableModel } from '@/components/chat/model-selector';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,8 @@ type Props = {
   email?: string | null;
   /** The dateline, as an instant — formatted in the reader's own zone. */
   lede?: { now: string; presses: number };
+  /** What this conversation, and this month, have cost. */
+  spend?: { conversationUsd: number; monthUsd: number };
 };
 
 /**
@@ -75,6 +78,7 @@ export function ChatThread({
   avatarKey = null,
   email = null,
   lede,
+  spend,
 }: Props) {
   const router = useRouter();
 
@@ -188,7 +192,13 @@ export function ChatThread({
             if (!line.trim()) continue;
             const event = JSON.parse(line) as
               | { type: 'text'; text: string }
-              | { type: 'done'; messageId: string | null }
+              | {
+                  type: 'done';
+                  messageId: string | null;
+                  inputTokens?: number;
+                  outputTokens?: number;
+                  costUsd?: number;
+                }
               | { type: 'error'; message: string; retryable: boolean };
 
             if (event.type === 'text') {
@@ -202,7 +212,17 @@ export function ChatThread({
               toast.error(event.message);
             } else if (event.type === 'done' && event.messageId) {
               setMessages((prev) =>
-                prev.map((m) => (m.id === 'streaming' ? { ...m, id: event.messageId! } : m)),
+                prev.map((m) =>
+                  m.id === 'streaming'
+                    ? {
+                        ...m,
+                        id: event.messageId!,
+                        cost: event.costUsd,
+                        inputTokens: event.inputTokens,
+                        outputTokens: event.outputTokens,
+                      }
+                    : m,
+                ),
               );
             }
           }
@@ -332,8 +352,22 @@ export function ChatThread({
           onSelect={setModelId}
         />
 
+        {/* What it has cost, beside what it is. The month total is always
+            shown; the conversation total appears once there is one. */}
+        {spend ? (
+          <span data-press="ledger" title="This conversation · this month">
+            {spend.conversationUsd > 0 ? (
+              <>
+                <span data-press="ledger-value">{formatUsd(spend.conversationUsd)}</span>
+                <span data-press="ledger-sep">·</span>
+              </>
+            ) : null}
+            <span data-press="ledger-month">{formatUsd(spend.monthUsd)} this month</span>
+          </span>
+        ) : null}
+
         {/* Sections live in this bar under Riso, so the page has one top rule
-            rather than two stacked bands. See RisoTabs. */}
+            rather than two stacked bands. See SectionTabs. */}
         <SectionTabs isAdmin={isAdmin} avatarKey={avatarKey} email={email} />
       </div>
 
