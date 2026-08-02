@@ -16,11 +16,38 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-041 — `verify:persistence` failed once in a chained run and passed alone
+
+**Status:** Open — flake, cause unconfirmed | **Severity:** Low | **Phase:** 7 | **Opened:** 2026-08-02
+**Problem:** One `verify:all` run reported `verify:persistence` as the only failing suite. Re-run standalone: pass. Re-run inside a full `verify:all`: pass. Two clean runs do not make the first one imaginary.
+**Most likely cause, stated as a hypothesis and not as a finding:** that suite asserts *"no navigation took longer than 2s"*, and the failing run happened while I was driving a browser against production and a full local suite at the same time. A wall-clock threshold on a loaded machine is exactly the kind of assertion that fails once and cannot be reproduced.
+**Why it is logged rather than fixed:** loosening a timing threshold to stop a flake is how a real performance regression gets hidden. If it recurs, the fix is to measure navigation against a baseline rather than a constant.
+
+### ISSUE-040 — A test harness can only `eval` where the CSP is loose
+
+**Status:** Resolved 2026-08-02 | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-08-02
+**Problem:** `verify:upload` run against production reported *"the upload never completed"* and failed *"the browser PUT the file to the bucket"* — on a deployment where the upload had succeeded in 4.5s in that same run. The message was invented by the harness.
+`page.waitForFunction` injects its poller into the page, so a string expression is `eval`, and our own production CSP (`script-src 'self' 'unsafe-inline'`, no `'unsafe-eval'`) refuses it. It threw `EvalError` 11ms in — not at the 30s timeout — and the `.catch()` printed a network summary instead of the error.
+**It passed locally the whole time**, because Next's dev CSP allows `unsafe-eval`. A browser suite that only works against a loose CSP is a suite that cannot check the deployment it exists to check.
+**Resolution:** polled through `page.evaluate` instead, which runs via CDP's `callFunctionOn` rather than the page's script loader and is not subject to page CSP (PR #67). This was the only `waitForFunction` in the repo.
+**A second defect in the check beside it:** `[].every()` is `true`, so *"the bucket accepted it"* reported `ok` on no evidence — passing in the same run where the check above it failed for having seen no PUT. It now requires at least one observed PUT.
+**Carry forward:** prefer `page.evaluate`; if a `waitForFunction` is ever needed, pass a function, not a string.
+
 ### ISSUE-031 — Untagged demo usage rows predate the fix and cannot be identified
 
 **Status:** Open — needs your decision | **Severity:** Low | **Phase:** 7 | **Opened:** 2026-08-01
 **Problem:** `--demo` wrote fabricated `usage_logs` rows with nothing marking them, and `--clean-demo` could not remove them ([ISSUE-030](#issue-030)). That is fixed going forward — new demo rows carry `source = 'demo'` — but the rows written **before** the fix are still there and are indistinguishable from real usage by the same argument that caused the bug.
 **Measured 2026-08-01:** 366 rows in `usage_logs`, none tagged, no exact duplicates (each seed run randomises token counts, so re-runs do not collide). For scale: this project has ~178 real messages, and each demo run wrote ~82 rows.
+**Re-measured 2026-08-02, and the number I gave you was wrong.** 366 was the size of the *whole table* at the time; I quoted it as the number of deletion candidates, including in the overnight report. Counted properly, against the discriminator this issue actually proposes:
+
+| | rows |
+| --- | --- |
+| `usage_logs`, total | 846 |
+| tagged `source = 'demo'` (removable by `--clean-demo`) | 49 |
+| untagged, any date | 797 |
+| **untagged AND before 2026-07-30 — the candidates** | **75** |
+
+Oldest row in the table is 2026-07-02; the newest candidate is 2026-07-29. Deleting the 75 would remove **23,994 tokens and $0.0779** from the analytics totals. The other 722 untagged rows are dated on or after the first commit and are indistinguishable from real usage — they stay, whatever you decide.
 **Why I did not clean them:** there is a defensible discriminator — the project's first commit is 2026-07-30, so any row dated before that is necessarily fabricated — but acting on it means deleting analytics data on my own inference. That is your call, not mine.
 **If you want them gone:** `delete from usage_logs where created_at < '2026-07-30' and source is null;` — check the count with a `select` first.
 
@@ -500,7 +527,8 @@ the main risk.
 
 ### ISSUE-017 — Resend not configured: email is rendered but never sent
 
-**Status:** Open — credentials landed 2026-07-31, **awaiting human verification** | **Severity:** Medium | **Phase:** 6
+**Status:** Open — configured everywhere, **delivery needs your inbox** | **Severity:** Medium | **Phase:** 6
+**Update 2026-08-02.** `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are now in Railway as well as `.env.local`. This is the one Phase 6 item I cannot close myself: I can prove the template renders and the transport is configured, and I cannot prove a message arrived. **One step for you:** sign up on the live site with the address that owns the Resend account, and confirm the welcome mail arrives. It must be that address — `onboarding@resend.dev` is an unverified domain, so Resend delivers only to the account owner.
 
 **Update 2026-07-31.** `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are in
 `.env.local`; `isEmailConfigured()` returns true, so the transport has switched
@@ -539,7 +567,8 @@ Resend requires a **verified sending domain** — an unverified `from` address i
 
 ### ISSUE-016 — Cloudflare R2 not configured: uploads cannot complete
 
-**Status:** Open — credentials landed 2026-07-31, **awaiting human verification** | **Severity:** Medium | **Phase:** 6
+**Status:** Resolved 2026-08-02 | **Severity:** Medium | **Phase:** 6
+**Resolved:** Variables added to Railway by the owner, then verified **against production**, not locally: `npm run verify:upload -- --base=https://myaichat-production.up.railway.app` passes 9/9 — paperclip enabled (so `isStorageConfigured()` is true there), presign 200, a real cross-origin PUT to the bucket returning 200, the message stored with its attachment, the model describing the image, and the object read back. Measured timing: presign 945ms, PUT 272ms, composer usable 4.5s after attaching. CSP as served includes both R2 hosts in `connect-src`.
 
 **Update 2026-07-31.** Credentials are in `.env.local` and **proven working**:
 `isStorageConfigured()` returns true, and a server-side round trip (presign →
@@ -667,7 +696,8 @@ in ROADMAP rather than here.
 
 ### ISSUE-003 — R2 and Resend credentials not yet provisioned
 
-**Status:** Open | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-07-30 | **Resolved:** —
+**Status:** Resolved 2026-08-02 | **Severity:** Medium | **Phase:** 6
+**Resolved:** all six variables are in Railway and in `.env.local`. R2 is verified end to end against production ([ISSUE-016](#issue-016)); Resend is configured and its delivery leg is tracked in [ISSUE-017](#issue-017). | **Opened:** 2026-07-30 | **Resolved:** —
 **Rescoped 2026-07-31:** Railway is done — provisioned, deployed and live since 2026-07-30 — so this now covers **R2 and Resend only**. Phase 8 dropped from the scope.
 **Problem:** No accounts or keys yet for Cloudflare R2 or Resend. Both block Phase 6 at the point of integration; everything up to that point is built and tested. See [PHASE-6-CHECKLIST.md](PHASE-6-CHECKLIST.md) for the exact sequence once they exist.
 **Resolution:** Provision per phase as needed. Track every new variable in `.env.example`; real values go in Railway, never in the repo.

@@ -29,11 +29,19 @@
 > from *"a valid request reports storage as unconfigured (503)"* to **"a valid
 > request returns an upload URL"** — only possible with working credentials.
 >
-> ### ⚠️ Phase 6 is NOT Done, and must not be marked so
+> ### ⚠️ Phase 6 is nearly Done — one item left, and it needs your inbox
 >
-> Every remaining item needs hands. **Nothing below has been verified**, and no
-> browser upload has ever completed — the round trip proven so far is
-> server-side only, which does not exercise CORS at all.
+> **Updated 2026-08-02.** The paragraph that stood here said "no browser upload
+> has ever completed". That is no longer true and is corrected rather than
+> deleted: the owner added the six variables to Railway, and the full browser
+> round trip is now verified **against production** — paperclip enabled, presign
+> 200, a real cross-origin PUT returning 200, the message stored with its
+> attachment, the model describing the image, the object read back. 9/9 in
+> `npm run verify:upload -- --base=https://myaichat-production.up.railway.app`.
+>
+> **The one thing I cannot close is email delivery.** I can prove the template
+> renders and the transport is configured; I cannot prove a message arrived.
+> That is check 9 below, and it is the last item.
 >
 > ### The remaining human checks, in order
 >
@@ -43,7 +51,7 @@
 > | # | Check | Expect |
 > | --- | --- | --- |
 > | 1 | ~~**Attach a PNG and send**~~ | ✅ **DONE 2026-08-02, by `npm run verify:upload`** — attaches in a real browser, PUTs to the bucket, stores the message with its attachment, reads the object back, and the model describes the image. It also found the real blocker: our CSP, not the bucket's CORS (ISSUE-038) |
-> | 2 | Cloudflare → `myaichat` → Objects | The file under `chat/<your-user-id>/` |
+> | 2 | Cloudflare → `myaichat` → Objects | The file under `chat/<your-user-id>/` — objects written by the production check are there now |
 > | 3 | **Attach a 30MB file** | Rejected instantly, before any network request |
 > | 4 | **Attach a `.exe`** | Rejected, message naming the accepted formats |
 > | 5 | **Drag a file** onto the composer | "Drop to attach" overlay; dropping attaches |
@@ -59,9 +67,8 @@
 >
 > ### Two gaps that are not bugs
 >
-> - **Production does not have these credentials.** They are in `.env.local`
->   only; checklist A4 says both. Uploads stay disabled on Railway until the
->   same seven variables are added there. Not done here — Railway is yours.
+> - ~~**Production does not have these credentials.**~~ **Done 2026-08-02** —
+>   all six are in Railway, and uploads are verified working on the live site.
 > - **`RESEND_FROM_EMAIL=onboarding@resend.dev`** is an unverified domain, so
 >   Resend delivers **only to the Resend account owner's address**. Your own test
 >   mail will arrive and every real user's will silently not. Correct for now;
@@ -74,7 +81,9 @@
 > ```
 >
 > Then message me: **"Phase 6 human checks — starting check 1"** and I will walk
-> them with you one at a time.
+> them with you one at a time. Check 1 is already done; the one that actually
+> needs you is **check 9**, and it is one signup on the live site with the
+> address that owns the Resend account.
 >
 > ---
 
