@@ -36,12 +36,12 @@ tree and fails if a vendor SDK import or a provider name appears outside
 
 | | |
 | --- | --- |
-| TypeScript | 20,097 lines across 139 files, strict mode |
-| Database | 12 tables, all with row-level security, 16 committed migrations |
-| Verification | 24 suites, 1,085 assertions, run by one command |
-| History | 70 commits across 8 phases and 30 pull requests |
-| Decisions recorded | 19 |
-| Issues opened | 28, of which 8 remain — none of them code |
+| TypeScript | 26,280 lines across 160 files, strict mode |
+| Database | 12 tables, all with row-level security, 21 committed migrations |
+| Verification | 29 suites, 1,536 assertions, run by one command |
+| History | 93 commits across 8 phases and 51 pull requests |
+| Decisions recorded | 26 |
+| Issues opened | 39, of which 10 remain — none of them a code defect |
 
 ## Stack
 
@@ -206,6 +206,32 @@ at all. Tested dead code is worse than none.
 **A timeout helper did not time out.** `.unref()` on the timer meant it did not
 hold the event loop — and neither does a pending promise — so the process exited
 before the deadline fired. Its own test caught it by ending mid-run.
+
+**The navigation was unreachable on a phone, past 1,176 passing assertions.**
+At 360px, *Presses, Profile, Appearance, Admin and Sign out* were all beyond the
+right edge — not scrolled off, clipped and gone, because the chat pane clips
+with `overflow: hidden`. There was no scrollbar to hint they existed; you could
+not open settings or sign out from a phone at all. Every suite in this repo
+asserted rows, bytes or source text. **None of them had ever opened a page.**
+
+That is the finding behind `verify:pages`, and the suite's first three attempts
+at a check were themselves wrong — each proven so by breaking the app on
+purpose:
+
+- The obvious overflow test **never fires here.** A deliberately 2200px-wide
+  element left the document at exactly 360px, because the shell clips. Measuring
+  `<html>` was a green light on a broken page.
+- An 18px switch **is a 34px target** — the component pushes its hit area out
+  with a pseudo-element, so the element's own box condemns a control that is
+  fine.
+- WCAG exempts a target inside a sentence. An approximation of that rule
+  ("the parent is 12 characters longer") called *"No account? Create one"* a
+  standalone control, by one character.
+
+**`role="status"` is not an error channel.** The failure-path suite asked "did
+the app say anything when the budget ran out" and got back *"Loading
+conversation…"* — a progress announcement, counted as an answer. It passed the
+"it said something" check and failed the one that read what was said.
 
 ---
 
