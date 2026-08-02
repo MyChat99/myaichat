@@ -201,17 +201,37 @@ async function main() {
     check('an attachment chip is rendered', true);
     await page.screenshot({ path: `${OUT}/1-attached.png` });
 
-    // Send only becomes possible once the file is up.
+    /**
+     * Send only becomes possible once the file is up — polled, not
+     * `waitForFunction`.
+     *
+     * `page.waitForFunction` injects its poller into the page, so a string
+     * expression is `eval` and **our own production CSP blocks it**:
+     * `script-src 'self' 'unsafe-inline'` has no `'unsafe-eval'`. It threw
+     * `EvalError` 11ms in, the `.catch()` swallowed it, and the suite printed
+     * "the upload never completed" — blaming the application for a limitation
+     * of the harness, against a deployment where the upload had in fact
+     * succeeded. Locally it passed, because Next's dev CSP allows `unsafe-eval`.
+     *
+     * `page.evaluate` is not affected: it runs through CDP's `callFunctionOn`
+     * rather than the page's own script loader, so page CSP does not apply.
+     */
     const send = page.locator('[data-press="quill"]');
-    await page
-      .waitForFunction(`!document.querySelector('[data-press="quill"]')?.disabled`, undefined, {
-        timeout: 30_000,
-      })
-      .catch(() => {
-        console.error('\n  the upload never completed. Network detail:');
-        for (const f of [...new Set(failed)]) console.error(`    ${f}`);
-        for (const p of bucketPuts) console.error(`    PUT ${p.status} ${p.url}`);
-      });
+    let sendEnabled = false;
+    for (let i = 0; i < 60; i++) {
+      sendEnabled = Boolean(
+        await page.evaluate(`!document.querySelector('[data-press="quill"]')?.disabled`),
+      );
+      if (sendEnabled) break;
+      await page.waitForTimeout(500);
+    }
+
+    if (!sendEnabled) {
+      console.error('\n  the upload never completed. Network detail:');
+      for (const f of [...new Set(failed)]) console.error(`    ${f}`);
+      for (const p of bucketPuts) console.error(`    PUT ${p.status} ${p.url}`);
+    }
+
     check(
       'the browser PUT the file to the bucket',
       bucketPuts.length > 0,
@@ -219,8 +239,13 @@ async function main() {
     );
     check(
       'the bucket accepted it',
-      bucketPuts.every((p) => p.status >= 200 && p.status < 300),
-      bucketPuts.map((p) => p.status).join(', '),
+      // `[].every()` is `true`, so this used to report OK on no evidence at all:
+      // it passed in the same run where the check above failed for having seen
+      // no PUT. An assertion about statuses needs a status.
+      bucketPuts.length > 0 && bucketPuts.every((p) => p.status >= 200 && p.status < 300),
+      bucketPuts.length === 0
+        ? 'no PUT was observed to have a status'
+        : bucketPuts.map((p) => p.status).join(', '),
     );
 
     await page.fill('textarea', 'Describe this image in one short sentence.');
