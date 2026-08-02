@@ -1131,3 +1131,55 @@ main h2 {
 [data-slot='button'] {
   border-radius: 0;
 }
+
+/* ── the gate ────────────────────────────────────────────────────────────────
+   Sign-in and sign-up. The masthead above the card so the first page a visitor
+   sees is recognisably the same publication as the one behind it, and the
+   fields set in the same mono rail the composer uses.
+
+   Nothing here is new vocabulary — it is the sidebar's masthead and the
+   composer's label rail, applied to the one screen that had neither. */
+[data-press='gate-masthead'] {
+  margin-bottom: 18px;
+  text-align: center;
+}
+[data-press='gate-masthead'] [data-press='issue'] {
+  margin-top: 7px;
+}
+
+/* Labels as the composer sets them: mono, caps, tracked out. */
+[data-press='gate'] label {
+  font-family: var(--press-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* The submit takes the full offset the sidebar's primary action carries, and
+   presses INTO its shadow rather than shrinking — the same gesture, so the two
+   primary buttons in the product behave identically. */
+[data-press='gate'] button[type='submit'] {
+  /* `--border`, the same offset the sidebar's primary action carries. Using
+     `--foreground` here made the shadow near-white on a dark card — louder than
+     the button it belongs to, and a different weight from the identical gesture
+     elsewhere in the product. */
+  box-shadow: 4px 4px 0 var(--border);
+  transition:
+    transform 0.12s var(--press-ease),
+    box-shadow 0.12s var(--press-ease);
+}
+[data-press='gate'] button[type='submit']:hover:not(:disabled) {
+  transform: translate(1px, 1px);
+  box-shadow: 3px 3px 0 var(--border);
+}
+[data-press='gate'] button[type='submit']:active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 0 var(--border);
+}
+/* Pending: the offset flattens, so a submitted form reads as pressed and held
+   rather than as a button that stopped responding. */
+[data-press='gate'] button[type='submit']:disabled {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--border);
+}
