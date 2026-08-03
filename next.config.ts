@@ -13,6 +13,11 @@ import type { NextConfig } from 'next';
  *    and by inline style attributes.
  *  - `connect-src` must include the Supabase host or the browser client cannot
  *    reach auth; R2 is included so presigned PUT uploads work once configured.
+ *  - `img-src` must include the same R2 hosts, and for a reason that is easy to
+ *    miss: an avatar `<img>` points at our OWN `/api/uploads/download`, which
+ *    302s to a presigned R2 URL. CSP is checked against the URL the browser
+ *    actually fetches, so it is checked AFTER the redirect — `'self'` is not
+ *    enough, and the request is blocked with the app's own origin in the tag.
  *  - `frame-ancestors 'none'` is the modern X-Frame-Options; both are sent, as
  *    older browsers honour only the header.
  */
@@ -32,6 +37,11 @@ export function contentSecurityPolicy(dev = process.env.NODE_ENV !== 'production
    * Listed explicitly rather than as `*.r2.cloudflarestorage.com`: a wildcard
    * would also permit every other tenant's bucket on Cloudflare's shared
    * domain, which is a strictly larger hole than this needs.
+   *
+   * Used by `connect-src` (presigned PUT) and `img-src` (avatars and image
+   * attachments, which arrive via a redirect to the same hosts). Adding it to
+   * one and not the other is exactly the bug that hid a broken avatar in
+   * production while every upload test passed.
    */
   const account = process.env.R2_ACCOUNT_ID;
   const bucket = process.env.R2_BUCKET_NAME;
@@ -64,7 +74,7 @@ export function contentSecurityPolicy(dev = process.env.NODE_ENV !== 'production
     "default-src 'self'",
     scriptSrc,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    `img-src 'self' data: blob: ${r2}`.trim(),
     "font-src 'self' data:",
     `connect-src 'self' ${supabase} ${r2}`.trim(),
     "form-action 'self'",

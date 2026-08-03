@@ -16,6 +16,99 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-065 — Avatars have never displayed in production: CSP blocked the redirect target
+
+**Status:** Fixed 2026-08-03 (awaiting deploy) | **Severity:** Medium | **Phase:** 6/7 | **Opened:** 2026-08-03
+
+**Problem:** every avatar on the deployed site was blocked by our own Content Security Policy. Found by loading `/` as the owner's account and reading the console — not by any test.
+
+```
+Loading the image 'https://myaichat.<account>.r2.cloudflarestorage.com/avatar/…jpg?X-Amz-…'
+violates the following Content Security Policy directive: "img-src 'self' data: blob:".
+The action has been blocked.
+```
+
+**Why it survived every upload test.** The `<img>` src is our own origin — `/api/uploads/download?key=…` — which looks like `'self'` and passes any check that reads the markup. The route then **302s to a presigned R2 URL**, and CSP is evaluated against the URL the browser actually fetches, i.e. *after* the redirect. So the tag is same-origin, the policy is violated by a host that never appears in the HTML, and the violation names our own page. Uploading always worked; only *displaying* was broken, and no suite looked at a rendered avatar.
+
+**The specific oversight:** `connect-src` was given both R2 hosts when presigned PUT was fixed, and the comment in `next.config.ts` explains that failure mode in detail. `img-src` was never given the same treatment — the same hosts, the same reason, one directive apart.
+
+**Resolution:** `img-src` now interpolates the same `r2` host list as `connect-src` ([next.config.ts:77](../../next.config.ts#L77)). Both are still listed explicitly rather than as a wildcard, so no other tenant's bucket on Cloudflare's shared domain is admitted.
+
+**Two things were tightened rather than just the bug fixed:**
+
+- `verify:headers` now asserts the R2 hosts **per directive**. It previously substring-matched the whole policy, so a host present in `connect-src` alone satisfied a check named after it — a policy with this exact bug went green. Break-tested: reverting `img-src` turns 29/29 into 2 failures naming the directive.
+- `smoke:signed-in` fails on any console error during a signed-in walk with a real uploaded avatar, which is the check that would have caught this from the outside.
+
+**Standing lesson:** a CSP check that reads the HTML cannot see a redirect. The only reliable test is a browser loading the real page and reporting violations.
+
+### ISSUE-063 — Supabase Auth returns 500 on sign-up in production
+
+**Status:** Closed 2026-08-03 — **won't fix, this is the intended posture** | **Severity:** ~~High~~ n/a | **Opened:** 2026-08-03
+**Closed by the owner with the reasoning recorded, because the reasoning is the point.** Sign-ups are disabled at the **Supabase project level**, deliberately, in addition to the application's own switch. `NEXT_PUBLIC_SUPABASE_ANON_KEY` is public by design — it ships in the client bundle — so anyone can call Supabase's auth endpoints directly, and an application-level gate alone would not stop them. Both gates stay shut.
+**What that means for the break-test:** the "flip on → registration succeeds" half is unachievable by design, not by defect, and is not worth chasing. The closed direction is the one that matters and is proven against the live site: the app refuses first with *"New accounts are closed on this deployment"*, and behind it Supabase refuses too.
+**What was fixed off the back of it:** the sign-up action no longer passes the upstream message through, so nobody sees the literal `{}` — and, more importantly, no upstream text reaches the reader at all, since "User already registered" answers a question about who has an account here. `verify:spend` asserts both.
+**Access for real users** is via `npm run accounts:create`, verified end to end: a script-created account signs in on the deployed site, keeps its session across a reload, and lands on a working chat page.
+
+**Original diagnosis, kept for the record:**
+**Problem:** self-service registration is broken in production, independently of this application. Reproduced with the raw `supabase-js` anon client, no app code involved:
+
+```
+AuthRetryableFetchError  status 500  message "{}"
+user created: no
+```
+
+**Where it is NOT.** The sign-up policy works: with `signups_enabled` false the server refuses first with *"New accounts are closed on this deployment. Ask an administrator for access."* This 500 happens after that gate, inside Supabase's auth service.
+**Most likely cause,** consistent with [ISSUE-060](#issue-060): Supabase cannot send the confirmation email, so the sign-up transaction fails. Supabase auth mail goes through the project's own SMTP settings, not through the app's Resend client, so setting `RESEND_API_KEY` in Railway does not affect it.
+**Consequence for the break-test:** the "flip on, registration succeeds" half cannot be demonstrated through the UI until this is fixed. The "flip off, rejected server-side" half is proven against production.
+**Second, smaller defect this exposed:** our sign-up action passes `error.message` straight through, so the user is shown the literal string `{}`. Whatever the upstream failure, that is not a message anyone can act on.
+**To close (needs the owner):** Supabase dashboard → Authentication → Emails/SMTP. Either configure SMTP that works, or disable "Confirm email" so sign-up completes without one. Then re-run the break-test.
+
+### ISSUE-060 — Email is configured in production but delivery is unproven
+
+**Status:** Open | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-08-03
+**Correcting my own audit.** I reported that a missing `RESEND_API_KEY` would silently fall back to the console transport. The owner confirms **`RESEND_API_KEY` is set in Railway**, so that is not what is happening: `isEmailConfigured()` returns true and the Resend transport is live. The likely blocker is an **unverified sending domain** — `onboarding@resend.dev` only delivers to the address that owns the Resend account, so mail to any other recipient is accepted by the API and never arrives.
+**Why that is the worse failure mode:** the console fallback is loud in a log. This one succeeds at every layer we can see — the API returns a message id — and fails silently at the recipient. Nothing in this app can tell the difference.
+**To close:** verify a sending domain in Resend, set `RESEND_FROM_EMAIL` to an address on it, and confirm a real signup mail arrives at an address that does not own the Resend account. Related: [ISSUE-017](#issue-017).
+
+### ISSUE-064 — The verification suites run against the PRODUCTION database
+
+**Status:** Open | **Severity:** **High** | **Tier:** roadmap | **Opened:** 2026-08-03
+**Problem:** every suite that needs data — `verify:pages`, `verify:spend`, `verify:costs`, `verify:failures`, `verify:documents:e2e`, `verify:providers`, `verify:keepalive` and the rest — creates users, models, providers, conversations and settings in the **live** Supabase project. There is no separate test database.
+**This is not theoretical; it happened today.** Runs killed mid-execution left behind, in live data:
+
+| Leaked | Why it mattered |
+| --- | --- |
+| 10 test accounts | noise in the user list |
+| **4 of them with `role = 'admin'`** | real privilege on real data |
+| a `Broken press (failure test)` model on `anthropic` | other suites picked it as their model and failed on it |
+| a `test-provider-9239` provider row | visible on `/admin/providers` |
+
+**Why better cleanup is the wrong fix.** Every one of those suites already has cleanup in `finally`. `finally` does not run when the process is killed — by a timeout, by `pkill`, by a machine going to sleep — and that is exactly how each of these escaped. Any amount of additional diligence inside the test has the same hole.
+**The fix is isolation, not tidiness:** a second Supabase project used by `verify:*`, selected by environment, with the production URL refused outright when a test env var is set. That also removes the shared-state coupling that makes suites interfere when chained, and would let them run in parallel.
+**Estimated:** 4–6 hours, most of it applying the 21 migrations to a second project and threading the connection through `scripts/_env.ts`. Blocked on the owner creating that project — it is their Supabase account.
+**Interim mitigation, which is not a fix:** admin-role test accounts are the worst of it, and only `verify:pages` needs one. Until isolation exists, an audit of leaked test rows is worth running after any interrupted session.
+
+### ISSUE-059 — The whole verification suite runs against `next dev`
+
+**Status:** Open | **Severity:** **High** | **Tier:** roadmap | **Opened:** 2026-08-03
+**Problem:** every browser suite — `verify:pages`, `verify:costs`, `verify:failures`, `verify:motion`, `verify:documents:e2e` — points at `npm run dev`. A whole class of defect exists only in a production build and is therefore invisible to all of them.
+**Proven by a real outage, not by argument.** A Server Component calling a function exported from a `'use client'` module ([ISSUE-061](#issue-061)) returned 500 in production while `tsc`, `next build`, `next dev` and 34 green suites all passed simultaneously. In dev the real function is still there; in a production build it is a client reference and calling it throws.
+**What it would take:** a `verify:prod` mode that runs `next build`, starts `next start` on a spare port, and re-runs the browser suites against it. Most of the machinery exists — every suite already accepts `--base`/`BASE_URL`. The work is a build step in the runner (~2–4 minutes per run), deciding which suites are worth the wall-clock, and a fixture that has an avatar so the path that broke is actually exercised. **Estimate: 3–4 hours.**
+**Interim cover:** `verify:boundaries` catches this specific class statically, in milliseconds. It does not cover the class of "only breaks in a production build" generally.
+
+### ISSUE-061 — Production 500: a Server Component called a client function
+
+**Status:** Resolved 2026-08-03 | **Severity:** **Critical** | **Opened:** 2026-08-03 | **Resolved:** 2026-08-03
+**Problem:** `/` returned 500 for any signed-in account with an avatar. Digest `414204945`: *Attempted to call attachmentUrl() from the server but attachmentUrl is on the client.* `attachmentUrl` lived in `lib/upload/client.ts` (`'use client'`); `AvatarMark` has no directive and is rendered by the app shell on every authenticated page.
+**Why nothing caught it:** four layers passed at once — `tsc` (types are real, only the runtime value is a proxy), `next build` (a render-time failure), `next dev` (keeps the real function), and the suite ([ISSUE-059](#issue-059)). The call is guarded by `avatarKey ?`, so it fired only for accounts with an uploaded portrait, and every test account this repo creates has none.
+**Resolution:** moved to `lib/upload/urls.ts`, a module with no directive. `verify:boundaries` guards the class and was break-tested against the original defect. An audit of 93 server/shared modules against 32 client modules found no other instance. Deployed and confirmed: `/` 200 signed in with an avatar, `/login` 200 signed out.
+
+### ISSUE-062 — The provider env-key fallback is dormant here, not absent
+
+**Status:** Open — accepted risk | **Severity:** Low | **Opened:** 2026-08-03
+**Correcting my own audit.** I listed the `*_API_KEY` env fallback in `getProviderKey()` as a live silent-fallback risk in production. The owner confirms **no `ANTHROPIC_/OPENAI_/GROQ_/PERPLEXITY_API_KEY` variables are set in Railway at all**, so there is no second spend source on this deployment and admin-panel keys are already the only one.
+**The code path still exists**, and is the supported way a fresh checkout works before anyone opens the admin panel. The risk it describes — deleting a key in the admin panel while an env var quietly keeps that provider alive — is real for any deployment that does set them. Left as-is and documented rather than removed.
+
 ### ISSUE-058 — Free-tier sustainability across four services
 **Status:** Open | **Severity:** Medium | **Tier:** cross-cutting | **Opened:** 2026-08-03
 **Problem:** Railway, Supabase, R2 and Resend all have limits this app can reach, and provider API spend is not a free tier at all. No document states current usage against each limit, what happens as one is approached, or what to do having outgrown it.

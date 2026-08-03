@@ -86,6 +86,20 @@ claiming invite-only without it would be a claim the app cannot honour.
 
 ---
 
+## Two corrections to an earlier audit of this file's subject matter
+
+Both were reported by the owner from the Railway console, which this project
+does not read:
+
+- **There is no provider env-key fallback on this deployment.** No
+  `ANTHROPIC_/OPENAI_/GROQ_/PERPLEXITY_API_KEY` variables are set, so
+  admin-panel keys are already the only spend source. The code path exists and
+  is documented in [ISSUE-062](ISSUES.md#issue-062); it is dormant here.
+- **`RESEND_API_KEY` is set**, so the console-transport fallback is *not* what
+  is happening to email. Delivery is most likely blocked by an unverified
+  sending domain — which fails silently at the recipient while succeeding at
+  every layer this app can observe ([ISSUE-060](ISSUES.md#issue-060)).
+
 ## What is still open
 
 - **The per-user daily budget is unlimited on this deployment** (`0`). The

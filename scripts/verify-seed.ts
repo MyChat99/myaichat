@@ -20,7 +20,20 @@ const EXPECTED_SETTINGS = [
   'rate_limit_messages_per_hour',
   'max_upload_size_mb',
   'signups_enabled',
+  'signup_allowed_domains',
+  'monthly_spend_ceiling_usd',
 ];
+
+/**
+ * Written at runtime, not by the seed, so it is not part of the expected set.
+ *
+ * `system_settings` holds two different kinds of row: configuration an admin
+ * chooses, and state the app records. Comparing the whole table against the
+ * seed list treats the second kind as drift — this suite failed the moment the
+ * keep-alive started recording when it last touched the database, which is
+ * exactly what it is supposed to do.
+ */
+const RUNTIME_KEYS = new Set(['last_keepalive_at', 'default_model_id']);
 
 let failed = 0;
 
@@ -60,7 +73,10 @@ async function main() {
   check('exactly one admin profile exists', admins?.length === 1, `found ${admins?.length}`);
 
   const { data: settings } = await admin.from('system_settings').select('key, value');
-  const keys = (settings ?? []).map((s) => s.key).sort();
+  const keys = (settings ?? [])
+    .map((s) => s.key)
+    .filter((k) => !RUNTIME_KEYS.has(k))
+    .sort();
   check(
     'system settings match the expected set',
     JSON.stringify(keys) === JSON.stringify([...EXPECTED_SETTINGS].sort()),

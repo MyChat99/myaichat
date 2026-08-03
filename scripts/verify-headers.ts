@@ -134,9 +134,24 @@ async function main() {
    * passed perfectly. That combination reads exactly like a bucket CORS problem
    * and is not one.
    *
+   * `img-src` needs the identical hosts, for a reason that hid a broken avatar
+   * in production for days. An avatar `<img>` points at the app's own
+   * `/api/uploads/download`, which 302s to a presigned R2 URL — and CSP is
+   * evaluated against the URL the browser ends up fetching, i.e. AFTER the
+   * redirect. So `img-src 'self'` is not enough, and the violation names the
+   * app's own origin as the page, which makes it read like anything but a
+   * missing host. Every upload test passed throughout: uploading worked, it was
+   * only ever *displaying* that was blocked.
+   *
    * Exercised with stand-in values rather than the real ones: this script runs
    * credential-free in CI, so `contentSecurityPolicy()` would otherwise emit no
    * R2 host at all and the check would pass by being vacuous.
+   *
+   * Each assertion is scoped to its own directive rather than searching the
+   * whole policy string. Substring-matching the lot means a host present in
+   * ANY directive satisfies a check about a specific one — which is precisely
+   * how a policy could carry the host in `connect-src`, omit it from `img-src`,
+   * and still go green.
    */
   {
     const saved = [process.env.R2_ACCOUNT_ID, process.env.R2_BUCKET_NAME];
@@ -145,15 +160,20 @@ async function main() {
     const withR2 = contentSecurityPolicy(false);
     [process.env.R2_ACCOUNT_ID, process.env.R2_BUCKET_NAME] = saved as [string, string];
 
-    check(
-      'connect-src names the bucket-scoped R2 host',
-      withR2.includes('https://bkt.acct.r2.cloudflarestorage.com'),
-      withR2.match(/connect-src[^;]*/)?.[0],
-    );
-    check(
-      'connect-src still names the account R2 host',
-      withR2.includes('https://acct.r2.cloudflarestorage.com'),
-    );
+    const directive = (name: string) => withR2.match(new RegExp(`${name}[^;]*`))?.[0] ?? '';
+
+    for (const name of ['connect-src', 'img-src']) {
+      check(
+        `${name} names the bucket-scoped R2 host`,
+        directive(name).includes('https://bkt.acct.r2.cloudflarestorage.com'),
+        directive(name),
+      );
+      check(
+        `${name} still names the account R2 host`,
+        / https:\/\/acct\.r2\.cloudflarestorage\.com(\s|$)/.test(directive(name)),
+        directive(name),
+      );
+    }
   }
 
   check(
