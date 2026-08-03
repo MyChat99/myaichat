@@ -16,9 +16,24 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-066 — `/api/health` cannot say which build is deployed
+
+**Status:** Open | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-08-03
+**Problem:** the endpoint returns `{"status":"ok","checks":{"database":"ok","encryption":"ok"}}` and no version. There is no way to ask the deployment which commit it is serving, so "has my fix landed?" can only be answered by probing for a behavioural change — a header, a rendered pixel — which is indirect and needs a new probe per change. Verifying the ISSUE-065 deploy meant polling the CSP header in a loop.
+**Resolution:** expose the commit SHA (Railway provides `RAILWAY_GIT_COMMIT_SHA`) and the build time. Cheap, and it turns every future deploy check into one request. Not done as part of ISSUE-065 to avoid a third concurrent branch.
+
 ### ISSUE-065 — Avatars have never displayed in production: CSP blocked the redirect target
 
-**Status:** Fixed 2026-08-03 (awaiting deploy) | **Severity:** Medium | **Phase:** 6/7 | **Opened:** 2026-08-03
+**Status:** **Resolved 2026-08-03 — verified in production** | **Severity:** Medium | **Phase:** 6/7 | **Opened:** 2026-08-03
+
+**Proof, same check either side of the deploy**, signed in as the owner on the live site:
+
+```
+before    avatar-shaped images: 2    0x0        CSP violations: 1
+after     avatar-shaped images: 2    1320x2868  CSP violations: 0
+```
+
+`naturalWidth` is the assertion, not the presence of the tag — the broken version had an `<img>` that was present, had a same-origin `src`, and laid out.
 
 **Problem:** every avatar on the deployed site was blocked by our own Content Security Policy. Found by loading `/` as the owner's account and reading the console — not by any test.
 

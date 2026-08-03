@@ -88,13 +88,24 @@ async function main() {
     const cookieValue = `base64-${Buffer.from(JSON.stringify(signIn.session)).toString('base64')}`;
     const cookieHeader = `sb-${projectRef}-auth-token=${cookieValue}`;
 
+    const png = buildPng(64);
     const presign = await fetch(`${BASE}/api/uploads/presign`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: cookieHeader },
       body: JSON.stringify({
         filename: 'portrait.png',
         mimeType: 'image/png',
-        sizeBytes: 512,
+        /**
+         * The REAL byte length, which is not optional.
+         *
+         * The presigned URL signs `content-length;host`, so the signature is
+         * bound to the size declared here. Declaring 512 and then uploading a
+         * 181-byte PNG returns `SignatureDoesNotMatch`, which reads like a
+         * credentials problem and is not one — it is the server refusing to let
+         * a client presign for one size and upload another. That is a control
+         * worth having, so the test states the truth instead of a round number.
+         */
+        sizeBytes: png.length,
         scope: 'avatar',
       }),
     });
@@ -102,15 +113,24 @@ async function main() {
     check('an avatar upload can be presigned', presign.ok, `${presign.status}`);
 
     if (presigned?.uploadUrl) {
-      const png = buildPng(64);
       const put = await fetch(presigned.uploadUrl, {
         method: 'PUT',
-        headers: { 'content-type': 'image/png' },
+        // No `content-type`: it is not in the signed header list, and sending
+        // an unsigned header is harmless but sending a wrong one is not.
         // `Uint8Array`, not `Buffer`: Node's fetch types accept the former.
         body: new Uint8Array(png),
       });
       check('and the bucket accepts the avatar', put.ok, `${put.status}`);
-      await admin.from('profiles').update({ avatar_url: presigned.key }).eq('id', userId);
+
+      /**
+       * Only claim the avatar when the object is really there. Setting this
+       * after a failed PUT leaves a dangling key, and the next check then
+       * reports "the account really has an avatar" about a 404 — which is how
+       * one failure became three in the first run of this script.
+       */
+      if (put.ok) {
+        await admin.from('profiles').update({ avatar_url: presigned.key }).eq('id', userId);
+      }
     }
 
     const { data: profile } = await admin
@@ -255,33 +275,67 @@ async function main() {
     check('history survives a reload', messagesAfterReload >= 2, `${messagesAfterReload} messages`);
 
     // ── stop mid-stream ───────────────────────────────────────────────────
+    const beforeStop = await admin
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('conversation_id', conversationId!)
+      .eq('role', 'assistant');
+
     await page.fill('textarea', 'Write a long, detailed history of the printing press.');
     await page.click('[data-press="quill"]');
-    // Let it genuinely start before stopping it.
-    for (let i = 0; i < 40; i++) {
-      if ((await page.locator('[data-press="caret"]').count()) > 0) break;
-      await page.waitForTimeout(250);
+
+    /**
+     * Wait for real TEXT, not for the caret.
+     *
+     * The caret appears when the request is in flight, which is before the
+     * model has emitted anything. Stopping on the caret can abort at zero
+     * characters — at which point the server correctly persists nothing, and
+     * the assertion below fails while describing the app as losing work it
+     * never had. `verify:chat` gets this right by aborting after a few chunks
+     * have actually arrived; this now matches it.
+     */
+    const lastBubbleText = `(document.querySelectorAll('[data-message]')[document.querySelectorAll('[data-message]').length - 1]||{}).innerText || ''`;
+    let streamedChars = 0;
+    for (let i = 0; i < 100; i++) {
+      streamedChars = String(await page.evaluate(lastBubbleText)).trim().length;
+      if (streamedChars > 40) break;
+      await page.waitForTimeout(300);
     }
-    const started = (await page.locator('[data-press="caret"]').count()) > 0;
-    await page.waitForTimeout(1200);
+    const started = streamedChars > 40;
+
     await page.click('[data-press="quill"]'); // the same control reads "Stop" while streaming
     await page.waitForTimeout(2500);
     const stopped = (await page.locator('[data-press="caret"]').count()) === 0;
     check(
       'a stream can be started and stopped',
       started && stopped,
-      `started=${started} stopped=${stopped}`,
+      `streamed ${streamedChars} chars, stopped=${stopped}`,
     );
 
-    const { data: partial } = await admin
-      .from('messages')
-      .select('content')
-      .eq('conversation_id', conversationId!)
-      .eq('role', 'assistant');
+    /**
+     * Counted as a DELTA against this conversation, not against a hard-coded 2.
+     * The absolute number depends on how many turns ran earlier in the walk, so
+     * an assertion on it breaks whenever the walk changes and says nothing
+     * useful when it does.
+     *
+     * Polled rather than read once: the persist happens after the client has
+     * already disconnected, so a single read at a fixed offset races it.
+     */
+    let assistantCount = 0;
+    for (let i = 0; i < 20; i++) {
+      const { count } = await admin
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('conversation_id', conversationId!)
+        .eq('role', 'assistant');
+      assistantCount = count ?? 0;
+      if (assistantCount > (beforeStop.count ?? 0)) break;
+      await page.waitForTimeout(500);
+    }
     check(
       'and the partial answer is kept rather than discarded',
-      (partial ?? []).length >= 2,
-      `${(partial ?? []).length} assistant messages`,
+      assistantCount > (beforeStop.count ?? 0),
+      `${beforeStop.count} → ${assistantCount} assistant messages`,
     );
 
     // ── usage recorded ────────────────────────────────────────────────────
