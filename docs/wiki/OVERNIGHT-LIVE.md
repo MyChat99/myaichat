@@ -383,3 +383,105 @@ in § WHAT I NEED FROM YOU with the count query first. I did not override
 path here and overriding a framework's pinned native dependency trades a real
 deploy risk for no reduction in actual exposure; the reasoning is written into
 ISSUE-006 rather than left implicit. I touched no dashboard.
+
+---
+
+# Short session — 2026-08-02, ~2 hours
+
+Same three-part structure. Started from `main` @ `7bba24f`, 29 suites green.
+
+## § WHAT YOU CAN NOW DO
+
+- **Feel the app respond.** It did not move at all before. Lines settle into
+  place, sidebar cards lift off their shadow on hover and press all the way into
+  it, the send button and paperclip stamp down and hold, and the mobile panel
+  slides with a scrim that fades rather than appearing. Nothing bounces — the
+  design language is paper, and an overshoot curve reads as rubber.
+  → `docs/screenshots/motion/before/` vs `after/` (stills; the PR describes what
+  each one does, because a screenshot cannot show motion)
+- **See a square caret while an answer is being set**, in the type colour, on a
+  hard blink. It replaced a rounded pulsing bar — a radius in a design system
+  whose whole premise is that nothing has one.
+- **Read a competitive analysis** of ChatGPT, Claude, Gemini and Perplexity with
+  a ranked shortlist you can pick from → `COMPETITIVE-ANALYSIS.md`, shortlist in
+  `ROADMAP.md`.
+
+## § WHAT I NEED FROM YOU
+
+1. **Nothing is blocking.** Uploads are verified working in production
+   (re-confirmed at the start of this session: 9/9 upload, 19/19 smoke, health
+   ok, both R2 hosts in the CSP).
+2. **Email delivery** is still the one Phase 6 item I cannot close — one signup
+   on the live site with the address that owns the Resend account. Unchanged
+   from this morning (ISSUE-017).
+3. **The demo rows: still 75, still not deleted.** Re-counted this session.
+   `usage_logs` is now 878 rows total (my own test runs added to it); 49 tagged
+   `demo`, 829 untagged, and **75** untagged *and* dated before the first
+   commit — the deletion candidates. Say the word.
+4. **Pick the next feature** from the shortlist. My recommendation is #2, "what
+   this answer would have cost elsewhere": it is small, it is pure arithmetic
+   over data already stored, and it is structurally impossible for a
+   single-vendor product to offer.
+
+## § EVERYTHING ELSE
+
+### Task 1 findings, in one paragraph
+
+The matrix says something worth internalising: the five rows where this project
+stands alone — per-answer cost, several models side by side, admin-held keys,
+per-user budgets, an audit log — are all consequences of being **multi-vendor
+and self-hosted**, not of being clever. The gaps that matter are document
+attachments (worst-felt: the paperclip exists and takes images only, so it
+currently lies about what it accepts), folders, and share links. Web search,
+cross-chat memory, voice, image generation, code execution, connectors and agent
+modes are all **rejected with reasons written down**, so the decisions do not get
+re-litigated. The single best next build is *"what this answer would have cost on
+every other model"* — no second API call, no tokens spent, and impossible for a
+product that only sells one vendor's models.
+
+### The ranking, and why
+
+| Task | Size | Verdict |
+|---|---|---|
+| 2 — Document uploads | L | **Not started.** Top-ranked gap in my own analysis, and it needs new parser dependencies, content-type sniffing, extraction limits, capability gating and a negative-path test per format. Three hours minimum to do safely. A merged half of it is worse than not starting |
+| 3 — Folders | M–L | **Not started.** Migration + RLS + CRUD + sidebar + persisted expand state + tests |
+| 4 — Avatars | M | **Not started.** Client-side crop is fiddlier than it looks |
+| 5 — Motion | M | **Shipped complete.** No schema, no new dependencies, no new API surface, and the screenshot and reduced-motion harness already existed |
+
+The instruction was FINISH > BREADTH, and motion was the only one of the four I
+was confident of finishing completely in the time left.
+
+### What the motion work found
+
+A real bug, in the thing that was supposed to make motion safe. `globals.css`
+collapsed animation and transition **durations** under `prefers-reduced-motion`
+and **not delays**. A collapsed duration with `both` fill lands harmlessly on the
+end frame; a surviving delay pins an element to its *starting* frame for the
+length of the delay. That is precisely why the masthead once flashed in from
+`opacity: 0` — patched at the time with a rule naming the masthead, which left
+every future delayed animation carrying the same bug and no such rule. Delays now
+collapse globally.
+
+Three of the new suite's own checks were wrong before they were right, which is
+becoming the reliable pattern of this project: the literal-duration scan **read
+its own documentation as a violation** (it sliced from a marker that sits inside
+a comment, leaving an unterminated `/*` the comment-stripper could not match, so
+`0.01ms` in a sentence was reported as a hardcoded duration); the
+longest-animation check condemned the masthead's deliberate one-shot load
+flourish, now exempt by name; and one assertion was a tautology
+(`count === 0 || count > 0`) and is now a measurement.
+
+### Left undone, deliberately
+
+- **Page transitions between sections.** Doing them properly needs a client
+  wrapper keyed on pathname around every route. Under 90% confident that was safe
+  for first paint in the time available, so it was logged rather than attempted.
+- **The delay assertion is not proven non-vacuous.** Two attempts to make it fail
+  on demand both failed to isolate it — every animated element also carries an
+  explicit hold that zeroes the delay. Stopped at the three-strike rule. It is
+  kept as protection for future animations and is **not verified**. The
+  layout-shift check, by contrast, is proven by construction: the page is
+  rendered twice and every element must sit in identical coordinates.
+- **One flake carried over** from this morning: ISSUE-041, `verify:persistence`
+  failing once in a chained run and passing since. It did not recur in either
+  full-suite run this session.
