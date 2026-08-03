@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Fragment, useMemo, useState, useTransition } from 'react';
 
-import { LocalTime } from '@/components/ui/local-time';
 import { dayGroup, issueNumber } from '@/lib/time';
 import { useHydrated } from '@/lib/hooks/use-hydrated';
 
@@ -147,10 +146,18 @@ export function Sidebar({
             <span aria-hidden="true">myaichat</span>
           </div>
           {issue ? (
-            <div data-press="issue">
-              No. {issueNumber(issue.since, issue.now, !hydrated)} ·{' '}
-              <LocalTime iso={issue.now} style="dateShort" uppercase />
-            </div>
+            /**
+             * Set beside the wordmark rather than beneath it, so the wordmark
+             * centres on the same line as the navigation opposite it.
+             *
+             * One row is narrower than two. Measured: 79px of room beside the
+             * wordmark, against 36px for "No. 4" and 58px for "3 AUGUST" — one
+             * of them fits, not both, and "No. 1 · 3 …" truncating mid-date
+             * reads as a bug. The issue number stays because it is the
+             * masthead's own counter; the date is on every clock the reader
+             * owns.
+             */
+            <div data-press="issue">No. {issueNumber(issue.since, issue.now, !hydrated)}</div>
           ) : null}
         </div>
 
@@ -256,49 +263,56 @@ export function Sidebar({
                             {c.title}
                           </Link>
 
-                          {/* The slip's stamp line: which press set it, and how
-                              long it ran. */}
+                          {/*
+                            The stamp line, and the card's actions at the end of
+                            it.
+
+                            They used to be absolutely positioned over the card,
+                            vertically centred — which put them ON TOP of the
+                            title, and a long title ran underneath them. Given a
+                            place in the flow at the end of the meta row, they
+                            cannot overlap anything: the title has the full width
+                            of the card and the actions have their own.
+                          */}
                           <div data-press="stamp">
                             <span
                               data-press="square"
                               data-filled={(c.pressSlot ?? 0) % 2 === 0 ? 'true' : 'false'}
                             />
-                            {c.modelName ?? 'No model'}
-                            {' · '}
-                            {c.messageCount
-                              ? `${c.messageCount} note${c.messageCount === 1 ? '' : 's'}`
-                              : 'blank'}
-                          </div>
+                            <span data-press="stamp-text">
+                              {c.modelName ?? 'No model'}
+                              {' · '}
+                              {c.messageCount
+                                ? `${c.messageCount} note${c.messageCount === 1 ? '' : 's'}`
+                                : 'blank'}
+                            </span>
 
-                          <div className="absolute top-1/2 right-1 flex -translate-y-1/2 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="size-7"
-                              aria-label={c.pinned ? 'Unpin conversation' : 'Pin conversation'}
-                              onClick={() => startTransition(() => void togglePin(c.id, !c.pinned))}
-                            >
-                              {c.pinned ? (
-                                <PinOff className="size-3.5" />
-                              ) : (
-                                <Pin className="size-3.5" />
-                              )}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="size-7"
-                              aria-label="Delete conversation"
-                              onClick={() => {
-                                if (confirm(`Delete "${c.title}"? This cannot be undone.`)) {
-                                  startTransition(() => void deleteConversation(c.id));
+                            <span data-press="slip-actions">
+                              <button
+                                type="button"
+                                data-press="slip-action"
+                                data-on={c.pinned ? 'true' : 'false'}
+                                aria-label={c.pinned ? 'Unpin conversation' : 'Pin conversation'}
+                                onClick={() =>
+                                  startTransition(() => void togglePin(c.id, !c.pinned))
                                 }
-                              }}
-                            >
-                              <Trash2 className="size-3.5" />
-                            </Button>
+                              >
+                                {c.pinned ? <PinOff aria-hidden /> : <Pin aria-hidden />}
+                              </button>
+                              <button
+                                type="button"
+                                data-press="slip-action"
+                                data-danger="true"
+                                aria-label="Delete conversation"
+                                onClick={() => {
+                                  if (confirm(`Delete "${c.title}"? This cannot be undone.`)) {
+                                    startTransition(() => void deleteConversation(c.id));
+                                  }
+                                }}
+                              >
+                                <Trash2 aria-hidden />
+                              </button>
+                            </span>
                           </div>
                         </>
                       )}

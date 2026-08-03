@@ -14,6 +14,7 @@ import { LocalTime } from '@/components/ui/local-time';
 import { formatUsd } from '@/lib/theme/money';
 import { MessageList, type UiMessage } from '@/components/chat/message-list';
 import { ModelSelector, type SelectableModel } from '@/components/chat/model-selector';
+import { setConversationModel } from '@/app/(app)/conversations/actions';
 import { capabilityRefusal } from '@/lib/upload/types';
 import type { PricedModel } from '@/lib/theme/compare-cost';
 import { Button } from '@/components/ui/button';
@@ -281,6 +282,37 @@ export function ChatThread({
     abortRef.current?.abort();
   }
 
+  /**
+   * Re-run the last answer on a different model.
+   *
+   * The same machinery as regenerate — drop the last answer, resend the turn —
+   * with the conversation's model switched first, so the reply comes from the
+   * model that was clicked. Everything that guards a normal send guards this
+   * one: it goes through `/api/chat`, so the hourly limit, the daily token
+   * budget and the suspension check all apply unchanged.
+   *
+   * Only ever offered on the LAST answer. Re-running an older one would have to
+   * truncate every turn after it, and silently destroying a conversation is not
+   * something a click on a price should do.
+   */
+  function rerunOn(targetModelId: string) {
+    if (streaming || !activeId) return;
+    const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+    if (!lastAssistant) return;
+
+    setModelId(targetModelId);
+    void (async () => {
+      // Persisted BEFORE sending. The chat route reads the model from the
+      // conversation row, not from the request, so switching only the client's
+      // idea of it would re-run on the model we were already using.
+      await setConversationModel(activeId, targetModelId);
+      await run({
+        truncateFrom: lastAssistant.id,
+        optimistic: messages.filter((m) => m.id !== lastAssistant.id),
+      });
+    })();
+  }
+
   function regenerate() {
     if (streaming) return;
     const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
@@ -345,27 +377,27 @@ export function ChatThread({
           {conversations.find((c) => c.id === activeId)?.title ?? 'New page'}
         </span>
         {activeId ? (
-          <>
-            {/* Plain anchors, not fetch + Blob: the browser already knows how
-                to save a response with a content-disposition header, and doing
-                it by hand means holding the whole export in memory first. */}
-            <a
-              href={`/api/conversations/${activeId}/export?format=md`}
-              download
-              className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-md px-2 py-1 text-xs transition"
-              title="Download this conversation as Markdown"
-            >
-              .md
-            </a>
-            <a
-              href={`/api/conversations/${activeId}/export?format=json`}
-              download
-              className="text-muted-foreground hover:bg-accent hover:text-foreground mr-1 rounded-md px-2 py-1 text-xs transition"
-              title="Download this conversation as JSON"
-            >
-              .json
-            </a>
-          </>
+          /**
+           * One labelled control instead of two bare file extensions.
+           *
+           * `.md` and `.json` sat in the navigation as loose, unexplained
+           * strings — they read as debug output, and nothing told a reader they
+           * were downloads. A `<details>` needs no JavaScript, is keyboard
+           * operable and closes on Escape for free; the links inside are still
+           * plain anchors, because the browser already knows how to save a
+           * response with a content-disposition header.
+           */
+          <details data-press="export">
+            <summary aria-label="Export this conversation">Export</summary>
+            <div data-press="export-menu">
+              <a href={`/api/conversations/${activeId}/export?format=md`} download>
+                Markdown <span>.md</span>
+              </a>
+              <a href={`/api/conversations/${activeId}/export?format=json`} download>
+                JSON <span>.json</span>
+              </a>
+            </div>
+          </details>
         ) : null}
 
         <ModelSelector
@@ -474,6 +506,7 @@ export function ChatThread({
             onEdit={editAndResubmit}
             pricedModels={pricedModels}
             modelId={modelId}
+            onRerunOn={rerunOn}
           />
         )}
       </div>
