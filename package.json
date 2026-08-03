@@ -25,6 +25,7 @@
     "verify:logging": "tsx --conditions=react-server scripts/verify-logging.ts",
     "verify:csv": "tsx scripts/verify-csv.ts",
     "verify:bundle": "tsx scripts/verify-bundle.ts",
+    "verify:routes": "tsx scripts/verify-route-loads.ts",
     "verify:attachments": "tsx scripts/verify-attachments.ts",
     "verify:security": "tsx --conditions=react-server scripts/verify-security.ts",
     "verify:session": "tsx --conditions=react-server scripts/verify-session.ts",

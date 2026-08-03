@@ -60,6 +60,7 @@ const SUITES: Suite[] = [
   { script: 'verify:logging', needs: 'nothing' },
   { script: 'verify:csv', needs: 'nothing' },
   { script: 'verify:bundle', needs: 'nothing' },
+  { script: 'verify:routes', needs: 'nothing' },
   { script: 'verify:headers', needs: 'nothing' },
   { script: 'verify:attachments', needs: 'nothing' },
   { script: 'verify:theme', needs: 'nothing' },

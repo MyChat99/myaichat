@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { cache } from 'react';
 import { redirect } from 'next/navigation';
 
 import { createClient } from '@/lib/db/server';
@@ -21,8 +22,21 @@ export type SessionUser = {
  *
  * Uses getUser(), which verifies the token against the Auth server. getSession()
  * only decodes the cookie and must not be trusted for authorization.
+ *
+ * ## Wrapped in `cache()`, and why it matters more than it looks
+ *
+ * Two round trips happen here — verify the token, then read the profile — and
+ * they are genuinely sequential, because the profile is keyed by the id the
+ * first call returns. What was NOT necessary is doing both of them twice.
+ *
+ * The `(app)` layout calls this, and so does every page inside it. Next renders
+ * both in the same request, so every single page view paid for **four** round
+ * trips to authenticate instead of two. `cache()` dedupes for the lifetime of
+ * one request and nothing longer, so there is no staleness window and no
+ * authorization decision is ever made from a cached value that outlives the
+ * request that produced it.
  */
-export async function getSessionUser(): Promise<SessionUser | null> {
+export const getSessionUser = cache(async function getSessionUser(): Promise<SessionUser | null> {
   const supabase = await createClient();
 
   const {
@@ -47,7 +61,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     suspended: profile?.suspended ?? false,
     createdAt: profile?.created_at ?? user.created_at,
   };
-}
+});
 
 /** Server-side gate for authenticated pages. Redirects to /login if signed out. */
 export async function requireUser(): Promise<SessionUser> {
