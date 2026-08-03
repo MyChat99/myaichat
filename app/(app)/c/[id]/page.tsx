@@ -99,6 +99,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
       maxUploadMb={uploadMb}
       isAdmin={user.role === 'admin'}
       avatarKey={user.avatarUrl}
+      avatarSeed={user.id}
       email={user.email}
       spend={{ conversationUsd: cost.totalUsd, monthUsd }}
     />

@@ -59,6 +59,7 @@ export default async function NewChatPage() {
       maxUploadMb={uploadMb}
       isAdmin={user.role === 'admin'}
       avatarKey={user.avatarUrl}
+      avatarSeed={user.id}
       email={user.email}
       colophon={colophon}
       spend={{ conversationUsd: 0, monthUsd }}

@@ -26,10 +26,13 @@ import { AvatarExpand } from '@/components/ui/avatar-expand';
 export function SectionTabs({
   isAdmin,
   avatarKey = null,
+  avatarSeed,
   email = null,
 }: {
   isAdmin: boolean;
   avatarKey?: string | null;
+  /** The user id, so an unchosen portrait is still distinct per person. */
+  avatarSeed?: string;
   email?: string | null;
 }) {
   const pathname = usePathname();
@@ -64,13 +67,18 @@ export function SectionTabs({
         and still belongs here; an empty frame does not.
       */}
       {/*
-        The SAME expandable portrait the masthead uses. This is the copy that is
-        actually on screen while chatting — `body:has([data-press='tabs'])`
-        hides the masthead wherever these tabs render, so fixing only the
-        masthead one would have left the avatar inert on every page a reader
-        spends their time on, while passing a test that found the hidden copy.
+        The SAME expandable portrait the masthead uses, and rendered
+        UNCONDITIONALLY. It used to be gated on `avatarKey` because a generic
+        person glyph in the navigation reads as an unfinished control. Preset
+        marks removed that objection: with nothing stored the reader now gets a
+        mark seeded from their id, which is a portrait rather than a placeholder,
+        so hiding it would hide the feature from exactly the people it is for.
+
+        This is also the copy actually on screen while chatting —
+        `body:has([data-press='tabs'])` hides the masthead wherever these tabs
+        render.
       */}
-      {avatarKey ? <AvatarExpand avatarKey={avatarKey} label={email ?? 'You'} /> : null}
+      <AvatarExpand avatarKey={avatarKey} seed={avatarSeed} label={email ?? 'You'} />
 
       {/* A server action invoked from a client component — the form posts, so
           signing out still works with JavaScript disabled. */}

@@ -23,6 +23,7 @@ import { chromium, type Page } from 'playwright';
 import type { Database } from '../lib/db/types';
 import { buildPng } from './_fixtures';
 import { PUBLISHABLE_KEY, SECRET_KEY, SUPABASE_URL } from './_env';
+import { PRESET_COUNT, presetIndexFor, presetRef } from '../lib/upload/urls';
 
 const arg = (name: string, fallback: string) =>
   process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
@@ -337,6 +338,93 @@ async function main() {
         (await page.locator('[role="dialog"]').count()) === 0,
       );
     }
+
+    // ── A2b: the three portrait states, in BOTH places ────────────────────
+    /**
+     * Uploaded photo, chosen mark, and nothing chosen — each asserted in the
+     * masthead AND the tab rail.
+     *
+     * The states are exclusive by construction (one column), so the risk is not
+     * that both render — it is that one LOCATION handles a state the other does
+     * not. That has already happened once here, and a test that checked a single
+     * location would not have seen it.
+     *
+     * "Nothing chosen" asserts the SPECIFIC mark the id hashes to, not merely
+     * that a mark appeared. Everyone getting mark 0 is the plausible failure,
+     * and it looks identical to working unless the index is checked.
+     */
+    console.log('\nPortrait states, in both locations\n');
+
+    /**
+     * Distinctiveness, tested INDEPENDENTLY of the app.
+     *
+     * The per-location checks below compare what rendered against
+     * `presetIndexFor(userId)` — which is a consistency check between the app
+     * and the function, and cannot detect the function being wrong. Replacing
+     * its body with `return 0` left every one of those checks green, because
+     * the expectation and the reality moved together. A test that imports the
+     * thing it is testing to compute its own expectation is a tautology.
+     *
+     * So the spread is asserted over many ids at once. "Everyone is distinctive
+     * in the same way" is the plausible failure for a feature like this, it
+     * looks identical to working, and only this shape of check sees it.
+     */
+    const spread = new Set(
+      Array.from({ length: 240 }, (_, i) =>
+        presetIndexFor(`00000000-0000-4000-8000-${String(i).padStart(12, '0')}`),
+      ),
+    );
+    check(
+      'the marks are actually spread across the set, not all one',
+      spread.size >= PRESET_COUNT - 1,
+      `${spread.size} of ${PRESET_COUNT} marks used across 240 ids`,
+    );
+
+    const seeded = presetIndexFor(userId);
+
+    const LOCATIONS = [
+      ['tab rail', `/c/${convo!.id}`],
+      ['masthead', '/profile'],
+    ] as const;
+
+    for (const [state, stored, expect] of [
+      ['an uploaded photo', profile?.avatar_url ?? null, 'img'],
+      ['a chosen mark', presetRef(5), 'mark:5'],
+      ['nothing chosen', null, `mark:${seeded}`],
+    ] as const) {
+      await admin.from('profiles').update({ avatar_url: stored }).eq('id', userId);
+
+      for (const [where, path] of LOCATIONS) {
+        await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(1500);
+
+        const seen = (await page.evaluate(`(() => {
+          const frames = Array.from(document.querySelectorAll('[data-press="portrait"]'))
+            .filter((f) => f.getBoundingClientRect().width > 0);
+          const frame = frames[0];
+          if (!frame) return 'none';
+          const img = frame.querySelector('img');
+          if (img) return img.naturalWidth > 0 ? 'img' : 'img-broken';
+          const svg = frame.querySelector('svg[data-mark]');
+          return svg ? 'mark:' + svg.getAttribute('data-mark') : 'empty';
+        })()`)) as string;
+
+        check(
+          `${where}: ${state} renders correctly`,
+          seen === expect,
+          `expected ${expect}, saw ${seen}`,
+        );
+      }
+    }
+
+    // Leave the account as the walk found it, so the console-error check below
+    // is not reading a state this block invented.
+    await admin
+      .from('profiles')
+      .update({ avatar_url: profile?.avatar_url ?? null })
+      .eq('id', userId);
+    await page.goto(`${BASE}/profile`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1200);
 
     check(
       'no console errors while operating either control',
