@@ -51,8 +51,15 @@ export type CompatibleProviderConfig = {
    *
    * Cheapest available, because this runs on every admin dashboard render that
    * misses the health cache.
+   *
+   * A FUNCTION instead, for providers whose catalogue changes without notice.
+   * A hardcoded id is a health check that starts failing the day the vendor
+   * retires that model — and it fails as "the key is bad", which is the wrong
+   * thing to tell an operator whose key is fine. The function receives the live
+   * listing and picks; returning undefined means "nothing suitable", which is
+   * reported as such rather than as an auth failure.
    */
-  probeModel: string;
+  probeModel: string | ((listed: ProviderModel[]) => string | undefined);
   /** Some providers error rather than truncate on a tiny budget. */
   probeMaxTokens?: number;
   outputTokenParam?: 'max_tokens' | 'max_completion_tokens';
@@ -157,6 +164,33 @@ export function createOpenAICompatibleProvider(
   const client = makeClient(apiKey, config);
   const outputParam = config.outputTokenParam ?? 'max_completion_tokens';
 
+  async function listModels(): Promise<ProviderModel[]> {
+    if (config.models.source === 'static') return config.models.list;
+
+    try {
+      const page = await client.models.list();
+      const include = config.models.source === 'endpoint' ? config.models.include : undefined;
+      return page.data
+        .filter((m) => (include ? include(m.id) : true))
+        .map((m) => ({ id: m.id, displayName: m.id }))
+        .sort((a, b) => a.id.localeCompare(b.id));
+    } catch (err) {
+      throw normaliseCompatibleError(err, config.label);
+    }
+  }
+
+  /**
+   * Resolved once per adapter instance, not once per process: the adapter is
+   * rebuilt whenever the key is read, so a retired model is picked up on the
+   * next health check rather than surviving until a deploy.
+   */
+  let probePromise: Promise<string | undefined> | null = null;
+  function resolveProbeModel(): Promise<string | undefined> {
+    if (typeof config.probeModel === 'string') return Promise.resolve(config.probeModel);
+    probePromise ??= listModels().then(config.probeModel);
+    return probePromise;
+  }
+
   const body = (model: string, maxTokens: number, messages: unknown[], stream: boolean) => ({
     model,
     [outputParam]: maxTokens,
@@ -228,30 +262,30 @@ export function createOpenAICompatibleProvider(
       }
     },
 
-    async listModels(): Promise<ProviderModel[]> {
-      if (config.models.source === 'static') return config.models.list;
-
-      try {
-        const page = await client.models.list();
-        const include = config.models.source === 'endpoint' ? config.models.include : undefined;
-        return page.data
-          .filter((m) => (include ? include(m.id) : true))
-          .map((m) => ({ id: m.id, displayName: m.id }))
-          .sort((a, b) => a.id.localeCompare(b.id));
-      } catch (err) {
-        throw normaliseCompatibleError(err, config.label);
-      }
-    },
+    listModels,
 
     async validateKey(): Promise<KeyValidation> {
       const started = Date.now();
       try {
+        const probe = await resolveProbeModel();
+        if (!probe) {
+          // Distinct from an auth failure on purpose. "The key is bad" and
+          // "the vendor lists nothing we can run" need different actions, and
+          // reporting the second as the first sends someone to rotate a key
+          // that was never the problem.
+          return {
+            valid: false,
+            reason: `${config.label} listed no model this app can use.`,
+            latencyMs: Date.now() - started,
+          };
+        }
+
         // A real generation, never a models list: an unfunded key lists models
         // perfectly happily and fails only when asked to do work. Phase 3 was
         // blocked by exactly that, twice (ISSUE-012).
         await client.chat.completions.create(
           body(
-            config.probeModel,
+            probe,
             config.probeMaxTokens ?? 16,
             [{ role: 'user' as const, content: 'hi' }],
             false,

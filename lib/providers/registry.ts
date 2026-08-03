@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/db/admin';
 import { decryptSecret } from '@/lib/security/crypto';
 
 import { ANTHROPIC_PROVIDER_NAME, createAnthropicProvider } from './anthropic';
+import { CEREBRAS_PROVIDER_NAME, createCerebrasProvider } from './cerebras';
 import { GROQ_PROVIDER_NAME, createGroqProvider } from './groq';
 import { OPENAI_PROVIDER_NAME, createOpenAIProvider } from './openai';
 import { PERPLEXITY_PROVIDER_NAME, createPerplexityProvider } from './perplexity';
@@ -25,6 +26,7 @@ const ADAPTERS: Record<string, (apiKey: string) => ChatProvider> = {
   [OPENAI_PROVIDER_NAME]: createOpenAIProvider,
   [GROQ_PROVIDER_NAME]: createGroqProvider,
   [PERPLEXITY_PROVIDER_NAME]: createPerplexityProvider,
+  [CEREBRAS_PROVIDER_NAME]: createCerebrasProvider,
 };
 
 /**
@@ -39,6 +41,7 @@ const ENV_FALLBACK: Record<string, string | undefined> = {
   [OPENAI_PROVIDER_NAME]: 'OPENAI_API_KEY',
   [GROQ_PROVIDER_NAME]: 'GROQ_API_KEY',
   [PERPLEXITY_PROVIDER_NAME]: 'PERPLEXITY_API_KEY',
+  [CEREBRAS_PROVIDER_NAME]: 'CEREBRAS_API_KEY',
 };
 
 export type ResolvedModel = {
@@ -66,7 +69,7 @@ export function registeredProviderNames(): string[] {
  * building a list. Whether the key WORKS is a different question, answered by
  * `validateKey()` and the admin panel's Test connection.
  */
-function hasUsableKey(name: string, keyLast4: string | null): boolean {
+export function hasUsableKey(name: string, keyLast4: string | null): boolean {
   if (keyLast4) return true;
   const envVar = ENV_FALLBACK[name];
   return Boolean(envVar && process.env[envVar]);

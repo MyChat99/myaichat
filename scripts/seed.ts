@@ -223,6 +223,50 @@ const CATALOGUE: { provider: string; models: SeedModel[] }[] = [
       },
     ],
   },
+  {
+    /**
+     * Cerebras — open-weight models on wafer-scale hardware, OpenAI-compatible.
+     *
+     * ⚠️ THIS LIST IS A STARTING POINT, NOT THE CATALOGUE. Cerebras changes
+     * what it offers without notice, and `GET /v1/models` is authoritative —
+     * the admin panel's "Fetch models" reads it live. These rows exist so a
+     * freshly-seeded deployment has something selectable the moment a key is
+     * added; they are not a claim about what Cerebras serves today.
+     *
+     * Ids read from inference-docs.cerebras.ai on 2026-08-03. If one of them
+     * has been retired, the model simply fails on send and should be removed
+     * from /admin/models — the adapter itself pins nothing, so nothing else
+     * breaks.
+     *
+     * ⚠️ COSTS ARE ZERO AND THAT IS NOT A PRICE. Cerebras publishes no
+     * per-token rates on its pricing page — the entry tier is $5 of prepaid
+     * credit — so there is no honest number to put here. Combined with the
+     * missing stream usage (see lib/providers/cerebras.ts), Cerebras turns are
+     * invisible to the monthly ceiling and to per-user budgets. Fine for
+     * prepaid credit; NOT fine if a card is ever attached. See ISSUE-069.
+     */
+    provider: 'cerebras',
+    models: [
+      {
+        model_id: 'gpt-oss-120b',
+        display_name: 'GPT-OSS 120B (Cerebras)',
+        max_tokens: 8192,
+        default_temperature: 1.0,
+        input_cost_per_1k: 0,
+        output_cost_per_1k: 0,
+        enabled: true,
+      },
+      {
+        model_id: 'zai-glm-4.7',
+        display_name: 'GLM 4.7 (Cerebras)',
+        max_tokens: 8192,
+        default_temperature: 1.0,
+        input_cost_per_1k: 0,
+        output_cost_per_1k: 0,
+        enabled: true,
+      },
+    ],
+  },
 ];
 
 /**

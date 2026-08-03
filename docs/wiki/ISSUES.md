@@ -16,9 +16,88 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-070 — `/admin` reported disabled and keyless providers as "not responding"
+
+**Status:** **Fixed 2026-08-03** | **Severity:** Medium | **Phase:** 4/7 | **Opened:** 2026-08-03 (reported by the owner)
+
+**Problem:** the dashboard showed *"groq is not responding"* for a provider the owner had no key for and no intention of using. `getProviderHealth()` iterated `registeredProviderNames()` — **every adapter compiled into the binary** — and never read the `providers` table at all, so both `enabled` and `key_last4` were invisible to it. Each keyless provider then threw inside `getAdapter()`, was caught, and was recorded as `ok: false, "groq has no API key configured"`, which rendered as a red cross and a place in the red "not responding" banner.
+
+**Same defect class as the sign-up switch** ([ISSUE-063](#issue-063)): a flag stored, displayed in the UI, and never consulted where it decides something.
+
+**A correction to the report, which changed the fix.** The owner described groq as *disabled*. The production row was `enabled=true, key=(none)` — `toggleProvider` does persist, so the flag had simply never been flipped. **Excluding only disabled providers would therefore not have fixed what was on screen.** The trigger was *enabled with no key*, and both had to be handled.
+
+**Resolution:** health is now derived from the table, with three states:
+
+| State | Behaviour |
+| --- | --- |
+| Disabled | **Excluded entirely.** Off is not a health question. |
+| Enabled, no key | `ok: null` → "No key set", grey, and **not** in the failure count. |
+| Enabled, with key | Probed for real, as before. |
+
+The keyless case is also no longer cached, so a key arriving shows up on the next render rather than in five minutes, and it spends nothing.
+
+**What else was checked, since the same flag could have been ignored elsewhere.** It was not: `getProviderKey()` returns null when `enabled === false`, and `listAvailableModels()` filters `.eq('providers.enabled', true)` **and** on key presence. **A disabled provider could never be chatted to or billed against** — the flag was read correctly everywhere it guarded spend, and ignored only where it drove this panel. `configuredProviderNames()` is also enabled-blind but is used solely by tests.
+
+**Guaranteed** (`verify:providers`, each break-tested against the old implementation):
+
+- an enabled provider with no key is not reported as failing, and says "No key set"
+- a disabled provider is absent from the panel entirely
+- disabling one does not remove the others
+
+Before / after on the real dashboard:
+
+```
+before   groq is not responding          (red banner)
+after    anthropic  Responding   845ms
+         perplexity Responding   2012ms
+         groq       No key set
+         openai     Responding   1255ms
+```
+
+### ISSUE-069 — Cerebras spend is invisible to the ceiling and the budgets
+
+**Status:** Open | **Severity:** Medium — **rises to High the moment a card is attached** | **Phase:** 3 | **Opened:** 2026-08-03
+**Problem:** streamed Cerebras turns record **zero tokens and zero cost**, so they contribute nothing to `monthly_spend_ceiling_usd` or to per-user daily budgets. Two independent causes, both deliberate:
+
+- `stream_options.include_usage` is **not documented** by Cerebras either way. Sending an unsupported parameter fails the entire request; omitting it only loses a token count. It is omitted (`requestUsageInStream: false`) until someone can test it against a real key.
+- Cerebras publishes **no per-token rates** — the entry tier is $5 of prepaid credit — so the seeded models carry `0` cost. That is the absence of a price, not a price of zero.
+
+**Why this is tolerable today and not tomorrow:** prepaid credit cannot overspend, so the ceiling has nothing to protect. A card-backed Cerebras account would spend without appearing in any total this app shows.
+**To close:** with a real key, send one streamed turn with `requestUsageInStream: true`. If it succeeds and reports usage, flip it in `lib/providers/cerebras.ts` permanently. If it 400s, the flag stays off and the honest fix is to count tokens locally. Then set real costs in /admin/models if Cerebras ever publishes them.
+
+### ISSUE-068 — `npm run seed` silently reverts admin-panel edits
+
+**Status:** Open | **Severity:** Medium | **Phase:** 4 | **Opened:** 2026-08-03
+**Problem:** `seedProvidersAndModels()` upserts the **entire** catalogue — `{ name, enabled: true }` for every provider and every seeded column for every model. Run against a deployment where an admin has changed a display name, a cost, a `max_tokens`, or disabled a model in /admin/models, it puts all of them back to the seeded values with no diff, no confirmation and no audit entry.
+**Why it matters more than it looks:** /admin/providers tells an operator to run it — *"Adapters with no database row: cerebras. Run `npm run seed`"* — so the app actively recommends the destructive path to solve an additive problem.
+**Worked around today:** the Cerebras rows were inserted with a targeted upsert touching only `cerebras`, precisely to avoid this.
+**To close:** make seeding additive by default — insert rows that do not exist, leave existing ones alone — with `--force` for the current behaviour. Or narrow it with `--provider=<name>`.
+
+### ISSUE-067 — A provider with no key can only be disabled, never removed
+
+**Status:** Open | **Severity:** Low | **Phase:** 4 | **Opened:** 2026-08-03
+**Problem:** /admin/providers shows a full-size card for every row in the table, including ones with no key and no prospect of one. With five registered adapters and two unconfigured, most of the page is providers the operator is not using. There is no delete.
+**Why delete is not the obvious answer:** provider rows are seeded and gated on `ADAPTERS`, so a deleted row reappears on the next seed, and deleting one with models attached raises a cascade question for conversations that reference those models. Removal needs those decisions made deliberately rather than a button added.
+**Preferred direction (owner's suggestion, and the cheaper one):** collapse unconfigured providers into a compact "not configured" section rather than deleting them — same information, a fraction of the space, and no cascade to reason about. The dashboard health panel already distinguishes this state (`ok: null`, "No key set") as of [ISSUE-070](#issue-070), so the data is there.
+
+### ISSUE-066 — `/api/health` cannot say which build is deployed
+
+**Status:** Open | **Severity:** Low | **Phase:** 8 | **Opened:** 2026-08-03
+**Problem:** the endpoint returns `{"status":"ok","checks":{"database":"ok","encryption":"ok"}}` and no version. There is no way to ask the deployment which commit it is serving, so "has my fix landed?" can only be answered by probing for a behavioural change — a header, a rendered pixel — which is indirect and needs a new probe per change. Verifying the ISSUE-065 deploy meant polling the CSP header in a loop.
+**Resolution:** expose the commit SHA (Railway provides `RAILWAY_GIT_COMMIT_SHA`) and the build time. Cheap, and it turns every future deploy check into one request. Not done as part of ISSUE-065 to avoid a third concurrent branch.
+
 ### ISSUE-065 — Avatars have never displayed in production: CSP blocked the redirect target
 
-**Status:** Fixed 2026-08-03 (awaiting deploy) | **Severity:** Medium | **Phase:** 6/7 | **Opened:** 2026-08-03
+**Status:** **Resolved 2026-08-03 — verified in production** | **Severity:** Medium | **Phase:** 6/7 | **Opened:** 2026-08-03
+
+**Proof, same check either side of the deploy**, signed in as the owner on the live site:
+
+```
+before    avatar-shaped images: 2    0x0        CSP violations: 1
+after     avatar-shaped images: 2    1320x2868  CSP violations: 0
+```
+
+`naturalWidth` is the assertion, not the presence of the tag — the broken version had an `<img>` that was present, had a same-origin `src`, and laid out.
 
 **Problem:** every avatar on the deployed site was blocked by our own Content Security Policy. Found by loading `/` as the owner's account and reading the console — not by any test.
 

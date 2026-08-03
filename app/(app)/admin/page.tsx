@@ -1,6 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { AlertTriangle, CheckCircle2, MessagesSquare, Users, Wallet, XCircle } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  MessagesSquare,
+  MinusCircle,
+  Users,
+  Wallet,
+  XCircle,
+} from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -202,8 +210,16 @@ export default async function AdminOverviewPage() {
               className="border-border flex items-center justify-between gap-3 rounded-md border p-3"
             >
               <div className="flex min-w-0 items-center gap-2.5">
-                {provider.ok ? (
+                {/*
+                  Three states, not two. `null` means "enabled but never given a
+                  key" — a configuration gap, not an outage. Rendering it with
+                  the same red cross as a dead provider is what made a provider
+                  nobody had set up look like a provider that had broken.
+                */}
+                {provider.ok === true ? (
                   <CheckCircle2 className="text-success size-4 shrink-0" aria-hidden />
+                ) : provider.ok === null ? (
+                  <MinusCircle className="text-muted-foreground size-4 shrink-0" aria-hidden />
                 ) : (
                   <XCircle className="text-destructive size-4 shrink-0" aria-hidden />
                 )}

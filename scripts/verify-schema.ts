@@ -211,32 +211,71 @@ async function main() {
       assert('explain_analytics() returns plans', rows.length >= 6, `${rows.length}`);
 
       /**
-       * The dashboard counts user messages globally by date. Before
-       * `messages_user_created_at_idx` the planner had nothing to use and
-       * costed this at 13.61; with the index it costs 5.71.
+       * Asserted on the SHAPE of the plan, not on a cost number.
        *
-       * Asserted on the COST, not the runtime. At ~180 rows the runtime is
-       * 0.05ms either way — a timing assertion here would pass whether or not
-       * the index existed, which is the definition of a useless test. The cost
-       * estimate is what actually changes, because it is what the planner
-       * computes from the index's existence.
+       * This check used to read the planner's cost estimate and require it to
+       * be under 10 — 5.71 with `messages_user_created_at_idx`, 13.61 without.
+       * The trouble is that cost scales with table size, so the same query
+       * costed 6.89 on a quiet database and 10.76 while test rows were in
+       * flight. The check failed for a reason that had nothing to do with the
+       * index it was named after, and would have gone on failing harder as real
+       * data arrived. A threshold that decays into a false alarm gets ignored,
+       * and then it is not a check.
+       *
+       * The plan tree says whether the index was used, in as many words. That
+       * is the actual question, and it does not move with row count. It is
+       * readable only because `explain_analytics()` now returns the whole plan
+       * as JSON — with `format text` and `execute ... into`, every plan was
+       * truncated to its top line and the node naming the index never arrived.
        */
-      const messagesToday = rows.find((r) => r.label.includes('messages today'));
-      const cost = Number(messagesToday?.plan.match(/cost=[\d.]+\.\.([\d.]+)/)?.[1] ?? 0);
+      type PlanNode = { 'Node Type': string; 'Index Name'?: string; Plans?: PlanNode[] };
+      const nodes = (plan: string | undefined): PlanNode[] => {
+        if (!plan) return [];
+        try {
+          const flatten = (n: PlanNode): PlanNode[] => [n, ...(n.Plans ?? []).flatMap(flatten)];
+          return flatten((JSON.parse(plan) as { Plan: PlanNode }[])[0].Plan);
+        } catch {
+          // A plan that will not parse is a failure, not an empty result — the
+          // assertions below all read "found nothing", which is correct.
+          return [];
+        }
+      };
+      const describe = (plan: string | undefined) =>
+        nodes(plan)
+          .map((n) => n['Node Type'] + (n['Index Name'] ? ` using ${n['Index Name']}` : ''))
+          .join(' -> ') || '(no plan)';
+
+      const messagesToday = rows.find((r) => r.label.includes('messages today'))?.plan;
       assert(
-        'the user-message count has an index to use',
-        cost > 0 && cost < 10,
-        `planner cost ${cost} — without messages_user_created_at_idx it is ~13.6`,
+        'the user-message count is served by messages_user_created_at_idx',
+        nodes(messagesToday).some(
+          (n) =>
+            /Index (Only )?Scan/.test(n['Node Type']) &&
+            n['Index Name'] === 'messages_user_created_at_idx',
+        ),
+        describe(messagesToday),
       );
 
-      // Nothing in this set should be reading the whole of usage_logs when a
-      // date filter is present.
-      const analytics = rows.find((r) => r.label.includes('usage over 30 days'));
+      const analytics = rows.find((r) => r.label.includes('usage over 30 days'))?.plan;
       assert(
         'the 30-day analytics query is bounded by a limit',
-        (analytics?.plan ?? '').startsWith('Limit'),
-        (analytics?.plan ?? '').slice(0, 60),
+        nodes(analytics).some((n) => n['Node Type'] === 'Limit'),
+        describe(analytics),
       );
+
+      /**
+       * Generalised, because the two checks above name two queries and the set
+       * has six. A sequential scan on any of these tables is the failure mode
+       * the whole index suite exists to prevent, and it is silent — it only
+       * shows up as a page that got slower some time after the data grew.
+       */
+      for (const row of rows) {
+        assert(
+          `${row.label}: no sequential scan`,
+          !nodes(row.plan).some((n) => n['Node Type'] === 'Seq Scan'),
+          describe(row.plan),
+        );
+      }
     }
   }
 

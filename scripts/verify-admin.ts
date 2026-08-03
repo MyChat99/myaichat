@@ -172,8 +172,30 @@ async function main() {
       stored.slice(0, 12),
     );
 
+    /**
+     * Provider-AGNOSTIC, deliberately.
+     *
+     * This asserted `startsWith('sk-')` for every provider, which is OpenAI's
+     * prefix and nobody else's — Anthropic uses `sk-ant-`, Groq `gsk_`,
+     * Perplexity `pplx-`, Cerebras `csk-`. It passed for as long as the only
+     * keyed providers happened to be `sk-` ones, then failed the day a
+     * Perplexity key was entered. The key was fine; the assertion encoded one
+     * vendor's convention as a universal fact.
+     *
+     * What actually matters here is that the ciphertext round-trips to
+     * something that is plainly a credential and plainly not the ciphertext.
+     * Whether it is a *valid* key is a different question, answered by
+     * `validateKey()` against the provider — asserting a prefix only ever
+     * tested our guess about naming.
+     */
     const plaintext = decryptSecret(stored);
-    check(`${p.name}: decrypts to a real-looking key`, plaintext.startsWith('sk-'));
+    check(
+      `${p.name}: decrypts to something credential-shaped`,
+      plaintext.length >= 20 && !/\s/.test(plaintext) && plaintext !== stored,
+      `${plaintext.length} chars`,
+    );
+    // The real round-trip proof, and the one that would catch a corrupted
+    // decrypt: the last four characters must match what was stored separately.
     check(`${p.name}: key_last4 matches the key`, p.key_last4 === keyLast4(plaintext));
     check(`${p.name}: only the last 4 are stored in the clear`, (p.key_last4 ?? '').length <= 4);
   }
