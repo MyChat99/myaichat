@@ -7,7 +7,7 @@ import { createClient } from '@/lib/db/server';
 import { listAvailableModels } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
 import { listConversationTitles } from '@/lib/db/conversations';
-import { loadConversationCost, loadMonthToDateSpend } from '@/lib/db/costs';
+import { loadConversationCost, loadMonthToDateSpend, loadPricedModels } from '@/lib/db/costs';
 import { isStorageConfigured } from '@/lib/r2/storage';
 import { maxUploadMb } from '@/lib/db/settings';
 
@@ -73,6 +73,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         supportsVision: m.supportsVision,
         supportsDocuments: m.supportsDocuments,
       }))}
+      pricedModels={await loadPricedModels()}
       selectedModelId={conversation.model_id}
       conversations={await listConversationTitles()}
       storageEnabled={isStorageConfigured()}

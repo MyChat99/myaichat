@@ -3,7 +3,7 @@ import { listAvailableModels } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
 import { listConversationTitles } from '@/lib/db/conversations';
 import { loadColophon } from '@/lib/db/colophon';
-import { loadMonthToDateSpend } from '@/lib/db/costs';
+import { loadMonthToDateSpend, loadPricedModels } from '@/lib/db/costs';
 import { isStorageConfigured } from '@/lib/r2/storage';
 import { maxUploadMb } from '@/lib/db/settings';
 
@@ -31,6 +31,7 @@ export default async function NewChatPage() {
         supportsVision: m.supportsVision,
         supportsDocuments: m.supportsDocuments,
       }))}
+      pricedModels={await loadPricedModels()}
       selectedModelId={models[0]?.id ?? null}
       conversations={await listConversationTitles()}
       storageEnabled={isStorageConfigured()}

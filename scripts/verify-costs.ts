@@ -200,6 +200,131 @@ async function main() {
       `${orphaned.byMessage.size} priced`,
     );
 
+    console.log('\nWhat it would have cost elsewhere\n');
+
+    const { compareCost, describeRatio, ESTIMATE_CAVEAT } =
+      await import('../lib/theme/compare-cost');
+    const { loadPricedModels } = await import('../lib/db/costs');
+
+    const priced = [
+      {
+        id: 'a',
+        displayName: 'Cheap',
+        providerName: 'x',
+        inputCostPer1k: 0.001,
+        outputCostPer1k: 0.002,
+      },
+      {
+        id: 'b',
+        displayName: 'Dear',
+        providerName: 'y',
+        inputCostPer1k: 0.01,
+        outputCostPer1k: 0.02,
+      },
+      {
+        id: 'c',
+        displayName: 'Unpriced',
+        providerName: 'z',
+        inputCostPer1k: null,
+        outputCostPer1k: null,
+      },
+    ];
+    const compared = compareCost(1000, 1000, priced, 'a');
+
+    check(
+      'the comparison is arithmetic on the tokens, not a new request',
+      compared.find((r) => r.modelId === 'b')?.usd === 0.03,
+      String(compared.find((r) => r.modelId === 'b')?.usd),
+    );
+    check(
+      'the model that answered is marked as such',
+      compared.find((r) => r.actual)?.modelId === 'a',
+    );
+    check(
+      'a dearer model is described as dearer, in multiples',
+      describeRatio(compared.find((r) => r.modelId === 'b')?.ratio ?? null) === '10× more',
+      String(describeRatio(compared.find((r) => r.modelId === 'b')?.ratio ?? null)),
+    );
+
+    /**
+     * The case that matters most in this feature. A model with no price set
+     * must read as "no price set" and never as $0.00 — free is the one number
+     * here that would be actively harmful to invent, and it sorts last because
+     * a missing price is a gap in the admin's setup, not a bargain.
+     */
+    const unpriced = compared.find((r) => r.modelId === 'c');
+    check('a model with no price data reports null, not zero', unpriced?.usd === null);
+    check('and it carries no ratio', unpriced?.ratio === null);
+    check(
+      'and it sorts last, so it cannot be mistaken for the cheapest',
+      compared[compared.length - 1].modelId === 'c',
+    );
+    check('the cheapest priced model sorts first', compared[0].modelId === 'a');
+    check('and the estimate says out loud that it is one', /tokenise/i.test(ESTIMATE_CAVEAT));
+
+    console.log('\nA provider disabled mid-conversation\n');
+
+    /**
+     * Built rather than borrowed: disabling a real provider would mutate state
+     * every other suite depends on. A throwaway provider proves the same thing
+     * and is deleted in the same block.
+     */
+    const providerInsert = await admin
+      .from('providers')
+      .insert({ name: `test-provider-${process.pid}`, enabled: true, key_last4: '9999' })
+      .select('id')
+      .single();
+    if (providerInsert.error || !providerInsert.data) {
+      check(
+        'a throwaway provider can be created for this check',
+        false,
+        providerInsert.error?.message ?? 'no row returned',
+      );
+    }
+    const tempProvider = providerInsert.data;
+    const { data: tempModel } = tempProvider
+      ? await admin
+          .from('models')
+          .insert({
+            provider_id: tempProvider.id,
+            model_id: 'priceless-model',
+            display_name: 'Priceless (test)',
+            max_tokens: 256,
+            enabled: true,
+            // Prices deliberately omitted, so the row lands on the schema
+            // default — which is exactly how a model nobody priced looks.
+          })
+          .select('id')
+          .single()
+      : { data: null };
+
+    try {
+      if (!tempProvider || !tempModel) throw new Error('setup failed');
+      const withProvider = await loadPricedModels();
+      const found = withProvider.find((m) => m.id === tempModel!.id);
+      check('an enabled provider’s model is offered for comparison', Boolean(found));
+      check(
+        'a model nobody priced arrives as 0 and 0, the schema default',
+        found?.inputCostPer1k === 0 && found?.outputCostPer1k === 0,
+        JSON.stringify({ in: found?.inputCostPer1k, out: found?.outputCostPer1k }),
+      );
+      check(
+        'and is reported as unpriced, never as the cheapest option at $0.0000',
+        compareCost(1000, 1000, [priced[0], found!], 'a').find((r) => r.modelId === found!.id)
+          ?.usd === null,
+      );
+
+      await admin.from('providers').update({ enabled: false }).eq('id', tempProvider!.id);
+      const afterDisable = await loadPricedModels();
+      check(
+        'disabling the provider drops its model from the comparison',
+        !afterDisable.some((m) => m.id === tempModel!.id),
+      );
+    } finally {
+      if (tempModel) await admin.from('models').delete().eq('id', tempModel.id);
+      if (tempProvider) await admin.from('providers').delete().eq('id', tempProvider.id);
+    }
+
     console.log('\nOn screen\n');
 
     const browser = await chromium.launch();

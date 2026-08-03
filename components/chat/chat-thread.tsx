@@ -15,6 +15,7 @@ import { formatUsd } from '@/lib/theme/money';
 import { MessageList, type UiMessage } from '@/components/chat/message-list';
 import { ModelSelector, type SelectableModel } from '@/components/chat/model-selector';
 import { capabilityRefusal } from '@/lib/upload/types';
+import type { PricedModel } from '@/lib/theme/compare-cost';
 import { Button } from '@/components/ui/button';
 
 type Props = {
@@ -28,6 +29,11 @@ type Props = {
   /** False until R2 credentials exist; disables the paperclip with a reason. */
   storageEnabled?: boolean;
   maxUploadMb?: number;
+  /**
+   * Every model this deployment could have used, with prices. Passed down for
+   * the per-answer cost comparison, which is arithmetic — no request is made.
+   */
+  pricedModels?: PricedModel[];
   /** Figures for Riso's opening spread. Absent on every other theme. */
   colophon?: { notes: number; spendUsd: number; presses: number };
   /** The rule bar carries the navigation, so it needs these. */
@@ -75,6 +81,7 @@ export function ChatThread({
   storageEnabled = false,
   maxUploadMb,
   colophon,
+  pricedModels = [],
   isAdmin = false,
   avatarKey = null,
   email = null,
@@ -465,6 +472,8 @@ export function ChatThread({
             streaming={streaming}
             onRegenerate={regenerate}
             onEdit={editAndResubmit}
+            pricedModels={pricedModels}
+            modelId={modelId}
           />
         )}
       </div>
