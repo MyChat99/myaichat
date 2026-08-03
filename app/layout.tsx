@@ -6,6 +6,8 @@ import { themeCss, rootFontSize } from '@/lib/theme/css';
 import { accentToHex, loadAppearance } from '@/lib/theme/preferences';
 
 import './globals.css';
+import { after } from 'next/server';
+import { ping } from '@/lib/security/keepalive';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -82,11 +84,39 @@ a(q);
 q.addEventListener('change',a);
 }catch(e){}})();`;
 
+/**
+ * The arrival keep-alive.
+ *
+ * Done on the SERVER, in `after()`, rather than from a client component.
+ *
+ * The first version fired a `fetch('/api/ping')` from a `useEffect` in the
+ * browser. It worked — the server logged 200s — but it left the page with an
+ * outstanding request that never reported completion, so `networkidle` was
+ * never reached and every Playwright `goto` in the suite timed out at 45
+ * seconds. Isolated by removing the component: 40s timeout became 1190ms.
+ *
+ * `after()` is the right primitive anyway. The server is already rendering this
+ * layout on every arrival including the signed-out sign-in page, so the round
+ * trip it needs is one it is already positioned to make — and running it after
+ * the response is flushed means it cannot delay first paint by construction,
+ * rather than by asking the browser nicely to wait for idle. It also costs the
+ * visitor no JavaScript and no request at all.
+ */
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Fire-and-forget, after the response is sent. Never awaited on the render
+  // path, and a failure here must never surface to the reader.
+  after(async () => {
+    try {
+      await ping();
+    } catch {
+      /* the operator sees this on /admin; a visitor should not */
+    }
+  });
+
   const appearance = await loadAppearance();
   const accentHex = accentToHex(appearance.accentColor);
 

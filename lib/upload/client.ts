@@ -65,8 +65,3 @@ export async function uploadFile(
 
   return { ok: true, key: presigned.key, kind: presigned.kind };
 }
-
-/** URL for reading an object — always through our route, never the bucket. */
-export function attachmentUrl(key: string): string {
-  return `/api/uploads/download?key=${encodeURIComponent(key)}`;
-}

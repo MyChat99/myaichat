@@ -12,6 +12,7 @@ import { auditLog, redactMetadata } from '@/lib/security/audit';
 import { requireAdmin } from '@/lib/security/auth';
 import { encryptSecret, keyLast4 } from '@/lib/security/crypto';
 import { ReauthError, requireAdminWithPassword } from '@/lib/security/reauth';
+import { ping } from '@/lib/security/keepalive';
 
 /**
  * Admin mutations.
@@ -402,4 +403,27 @@ export async function updateSettings(input: unknown) {
 
   revalidatePath('/admin/settings');
   revalidatePath('/', 'layout');
+}
+
+/**
+ * A deliberate keep-alive from the admin panel.
+ *
+ * Always forces a real round trip, so the latency reported is measured now
+ * rather than read from a cache — an operator checking whether the database is
+ * reachable learns nothing from a cached "yes".
+ */
+export async function pingDatabase(): Promise<{
+  ok: boolean;
+  latencyMs: number | null;
+  lastActivityAt: string | null;
+  error?: string;
+}> {
+  await requireAdmin();
+  const result = await ping(true);
+  return {
+    ok: result.ok,
+    latencyMs: result.latencyMs,
+    lastActivityAt: result.lastActivityAt,
+    error: result.error,
+  };
 }

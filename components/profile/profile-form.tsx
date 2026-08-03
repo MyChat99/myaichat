@@ -8,7 +8,8 @@ import { removeAvatar, setAvatar, updateDisplayName } from '@/app/(app)/profile/
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { attachmentUrl, uploadFile } from '@/lib/upload/client';
+import { uploadFile } from '@/lib/upload/client';
+import { attachmentUrl } from '@/lib/upload/urls';
 
 export function ProfileForm({
   initialDisplayName,

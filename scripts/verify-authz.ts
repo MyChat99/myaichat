@@ -43,6 +43,8 @@ const PUBLIC_ROUTES: Record<string, string> = {
     'liveness probe for Railway — returns no user data and is called before any session exists',
   'app/auth/confirm/route.ts':
     'email confirmation link — the token in the URL is the credential, so a session cannot be required',
+  'app/api/ping/route.ts':
+    'database keep-alive — the failure it prevents is nobody signing in for a week, so requiring a session would silence it exactly when it matters. It reads and at most writes one timestamp, at most once per six hours however much traffic arrives, returns only { ok } and records nothing about the caller',
 };
 
 /**

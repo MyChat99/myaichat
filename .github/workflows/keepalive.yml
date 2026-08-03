@@ -1,0 +1,51 @@
+# Keep-alive — layer three: a ping that does not depend on anyone visiting.
+#
+# Layers one and two (a ping on arrival, and the admin button) both need a
+# human. The failure they cannot cover is the one that actually happens: nobody
+# opens the site for a week, so nothing ever pings, and the Supabase project
+# pauses. This workflow is the layer that runs when nobody is looking.
+#
+# ── NOT ENABLED. This is deliberate. ────────────────────────────────────────
+# The `schedule:` block below is commented out, so today this only runs when
+# someone presses "Run workflow" in the Actions tab. Turning it on consumes the
+# repository owner's GitHub Actions allowance on a recurring basis, which is
+# their infrastructure and their decision — uncommenting the four lines is the
+# whole change.
+#
+# Why GitHub Actions rather than the alternatives:
+#   Railway cron       needs the Railway dashboard, which this project does not touch
+#   Supabase pg_cron   needs the Supabase dashboard, same
+#   an external pinger a third party who can see the URL and stop working silently
+# Actions is already how this repository runs CI, it is free for public
+# repositories, the schedule lives in a reviewed file rather than in somebody's
+# console, and it fails loudly and visibly in a tab that is already watched.
+#
+# Every 3 days is well inside the ~7-day pause window, so two consecutive
+# failures still leave a day of margin.
+
+name: Keep-alive
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   # 06:17 UTC every third day. Off the hour on purpose: scheduled jobs at
+  #   # :00 queue behind everybody else's.
+  #   - cron: '17 6 */3 * *'
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the deployment
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://myaichat-production.up.railway.app' }}
+        run: |
+          echo "Pinging $APP_URL/api/ping"
+          # --fail turns a 5xx into a non-zero exit, so a paused database shows
+          # up as a red run rather than a green one with bad news in the log.
+          status=$(curl --silent --show-error --fail --max-time 30 \
+            --write-out '%{http_code}' --output /tmp/ping.json \
+            "$APP_URL/api/ping")
+          echo "HTTP $status"
+          cat /tmp/ping.json
+          grep -q '"ok":true' /tmp/ping.json

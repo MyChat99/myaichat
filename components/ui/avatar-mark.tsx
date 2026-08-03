@@ -1,6 +1,6 @@
 import { UserRound } from 'lucide-react';
 
-import { attachmentUrl } from '@/lib/upload/client';
+import { attachmentUrl } from '@/lib/upload/urls';
 
 /**
  * The reader's own portrait, wherever the app identifies them.

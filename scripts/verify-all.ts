@@ -61,6 +61,7 @@ const SUITES: Suite[] = [
   { script: 'verify:csv', needs: 'nothing' },
   { script: 'verify:bundle', needs: 'nothing' },
   { script: 'verify:routes', needs: 'nothing' },
+  { script: 'verify:boundaries', needs: 'nothing' },
   { script: 'verify:headers', needs: 'nothing' },
   { script: 'verify:attachments', needs: 'nothing' },
   { script: 'verify:theme', needs: 'nothing' },
@@ -93,6 +94,7 @@ const SUITES: Suite[] = [
   // security changes a system setting; admin breaks a provider key. Nothing
   // after them reads what they touch.
   { script: 'verify:spend', needs: 'server' },
+  { script: 'verify:keepalive', needs: 'server' },
   { script: 'verify:security', needs: 'database', mutates: true },
   { script: 'verify:admin', needs: 'server', mutates: true },
 ];

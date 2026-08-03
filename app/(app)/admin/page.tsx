@@ -8,6 +8,9 @@ import { getDashboardStats } from '@/lib/admin/dashboard';
 import { requireAdmin } from '@/lib/security/auth';
 import { checkMonthlySpendCeiling } from '@/lib/security/spend-ceiling';
 import { loadSignupPolicy } from '@/lib/security/signup-policy';
+import { activityStatus } from '@/lib/security/keepalive';
+
+import { KeepAlivePanel } from './keepalive-panel';
 import { formatUsd } from '@/lib/theme/money';
 
 export const metadata: Metadata = { title: 'Overview' };
@@ -51,10 +54,11 @@ function Stat({
 
 export default async function AdminOverviewPage() {
   await requireAdmin();
-  const [stats, ceiling, signupPolicy] = await Promise.all([
+  const [stats, ceiling, signupPolicy, activity] = await Promise.all([
     getDashboardStats(),
     checkMonthlySpendCeiling(),
     loadSignupPolicy(),
+    activityStatus(),
   ]);
 
   const down = stats.providers.filter((p) => p.ok === false);
@@ -123,6 +127,15 @@ export default async function AdminOverviewPage() {
           </p>
         )}
       </section>
+
+      <KeepAlivePanel
+        initial={{
+          daysSince: activity.daysSince,
+          level: activity.level,
+          message: activity.message,
+          lastActivityAt: activity.lastActivityAt,
+        }}
+      />
 
       {down.length > 0 ? (
         <div className="border-destructive/40 bg-destructive/5 flex items-start gap-3 rounded-lg border p-3">
