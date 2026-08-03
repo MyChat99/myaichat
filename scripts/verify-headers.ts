@@ -160,8 +160,7 @@ async function main() {
     const withR2 = contentSecurityPolicy(false);
     [process.env.R2_ACCOUNT_ID, process.env.R2_BUCKET_NAME] = saved as [string, string];
 
-    const directive = (name: string) =>
-      withR2.match(new RegExp(`${name}[^;]*`))?.[0] ?? '';
+    const directive = (name: string) => withR2.match(new RegExp(`${name}[^;]*`))?.[0] ?? '';
 
     for (const name of ['connect-src', 'img-src']) {
       check(
