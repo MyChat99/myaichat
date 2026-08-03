@@ -464,14 +464,17 @@ export function ChatThread({
                   {lede.presses === 1 ? '' : 'es'} running
                 </div>
               ) : null}
+              {/* No standfirst under the headline. It counted the models,
+                  which is a number nobody asked the empty state for, and then
+                  reassured the reader at length that nothing was precious —
+                  copy that has to argue for itself is copy the page is better
+                  without. The starters below say what to do; the headline says
+                  what the place is. */}
               <h1 className="text-2xl font-semibold" data-press="headline">
                 A quiet place
                 <br />
                 to <mark>think out loud</mark>.
               </h1>
-              <p className="text-muted-foreground mt-1 text-sm" data-press="standfirst">
-                {`${models.length} model${models.length === 1 ? ' is' : 's are'} inked and ready. Ask something badly, change your mind halfway through, and start again — nothing here is precious.`}
-              </p>
             </div>
             <div className="grid w-full gap-2 sm:grid-cols-2" data-press="picks">
               {STARTERS.map(({ prompt, note }, i) => (

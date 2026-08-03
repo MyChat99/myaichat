@@ -1,6 +1,8 @@
 'use client';
 
 import { Menu, MessageSquarePlus, Pin, PinOff, Search, Trash2, X } from 'lucide-react';
+
+import { EditionPicker } from '@/components/chat/edition-picker';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Fragment, useMemo, useState, useTransition } from 'react';
@@ -17,11 +19,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+export type SidebarEdition = { id: string; name: string };
+
 export type SidebarConversation = {
   id: string;
   title: string;
   pinned: boolean;
   updated_at: string;
+  /** Null when the page is loose. */
+  editionId?: string | null;
   /** Null when the conversation's model has since been removed. */
   modelName?: string | null;
   /**
@@ -52,9 +58,11 @@ export type SidebarIssue = { since: string; now: string };
 
 export function Sidebar({
   conversations,
+  editions = [],
   issue,
 }: {
   conversations: SidebarConversation[];
+  editions?: SidebarEdition[];
   issue?: SidebarIssue;
 }) {
   const params = useParams<{ id?: string }>();
@@ -94,11 +102,69 @@ export function Sidebar({
    * pinned conversation cannot end up under a heading it does not belong to —
    * pinned items sort to the top and simply carry their own heading with them.
    */
+  /**
+   * Editions first, then loose pages under their date headings.
+   *
+   * Two lists rather than one, because they answer different questions: an
+   * edition is a place the reader PUT something, a date heading is when they
+   * last touched it. Filing a page into an edition should not change what day
+   * it was written, and the database enforces exactly that — releasing a page
+   * leaves `updated_at` alone, so it drops back under its original heading
+   * rather than under Today.
+   */
+  const loose = useMemo(() => filtered.filter((c) => !c.editionId), [filtered]);
+
+  const byEdition = useMemo(() => {
+    const groups = new Map<string, SidebarConversation[]>();
+    for (const c of filtered) {
+      if (c.editionId)
+        (groups.get(c.editionId) ?? groups.set(c.editionId, []).get(c.editionId)!).push(c);
+    }
+    return groups;
+  }, [filtered]);
+
+  /**
+   * One ordered list: every edition's pages, then the loose ones.
+   *
+   * Composed rather than rendered as two separate `.map()` blocks, because the
+   * conversation card is forty lines of markup with rename, pin and delete in
+   * it — duplicating that to draw the same card under two headings is how the
+   * two copies drift, and this codebase has already shipped one avatar fixed in
+   * one place and dead in the other.
+   */
+  const editionHeaderAt = useMemo(() => {
+    const at = new Map<string, SidebarEdition>();
+    for (const edition of editions) {
+      const first = byEdition.get(edition.id)?.[0];
+      if (first) at.set(first.id, edition);
+    }
+    return at;
+  }, [editions, byEdition]);
+
+  const ordered = useMemo(
+    () => [...editions.flatMap((e) => byEdition.get(e.id) ?? []), ...loose],
+    [editions, byEdition, loose],
+  );
+
+  /**
+   * "Loose pages" introduces the unfiled run — but only when an edition exists.
+   * With none, every page is loose and the label would be a heading over the
+   * whole list saying nothing the reader does not already know.
+   */
+  const looseHeaderAt = useMemo(
+    () =>
+      editions.some((e) => (byEdition.get(e.id) ?? []).length > 0) ? (loose[0]?.id ?? null) : null,
+    [editions, byEdition, loose],
+  );
+
   const headings = useMemo(() => {
     const now = new Date();
     const at = new Map<string, string>();
     let previous: string | undefined;
-    for (const c of filtered) {
+    // Derived from the LOOSE list: a date heading introduces loose pages, and
+    // emitting them across the whole set would print headings for pages that
+    // are filed under an edition and never shown here.
+    for (const c of loose) {
       const group = hydrated ? dayGroup(c.updated_at, now, false) : c.group;
       if (group && group !== previous) {
         at.set(c.id, group);
@@ -106,7 +172,7 @@ export function Sidebar({
       }
     }
     return at;
-  }, [filtered, hydrated]);
+  }, [loose, hydrated]);
 
   return (
     <>
@@ -215,14 +281,26 @@ export function Sidebar({
             </p>
           ) : (
             <ul className="space-y-0.5">
-              {filtered.map((c) => {
+              {ordered.map((c) => {
                 const active = params?.id === c.id;
                 const heading = headings.get(c.id);
+                const edition = editionHeaderAt.get(c.id);
+                const startsLoose = looseHeaderAt === c.id;
                 return (
                   /* The section rule is a SIBLING of the card, not a child of
                      it — nested inside, it sat within the card's border and
                      read as part of the first conversation. */
                   <Fragment key={c.id}>
+                    {edition ? (
+                      <li data-press="divider" data-edition="true" role="presentation">
+                        {edition.name}
+                      </li>
+                    ) : null}
+                    {startsLoose ? (
+                      <li data-press="divider" data-loose="true" role="presentation">
+                        Loose pages
+                      </li>
+                    ) : null}
                     {heading ? (
                       <li data-press="divider" role="presentation">
                         {heading}
@@ -298,6 +376,11 @@ export function Sidebar({
                             </span>
 
                             <span data-press="slip-actions">
+                              <EditionPicker
+                                conversationId={c.id}
+                                editionId={c.editionId}
+                                editions={editions}
+                              />
                               <button
                                 type="button"
                                 data-press="slip-action"

@@ -32,20 +32,40 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // The model name and message count are embedded rather than fetched per row:
   // PostgREST resolves both in the same round trip, where a count per
   // conversation from the client would be 200 requests to render a sidebar.
-  const { data } = await supabase
-    .from('conversations')
-    .select('id, title, pinned, updated_at, models(display_name, providers(name)), messages(count)')
-    .order('updated_at', { ascending: false })
-    .limit(200);
+  /*
+   * Issued together, not one after the other.
+   *
+   * The conversation list and the edition list are independent — neither reads
+   * the other's result — so awaiting them in sequence adds a whole round trip
+   * to every authenticated page render for no reason. `verify:routes` exists to
+   * catch exactly this and caught it here: adding the editions query as a third
+   * sequential await was a straight regression of the Tier 0 work that removed
+   * the chain in the first place.
+   */
+  const [{ data }, { data: editionRows }] = await Promise.all([
+    supabase
+      .from('conversations')
+      .select(
+        'id, title, pinned, updated_at, edition_id, models(display_name, providers(name)), messages(count)',
+      )
+      .order('updated_at', { ascending: false })
+      .limit(200),
+    supabase.from('editions').select('id, name').order('created_at', { ascending: true }),
+  ]);
 
   // No cast: the embed is typed from the foreign keys declared in
   // lib/db/types.ts, so a column that stops existing is a compile error rather
   // than an undefined at runtime.
+  // Ordered oldest-first so the sidebar's sections do not reshuffle every time
+  // one is renamed.
+  const editions = editionRows ?? [];
+
   const conversations: SidebarConversation[] = (data ?? []).map((c) => ({
     id: c.id,
     title: c.title,
     pinned: c.pinned,
     updated_at: c.updated_at,
+    editionId: c.edition_id,
     modelName: c.models?.display_name ?? null,
     pressSlot: pressSlots.get(c.models?.providers?.name ?? '') ?? null,
     messageCount: c.messages?.[0]?.count ?? 0,
@@ -78,6 +98,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex h-dvh overflow-hidden">
       <Sidebar
         conversations={conversations}
+        editions={editions}
         issue={{ since: user.createdAt, now: now.toISOString() }}
       />
 
