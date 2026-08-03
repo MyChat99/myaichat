@@ -18,6 +18,7 @@ import { AppError, fromProviderKind, toAppError } from '@/lib/errors/app-error';
 import { logRequest, newRequestId, outcomeFor } from '@/lib/observability/log';
 import { checkChatRateLimit } from '@/lib/security/rate-limit';
 import { checkDailyTokenBudget } from '@/lib/security/token-budget';
+import { CEILING_MESSAGE, checkMonthlySpendCeiling } from '@/lib/security/spend-ceiling';
 
 /**
  * Streaming chat endpoint — provider-agnostic.
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
    * were going to be refused anyway. Four cheap indexed reads is a good trade
    * for half a second on every accepted one.
    */
-  const [conversationResult, profileResult, rate, budget] = await Promise.all([
+  const [conversationResult, profileResult, rate, budget, ceiling] = await Promise.all([
     // Ownership runs through the user's own client, so RLS enforces it.
     supabase.from('conversations').select('id, title, model_id').eq('id', conversationId).single(),
     // Suspension is enforced by RLS too (migration 20260730120005), so a bypass
@@ -135,6 +136,10 @@ export async function POST(request: NextRequest) {
     // Spend ceiling, separate from the message counter: sixty messages an hour
     // of very large context is a bill a message count never sees.
     checkDailyTokenBudget(user.id),
+    // The deployment-wide ceiling. Issued with the others rather than after
+    // them: it is one more read, and a spend control that costs a round trip
+    // per message is a spend control someone will be tempted to remove.
+    checkMonthlySpendCeiling(),
   ]);
 
   const conversation = conversationResult.data;
@@ -165,6 +170,15 @@ export async function POST(request: NextRequest) {
       },
       { status: 429 },
     );
+  }
+
+  /**
+   * Evaluated last of the refusals, so a user who is over their own budget is
+   * told about their own budget rather than about the deployment's — the first
+   * is something they can act on.
+   */
+  if (!ceiling.allowed) {
+    return NextResponse.json({ error: CEILING_MESSAGE, retryable: false }, { status: 429 });
   }
 
   // Resolve which model to call. `resolveModel` returns null when the pinned

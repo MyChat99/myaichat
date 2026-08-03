@@ -6,6 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDashboardStats } from '@/lib/admin/dashboard';
 import { requireAdmin } from '@/lib/security/auth';
+import { checkMonthlySpendCeiling } from '@/lib/security/spend-ceiling';
+import { loadSignupPolicy } from '@/lib/security/signup-policy';
+import { formatUsd } from '@/lib/theme/money';
 
 export const metadata: Metadata = { title: 'Overview' };
 
@@ -48,7 +51,11 @@ function Stat({
 
 export default async function AdminOverviewPage() {
   await requireAdmin();
-  const stats = await getDashboardStats();
+  const [stats, ceiling, signupPolicy] = await Promise.all([
+    getDashboardStats(),
+    checkMonthlySpendCeiling(),
+    loadSignupPolicy(),
+  ]);
 
   const down = stats.providers.filter((p) => p.ok === false);
 
@@ -60,6 +67,62 @@ export default async function AdminOverviewPage() {
           Today is measured from 00:00 UTC, the same boundary the per-user token budget uses.
         </p>
       </header>
+
+      {/*
+        Spend against the ceiling, at the top, before anything else.
+        Every other number on this page is interesting; this one is the bill.
+      */}
+      <section className="border-border rounded-lg border p-4" data-press="panel">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-medium">Spend this month</h2>
+          <p className="text-muted-foreground text-xs">
+            {signupPolicy.mode === 'open'
+              ? 'Sign-ups are OPEN — anyone with the link can create an account'
+              : signupPolicy.mode === 'domain'
+                ? `Sign-ups limited to ${signupPolicy.allowedDomains.map((d) => `@${d}`).join(', ')}`
+                : 'Sign-ups are CLOSED'}
+          </p>
+        </div>
+
+        <p className="mt-2 text-2xl font-semibold tabular-nums">
+          {formatUsd(ceiling.spentUsd)}
+          <span className="text-muted-foreground ml-2 text-sm font-normal">
+            {ceiling.limitUsd === 0 ? 'of no ceiling' : `of ${formatUsd(ceiling.limitUsd)} ceiling`}
+          </span>
+        </p>
+
+        {ceiling.limitUsd > 0 ? (
+          <>
+            {/* A bar rather than a percentage: the thing worth seeing at a
+                glance is how much room is left, not a number to read. */}
+            <div
+              className="bg-muted mt-3 h-2 w-full overflow-hidden rounded-none"
+              role="img"
+              aria-label={`${Math.round((ceiling.spentUsd / ceiling.limitUsd) * 100)}% of the monthly ceiling used`}
+            >
+              <div
+                className={
+                  ceiling.spentUsd / ceiling.limitUsd >= 0.8
+                    ? 'bg-destructive h-full'
+                    : 'bg-primary h-full'
+                }
+                style={{
+                  width: `${Math.min(100, Math.round((ceiling.spentUsd / ceiling.limitUsd) * 100))}%`,
+                }}
+              />
+            </div>
+            <p className="text-muted-foreground mt-2 text-xs">
+              {ceiling.allowed
+                ? `${formatUsd(ceiling.remainingUsd ?? 0)} left. New messages are refused when this reaches zero.`
+                : 'Reached. New messages are being refused until the ceiling is raised or the month rolls over.'}
+            </p>
+          </>
+        ) : (
+          <p className="text-destructive mt-2 text-xs">
+            No ceiling is set, so spend is unbounded. Set one in Settings.
+          </p>
+        )}
+      </section>
 
       {down.length > 0 ? (
         <div className="border-destructive/40 bg-destructive/5 flex items-start gap-3 rounded-lg border p-3">

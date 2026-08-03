@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 
 import { createClient } from '@/lib/db/server';
 import { isDisposableEmail } from '@/lib/security/disposable-domains';
+import { checkSignupAllowed } from '@/lib/security/signup-policy';
 import { signUpPasswordSchema } from '@/lib/security/password';
 import { noteSignIn } from '@/lib/security/login-alert';
 import { checkThrottle, clientIp, recordAttempt } from '@/lib/security/throttle';
@@ -107,6 +108,20 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   if (isDisposableEmail(parsed.data.email)) {
     return { error: 'Please sign up with a permanent email address.' };
   }
+
+  /**
+   * The policy gate, checked BEFORE the password rules.
+   *
+   * The admin panel has carried an "Allow new signups" switch since Phase 4 and
+   * nothing read it: turning signups off left them on. Someone about to share
+   * this link publicly would reasonably have relied on that switch.
+   *
+   * Ordered before the password check so a person on a domain that will never
+   * be accepted is told that, rather than being asked to strengthen a password
+   * for an account they cannot have.
+   */
+  const policy = await checkSignupAllowed(parsed.data.email);
+  if (!policy.allowed) return { error: policy.reason };
 
   const strength = signUpPasswordSchema.safeParse({
     email: parsed.data.email,

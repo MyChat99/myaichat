@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/db/admin';
 import { listAvailableModels } from '@/lib/providers/registry';
 import { requireAdmin } from '@/lib/security/auth';
+import { DEFAULT_CEILING_USD } from '@/lib/security/spend-ceiling';
 
 import { SettingsForm } from './settings-form';
 
@@ -37,9 +38,16 @@ export default async function SettingsPage() {
           daily_token_budget_per_user: readSetting(rows, 'daily_token_budget_per_user', 0),
           session_idle_timeout_minutes: readSetting(rows, 'session_idle_timeout_minutes', 0),
           signups_enabled: readSetting(rows, 'signups_enabled', true),
+          signup_allowed_domains: readSetting(rows, 'signup_allowed_domains', ''),
+          monthly_spend_ceiling_usd: readSetting(
+            rows,
+            'monthly_spend_ceiling_usd',
+            DEFAULT_CEILING_USD,
+          ),
           default_model_id: readSetting<string | null>(rows, 'default_model_id', null),
         }}
         models={models.map((m) => ({ id: m.id, label: `${m.displayName} (${m.providerName})` }))}
+        defaultCeilingUsd={DEFAULT_CEILING_USD}
       />
     </div>
   );

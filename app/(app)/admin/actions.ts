@@ -361,6 +361,19 @@ const settingsInput = z.object({
   // 0 = disabled. Capped at a week — beyond that it is not an idle policy.
   session_idle_timeout_minutes: z.coerce.number().int().min(0).max(10_080),
   signups_enabled: z.boolean(),
+  /**
+   * Comma or space separated. Empty means any domain may sign up.
+   * Stored as a string and normalised on read, so an admin can paste a list
+   * without thinking about JSON.
+   */
+  signup_allowed_domains: z.string().max(2_000),
+  /**
+   * Dollars per calendar month across EVERY user. 0 turns the ceiling off,
+   * which is deliberately possible and deliberately explicit — unlike the other
+   * limits here, a missing value defaults to a real figure rather than to
+   * infinity, because these keys are funded by one person's card.
+   */
+  monthly_spend_ceiling_usd: z.coerce.number().min(0).max(100_000),
   default_model_id: z.string().uuid().nullable().optional(),
 });
 

@@ -92,6 +92,7 @@ const SUITES: Suite[] = [
   // ── mutating, last, in this order ──
   // security changes a system setting; admin breaks a provider key. Nothing
   // after them reads what they touch.
+  { script: 'verify:spend', needs: 'server' },
   { script: 'verify:security', needs: 'database', mutates: true },
   { script: 'verify:admin', needs: 'server', mutates: true },
 ];
