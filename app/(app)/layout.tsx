@@ -86,8 +86,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           data-press="masthead-bar"
           className="border-border flex items-center justify-between border-b py-3 pr-4 pl-14 md:pl-4"
         >
-          <Link href="/" className="font-semibold">
-            myaichat
+          <Link href="/" className="font-semibold" data-press="lockup">
+            <span data-press="mark" aria-hidden="true">
+              ¶
+            </span>
+            Pilcrow
           </Link>
 
           {/* Wraps rather than overflowing: at 360px the four links plus the

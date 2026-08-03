@@ -1,7 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="myaichat">
-  <rect width="512" height="512" rx="113" fill="#4f46e5" />
-  <path
-    fill="#ffffff"
-    d="M164 113h184a51 51 0 0 1 51 51v107a51 51 0 0 1-51 51H236l-82 87v-87h-9a51 51 0 0 1-51-51V164a51 51 0 0 1 51-51Z"
-  />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Pilcrow">
+  <!--
+    The mark is the pilcrow itself — the standalone logo, as distinct from the
+    wordmark, which stays the clean word "Pilcrow".
+
+    Square with no corner radius, because `--radius: 0` is the one structural
+    invariant of this design and a rounded app icon would be the only soft
+    corner the product owns.
+
+    Colours are literal here and cannot be otherwise: this file is served as a
+    static asset to browser chrome, outside the document, so no CSS custom
+    property is in scope. Ink on paper, at a contrast that survives both a light
+    and a dark tab strip.
+
+    Drawn as geometry rather than set as text: a <text> favicon depends on a
+    font the rendering context may not have and silently falls back to whatever
+    it does have — which, for a mark that IS one glyph, means the logo is wrong.
+  -->
+  <rect width="512" height="512" fill="#121212" />
+  <g fill="#f5f2e9">
+    <!-- The bowl: solid, as a pilcrow's is. -->
+    <circle cx="227" cy="190" r="70" />
+    <!-- Top bar, joining the two stems. -->
+    <rect x="227" y="120" width="128" height="48" />
+    <!-- The two descenders. -->
+    <rect x="227" y="120" width="48" height="272" />
+    <rect x="307" y="120" width="48" height="272" />
+  </g>
 </svg>

@@ -152,7 +152,7 @@ async function main() {
       await page.waitForLoadState('networkidle');
     };
 
-    await clickLink('myaichat');
+    await clickLink('Pilcrow');
     await record('chat-via-click');
 
     await clickLink('Admin');
@@ -160,7 +160,7 @@ async function main() {
 
     // Also the wordmark: outside the chat there are no section tabs, so `Page`
     // does not exist to click. See the note on navigation below.
-    await clickLink('myaichat');
+    await clickLink('Pilcrow');
     await record('back-to-chat');
 
     // A full reload should agree with everything above.
@@ -180,7 +180,7 @@ async function main() {
     console.log(`      while still on settings   ${describe(previewed)}`);
     await page.screenshot({ path: `${OUT}/7-unsaved-preview.png` });
 
-    await clickLink('myaichat');
+    await clickLink('Pilcrow');
     await page.waitForTimeout(500);
     const afterLeaving = await painted(page);
     console.log(`      after navigating away     ${describe(afterLeaving)}`);
@@ -197,9 +197,9 @@ async function main() {
     const timings: { to: string; ms: number }[] = [];
     for (const [name, label] of [
       ['Admin', 'admin'],
-      ['myaichat', 'chat'],
+      ['Pilcrow', 'chat'],
       ['Appearance', 'settings'],
-      ['myaichat', 'chat'],
+      ['Pilcrow', 'chat'],
     ] as const) {
       const started = Date.now();
       await clickLink(name);

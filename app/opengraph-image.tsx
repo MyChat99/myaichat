@@ -11,7 +11,7 @@ import { ImageResponse } from 'next/og';
  * CSS variables and custom fonts do not apply here unless explicitly loaded.
  */
 
-export const alt = 'myaichat — one chat interface, every model';
+export const alt = 'Pilcrow — one chat interface, every model';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -51,7 +51,7 @@ export default function OpengraphImage() {
             }}
           />
         </div>
-        <div style={{ fontSize: 64, fontWeight: 700, letterSpacing: -1.5 }}>myaichat</div>
+        <div style={{ fontSize: 64, fontWeight: 700, letterSpacing: -1.5 }}>Pilcrow</div>
       </div>
 
       <div style={{ marginTop: 48, fontSize: 44, lineHeight: 1.25, maxWidth: 900 }}>

@@ -130,6 +130,81 @@ aside {
   white-space: nowrap;
 }
 
+/* ── the lockup ──────────────────────────────────────────────────────────────
+   The mark and the wordmark are two different things and the distinction is
+   the whole identity: ¶ is the MARK — it stands alone on the favicon and
+   wherever a logo sits — and "Pilcrow" is the WORDMARK, which stays the clean
+   word. The P is never replaced by the glyph; that would make the mark and the
+   word the same object and leave the product with no standalone symbol.
+
+   Set tight (0.28em) so the pair reads as one unit rather than as a bullet in
+   front of a heading. The glyph is `aria-hidden` at every call site — spoken,
+   it is the name said twice. */
+[data-press='lockup'] {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28em;
+  min-width: 0;
+  text-decoration: none;
+}
+/* In the app header the lockup is body-sized; in the press masthead it takes
+   the wordmark's size. Declared on the lockup so the mark always tracks the
+   word beside it rather than being set twice. */
+[data-press='masthead'] [data-press='mark'] {
+  font-size: 24px;
+}
+[data-press='mark'] {
+  font-family: var(--press-mono);
+  font-weight: 700;
+  line-height: 1;
+  /*
+   * `--display`, for the same reason as the rail mark — and worth stating that
+   * NO test caught this one. It is `aria-hidden`, so the contrast checker skips
+   * it as decorative, and it would have shipped as a near-invisible yellow
+   * glyph in Riso while every suite stayed green.
+   */
+  color: var(--display, var(--foreground));
+  /* Optical, not metric: the pilcrow's bowl sits high in the em box, so
+     matching the wordmark's cap height means nudging it down a hair. */
+  transform: translateY(0.04em);
+}
+
+/* The mark standing alone in the chat rail, where there is no wordmark. Sized
+   to the folio beside it and set in the second ink, so it reads as the logo
+   rather than as punctuation that wandered into the navigation. */
+[data-press='rail-mark'] {
+  font-family: var(--press-mono);
+  font-weight: 700;
+  /*
+   * 19px, and bold, so this is LARGE TEXT under WCAG 1.4.3 (>=18.66px at
+   * weight 700) and answers to 3:1 rather than 4.5:1 — which is the bar
+   * `--display` is held to.
+   *
+   * At 17px it needed 4.5:1 and measured 1.08:1 in Riso. That was my mistake
+   * and the design system had already named it: `--accent-alt` is the second
+   * ink as a FILL, `--display` is the second ink as TYPE, and the comment on
+   * the token says in as many words that "a colour that works as a filled chip
+   * is often unusable as text on the paper — Riso's yellow pill is the obvious
+   * case". I used the fill role for a glyph.
+   */
+  font-size: 19px;
+  line-height: 1;
+  color: var(--display, var(--foreground));
+  text-decoration: none;
+  flex-shrink: 0;
+  /* 24px minimum: it is a link, and WCAG 2.5.8 does not care that it is small.
+     The same oversight shipped a 22x22 portrait button to production. */
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+[data-press='rail-mark']:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
 /* The registration moment: a second plate that slides into alignment, the way
    a two-colour print does when the paper is fed slightly off. It runs once, on
    load, and is the only animation this theme adds. */

@@ -1,4 +1,4 @@
-# myaichat
+# Pilcrow
 
 A production-grade, multi-provider AI chat platform. Bring your own OpenAI and
 Anthropic keys, and get streaming chat, an admin panel to manage providers and

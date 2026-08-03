@@ -29,22 +29,22 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://myaichat-production.
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: 'myaichat',
+    default: 'Pilcrow',
     // Page-level titles fill the slot; the suffix is not repeated by hand.
-    template: '%s · myaichat',
+    template: 'Pilcrow — %s',
   },
   description: 'One chat interface for every model — streaming chat across providers.',
-  applicationName: 'myaichat',
+  applicationName: 'Pilcrow',
   openGraph: {
     type: 'website',
-    siteName: 'myaichat',
-    title: 'myaichat',
+    siteName: 'Pilcrow',
+    title: 'Pilcrow',
     description: 'One chat interface for every model — streaming chat across providers.',
     url: APP_URL,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'myaichat',
+    title: 'Pilcrow',
     description: 'One chat interface for every model — streaming chat across providers.',
   },
   // A private chat app has nothing to gain from being indexed, and conversation
