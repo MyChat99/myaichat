@@ -1103,7 +1103,9 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
   justify-items: center;
   gap: 6px;
   position: relative;
-  padding: 10px 6px 8px;
+  /* Extra headroom at the top so the selected tick has somewhere to sit that
+     is not the keyline. */
+  padding: 14px 6px 8px;
   background: var(--background);
   border: var(--hairline) solid var(--border);
   box-shadow: 2px 2px 0 var(--border);
@@ -1141,12 +1143,19 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
 [data-press='mark-option'][data-active='true'] [data-press='mark-name'] {
   color: var(--foreground);
 }
+/* Set INSIDE the frame rather than on it.
+   At 3px from a 2px keyline the tick read as if it had been dropped on the
+   tile edge rather than printed on the tile. Inset to clear the rule, and
+   backed with paper so it never sits on top of the mark's own ink. */
 [data-press='mark-check'] {
   position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 12px;
-  height: 12px;
+  top: 4px;
+  right: 4px;
+  width: 11px;
+  height: 11px;
+  padding: 1px;
+  box-sizing: content-box;
+  background: var(--background);
   color: var(--primary);
 }
 /* The enlarged mark sits in the same plate an enlarged photo does. */
