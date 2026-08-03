@@ -607,3 +607,114 @@ It asserts stored state now, which is this project's own rule.
 **Folders** (#3 on the shortlist) and **avatars**. Both are a migration or a
 crop-and-resize away from being half-done, and the instruction was FINISH >
 BREADTH. Two complete features beat two complete features and a broken third.
+
+---
+
+# Session — 2026-08-03, performance and five device-testing fixes
+
+Started from `main` @ `c936d2a`. PRs #75, #76, #77.
+
+## § WHAT YOU CAN NOW DO
+
+### 1. Notice the app answering faster — 20 seconds
+
+1. Open the live site and click between **Page**, **Presses** and **Appearance**.
+2. **Expect** the switch to feel immediate rather than delayed. Measured on the
+   deployment, before and after:
+
+| | before | after |
+| --- | --- | --- |
+| chat page, time to first byte | 1160ms | **695ms** |
+| chat page, first paint | 1308ms | **848ms** |
+| navigating back to chat | 1332ms | **829ms** |
+
+### 2. See a top bar that lines up — 15 seconds
+
+1. Look along the very top of the page at 1440px.
+2. **Expect** "myaichat" to sit on the same line as *Page · Presses · Profile ·
+   Appearance*. It was 6px low, because the masthead band was 83px tall and the
+   rule beside it was 55px. → `docs/screenshots/topbar/after/band-1440.png`
+3. **Expect** no `.md` / `.json` and no grey person icon. In their place, one
+   **EXPORT** control — click it. → `topbar/after/export-open.png`
+
+### 3. Find the pin and delete on a conversation — 20 seconds
+
+1. Hover any conversation card in the sidebar.
+2. **Expect** two bordered buttons at the end of the *"Claude Opus 5 · 4 notes"*
+   line — not on top of the title, and clearly visible rather than blending into
+   the card. On a phone they are always visible.
+   → `docs/screenshots/slip/riso-dark.png`
+
+### 4. Click a model in the cost comparison and have it actually work — 30 seconds
+
+1. Under the **most recent** answer, click **Elsewhere**.
+2. Hover a row: **expect** it to highlight and offer **Re-run**.
+3. Click one. **Expect** a confirmation naming the model and the price, then the
+   same question answered by that model.
+4. Open **Elsewhere** under an *older* answer. **Expect** plain rows with
+   nothing to press — re-running there would discard every turn after it.
+   → `docs/screenshots/elsewhere/actionable.png`
+
+## § WHAT I NEED FROM YOU
+
+1. **Re-test the feel on your phone and iPad.** The numbers halved, but the
+   fixes were measured with a headless browser on a wired connection. Whether it
+   now *feels* right is the part I cannot measure.
+2. **Email delivery** — still the one Phase 6 item I cannot close (ISSUE-017).
+3. **The 75 demo rows** — still counted, still not deleted.
+
+## § EVERYTHING ELSE
+
+### What the performance investigation actually found
+
+**Almost none of the suspects were guilty.** Measured on a production build at
+4× CPU throttle, median of five:
+
+- **Total blocking time: 0ms** on every route but one. No long tasks.
+- **A streamed answer produces zero long tasks.** The motion pass is not
+  implicated and nothing was removed.
+- The sidebar rendering 60 conversations without windowing costs nothing
+  measurable.
+
+**The app was never choppy. It was waiting.** Every route is server-rendered and
+was issuing its database reads one after another — `/` had seven sequential
+`await`s, four of them inline in the JSX. Timed in isolation: **442ms sequential
+against a 104ms parallel floor.**
+
+Two changes, both of which only remove waiting: issue the independent loads
+together, and stop reading the model table twice (`loadPricedModels` was a second
+read of rows `listAvailableModels` had already returned — which also removed a
+real bug, since two independently-filtered lists of "models you could have used"
+can disagree).
+
+**The honest part.** On localhost the change was *within noise* — one "before"
+sample came out faster than the "after". It shipped on the reasoning that it can
+only remove serialisation and that the deployment pays a much higher
+per-round-trip cost. Re-measured on the deployment afterwards, that held: −40%
+TTFB on the chat page, −38% on navigation. **But `admin` also improved by 553ms
+and I changed nothing on that page**, so part of the gain is instance warmth and
+I cannot honestly attribute all of it to the change. The routes I edited moved
+most, and by the predicted magnitude.
+
+`measure:perf` is committed. It reports a median of five after a discarded
+warm-up, because one sample per route swamped a real effect and reported an
+unchanged route as slower. It also reports React commit counts as *"not
+measurable in a production build"* rather than as zero, because the devtools hook
+it needs is not present there.
+
+### Measurements behind the five UI fixes
+
+- masthead 83px vs rule 55px; wordmark centre 32 vs tabs 26 → now 55/55 and
+  27/27
+- 79px of room beside the wordmark; "No. 4" needs 36px, "3 AUGUST" needs 58px —
+  hence the date went, not the number
+- slip controls: no overlap in any of the 14 palette-and-mode combinations,
+  every target 26px, worst trash-icon contrast **8.64:1** (previously
+  `--muted-foreground` against the card's own fill)
+
+### One check that was wrong before it was right
+
+The new "older rows are inert" assertion was first written as an `if` around a
+toggle count, and ran against a conversation with no priced answers — so it
+skipped in silence and reported a pass. The guard is now itself a check that
+fails when the fixture cannot support the test.
