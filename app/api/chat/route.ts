@@ -516,6 +516,39 @@ export async function POST(request: NextRequest) {
       let inputTokens = 0;
       let outputTokens = 0;
 
+      /**
+       * Suspension is re-checked DURING the answer, not only at the door.
+       *
+       * The gate above runs once, when the request arrives. A stream already
+       * in flight when an administrator suspends the account used to run to
+       * completion and bill for it — measured at 286 chunks and 32kB after
+       * revocation, with a usage row written. For the one mechanism that
+       * revokes access, "you are cut off, once this finishes" is not
+       * revocation.
+       *
+       * Polled on an interval rather than per chunk: a database round trip
+       * per token would cost more than the answer. Four seconds is far
+       * shorter than any answer worth aborting and far longer than the
+       * cadence at which chunks arrive.
+       *
+       * `after()` is not usable here — this has to affect the response while
+       * it is still open, which is the whole point.
+       */
+      let suspendedMidStream = false;
+      const revocationWatch = setInterval(() => {
+        void admin
+          .from('profiles')
+          .select('suspended')
+          .eq('id', user.id)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (data?.suspended) {
+              suspendedMidStream = true;
+              abort.abort();
+            }
+          });
+      }, 4000);
+
       try {
         /**
          * Retried only until the first token.
@@ -529,6 +562,7 @@ export async function POST(request: NextRequest) {
          * The abort signal is honoured throughout: a user pressing Stop must
          * not be answered with a retry.
          */
+
         await withRetry(
           async () => {
             for await (const event of adapter.streamChat({
@@ -610,6 +644,11 @@ export async function POST(request: NextRequest) {
             retryable: failure.retryable,
           }),
         );
+      } finally {
+        // `finally`, not a line after the catch: an enqueue to a client that
+        // has already gone away throws, and a leaked interval would poll the
+        // database for the life of the process.
+        clearInterval(revocationWatch);
       }
 
       // One line per completed turn. The success path logged nothing at all
@@ -629,9 +668,28 @@ export async function POST(request: NextRequest) {
         outputTokens,
       });
 
+      /**
+       * Nothing is persisted or billed for an answer cut off by revocation.
+       *
+       * A partial IS kept when the READER presses Stop — they asked for it and
+       * it is their work. A partial produced after their access was revoked is
+       * neither, and writing a usage row for it would bill the owner for tokens
+       * spent past the moment they said stop.
+       */
+      if (suspendedMidStream) {
+        controller.enqueue(
+          ndjson({
+            type: 'error',
+            kind: 'auth',
+            message: 'Your account is suspended. Contact an administrator.',
+            retryable: false,
+          }),
+        );
+      }
+
       // Persist whatever was produced, including a partial from a stopped
       // stream — losing the user's partial answer would be worse than keeping it.
-      if (assistantText.length > 0) {
+      if (!suspendedMidStream && assistantText.length > 0) {
         const { data: saved } = await admin
           .from('messages')
           .insert({

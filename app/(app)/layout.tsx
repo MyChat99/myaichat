@@ -168,18 +168,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </nav>
         </header>
 
-        {user.suspended ? (
-          <p
-            role="alert"
-            className="border-destructive/40 bg-destructive/10 text-destructive border-b px-4 py-2 text-sm"
-          >
-            {/* Says what is true, and what to do about it. Without the second
-                sentence the banner is a dead end: a suspended user can see
-                that they are blocked and has no idea who lifted the rope. */}
-            Your account is suspended. You can read your history but cannot send new messages.
-            Contact an administrator to have it restored.
-          </p>
-        ) : null}
+        {/*
+          The suspended banner is gone, and it is gone because it is now
+          unreachable rather than because it was wrong.
+
+          It said "you can read your history but cannot send new messages",
+          which was true when suspension was a read-only state. `requireUser`
+          now bounces a suspended session to /login, so this shell never renders
+          for one — leaving the markup would be dead code that reads like a
+          supported state and would send the next person looking for a bug that
+          cannot happen. The message it carried moved to the login form, which
+          is where a revoked reader now lands.
+        */}
 
         <main className="flex min-h-0 flex-1 flex-col">{children}</main>
       </div>

@@ -123,8 +123,21 @@ async function main() {
   const anon = createClient<Database>(url, PUBLISHABLE_KEY(), {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const { data: signIn } = await anon.auth.signInWithPassword({ email, password: PASSWORD });
-  const cookieValue = `base64-${Buffer.from(JSON.stringify(signIn!.session)).toString('base64')}`;
+  /**
+   * Re-establishable, not fixed for the whole run.
+   *
+   * The suspension section deliberately drives a path that SIGNS THE USER OUT,
+   * and `signOut()` revokes the refresh token on the server — so a cookie
+   * captured once at the top is dead for every section after it. Every later
+   * block then landed on /login and timed out looking for a composer, which
+   * reads like four broken features rather than one spent session.
+   */
+  let cookieValue = '';
+  const openSession = async () => {
+    const { data } = await anon.auth.signInWithPassword({ email, password: PASSWORD });
+    cookieValue = `base64-${Buffer.from(JSON.stringify(data!.session)).toString('base64')}`;
+  };
+  await openSession();
 
   const budgetBefore = await readSetting('daily_token_budget_per_user');
   const rateBefore = await readSetting('rate_limit_messages_per_hour');
@@ -324,35 +337,65 @@ async function main() {
       };
       const before = await messageCount();
 
-      const { context, page } = await newPage(true);
-      await page.goto(`${BASE_URL}/`, { waitUntil: 'networkidle' });
-      await page.fill('textarea', 'Say hello');
-      await page.click('[data-press="quill"]');
-
-      const messages = await waitForMessage(page);
-      await page.screenshot({ path: `${OUT}/suspended.png` });
-
-      check('a suspended user is told so', messages.length > 0, 'the page said nothing');
-
       /**
-       * The banner is on screen from page load, so seeing it proves nothing
-       * about the send being refused. What proves it: no message was stored.
+       * Suspension REVOKES; it no longer means read-only.
+       *
+       * This section used to load `/`, read a banner saying "you can read your
+       * history but cannot send new messages", and assert the send was refused.
+       * That was the honest test of the old design. The owner's decision changed
+       * the design: a suspended session is ended on its next request, so there
+       * is no page to read a banner on and the assertions had to change with it.
+       *
+       * What is asserted now is stronger — that the session is over, not merely
+       * that one endpoint refuses.
        */
-      const after = await messageCount();
+      const { context, page } = await newPage(true);
+
+      const landed = await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' });
       check(
-        'and the send is actually refused, not merely discouraged',
-        after === before,
-        `${after - before} message(s) stored while suspended`,
+        'a suspended session is bounced off the app entirely',
+        new URL(page.url()).pathname === '/login',
+        `landed on ${new URL(page.url()).pathname} (${landed?.status()})`,
+      );
+
+      const notice = String(await page.evaluate('document.body.innerText'));
+      check(
+        'and is told it was suspended, not merely shown a login form',
+        /suspended/i.test(notice),
+        notice.replace(/\s+/g, ' ').slice(0, 120),
       );
       check(
         'and is told who to ask, rather than just being refused',
-        messages.some((m) => /administrator|admin|contact/i.test(m)),
-        messages.join(' | ').slice(0, 140),
+        /administrator|admin|contact/i.test(notice),
+        notice.replace(/\s+/g, ' ').slice(0, 140),
       );
-      check('and it leaks nothing', messages.every(clean), messages.join(' | ').slice(0, 120));
+
+      /**
+       * The session is really gone, not just redirected away from. Proven by
+       * asking for a protected page again: a cleared cookie lands on /login,
+       * a merely-blocked one would still be carrying a valid token.
+       */
+      await page.goto(`${BASE_URL}/settings`, { waitUntil: 'domcontentloaded' });
+      check(
+        'and the session itself is cleared, not merely refused',
+        new URL(page.url()).pathname === '/login',
+        `/settings landed on ${new URL(page.url()).pathname}`,
+      );
+
+      await page.screenshot({ path: `${OUT}/suspended.png` });
+
+      const after = await messageCount();
+      check(
+        'and nothing was stored while suspended',
+        after === before,
+        `${after - before} message(s) stored while suspended`,
+      );
 
       await context.close();
       await admin.from('profiles').update({ suspended: false }).eq('id', userId);
+      // The walk above signed this user out for real. Later sections need a
+      // live session, so take a new one now that the suspension is lifted.
+      await openSession();
     }
 
     console.log('\nA model that no longer exists\n');

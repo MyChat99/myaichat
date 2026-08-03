@@ -63,10 +63,34 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
   };
 });
 
-/** Server-side gate for authenticated pages. Redirects to /login if signed out. */
+/**
+ * Server-side gate for authenticated pages.
+ *
+ * Redirects to /login if signed out — and if SUSPENDED, which is the same
+ * outcome for a different reason and has to be said out loud because it did not
+ * used to be true. Suspension was a read-only state: the flag was loaded here
+ * and never enforced, so a suspended account kept every page. `/settings`
+ * returned 200 for a suspended user, and because `requireAdmin` delegates here,
+ * a suspended ADMIN kept the admin panel.
+ *
+ * Suspension now means revoked. Every authenticated page is unreachable, the
+ * reader is told why on the login form, and un-suspending restores access with
+ * no further action.
+ *
+ * Sent to `/auth/suspended` rather than straight to `/login`, because a render
+ * cannot write cookies and this session has to actually END. That route signs
+ * them out and then forwards to the notice.
+ *
+ * Redirecting here directly to `/login?suspended=1` looked right and was not:
+ * the proxy bounces any signed-in visitor off /login back to `/`, `/` bounces
+ * back to /login, and the browser stops with ERR_TOO_MANY_REDIRECTS. Every hop
+ * was individually correct, which is why reading them one at a time did not
+ * find it — `verify:failures` did, by driving the path in a browser.
+ */
 export async function requireUser(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) redirect('/login');
+  if (user.suspended) redirect('/auth/suspended');
   return user;
 }
 
