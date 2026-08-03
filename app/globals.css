@@ -266,6 +266,15 @@ html[data-bubble='flat'] [data-message='user'] {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    /* Delays too, and this is the one that actually bites.
+       A collapsed DURATION with `both` fill still lands on the end frame, so it
+       is harmless. A surviving DELAY holds the element at its STARTING frame
+       for the whole delay — which is how the masthead flashed in from
+       `opacity: 0` for 250ms at a duration of 0.01ms. That was patched with a
+       rule naming the masthead; every future animation with a delay would have
+       had the same bug and no such rule. */
+    animation-delay: 0.01ms !important;
+    transition-delay: 0.01ms !important;
     scroll-behavior: auto !important;
   }
 }
