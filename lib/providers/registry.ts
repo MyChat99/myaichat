@@ -8,6 +8,7 @@ import { GROQ_PROVIDER_NAME, createGroqProvider } from './groq';
 import { OPENAI_PROVIDER_NAME, createOpenAIProvider } from './openai';
 import { PERPLEXITY_PROVIDER_NAME, createPerplexityProvider } from './perplexity';
 import { ProviderError, type ChatProvider } from './types';
+import type { PricedModel } from '@/lib/theme/compare-cost';
 
 /**
  * Maps `providers.name` rows to adapter factories.
@@ -201,4 +202,28 @@ export async function resolveModel(modelDbId: string): Promise<ResolvedModel | n
 export async function defaultModel(): Promise<ResolvedModel | null> {
   const models = await listAvailableModels();
   return models[0] ?? null;
+}
+
+/**
+ * The models a user could have picked, shaped for the cost comparison.
+ *
+ * Derived from `listAvailableModels()` rather than read from the database
+ * again: it was a second query against the same table on every page render, and
+ * two independently-filtered lists of "models you could have used" can disagree
+ * — the comparison would then price a model the picker never offered.
+ *
+ * Prices come straight through. `models.input_cost_per_1k` is
+ * `not null default 0`, so a model nobody priced arrives as 0 rather than null,
+ * and `compareCost` is what decides that both-zero means "no price set".
+ */
+export function toPricedModels(models: ResolvedModel[]): PricedModel[] {
+  return models
+    .map((m) => ({
+      id: m.id,
+      displayName: m.displayName,
+      providerName: m.providerName,
+      inputCostPer1k: m.inputCostPer1k,
+      outputCostPer1k: m.outputCostPer1k,
+    }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
