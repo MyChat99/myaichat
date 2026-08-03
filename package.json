@@ -13,6 +13,7 @@
     "db:push": "supabase db push",
     "db:link": "supabase link --project-ref uorgodndubyznjzotzje",
     "seed": "tsx scripts/seed.ts",
+    "accounts:create": "tsx scripts/create-accounts.ts",
     "verify:rls": "tsx scripts/verify-rls.ts",
     "verify:all": "tsx scripts/verify-all.ts",
     "verify:schema": "tsx scripts/verify-schema.ts",

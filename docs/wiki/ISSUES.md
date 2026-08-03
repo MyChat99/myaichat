@@ -16,6 +16,50 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-063 — Supabase Auth returns 500 on sign-up in production
+
+**Status:** Open — **needs the Supabase dashboard, which this project does not touch** | **Severity:** High | **Opened:** 2026-08-03
+**Problem:** self-service registration is broken in production, independently of this application. Reproduced with the raw `supabase-js` anon client, no app code involved:
+
+```
+AuthRetryableFetchError  status 500  message "{}"
+user created: no
+```
+
+**Where it is NOT.** The sign-up policy works: with `signups_enabled` false the server refuses first with *"New accounts are closed on this deployment. Ask an administrator for access."* This 500 happens after that gate, inside Supabase's auth service.
+**Most likely cause,** consistent with [ISSUE-060](#issue-060): Supabase cannot send the confirmation email, so the sign-up transaction fails. Supabase auth mail goes through the project's own SMTP settings, not through the app's Resend client, so setting `RESEND_API_KEY` in Railway does not affect it.
+**Consequence for the break-test:** the "flip on, registration succeeds" half cannot be demonstrated through the UI until this is fixed. The "flip off, rejected server-side" half is proven against production.
+**Second, smaller defect this exposed:** our sign-up action passes `error.message` straight through, so the user is shown the literal string `{}`. Whatever the upstream failure, that is not a message anyone can act on.
+**To close (needs the owner):** Supabase dashboard → Authentication → Emails/SMTP. Either configure SMTP that works, or disable "Confirm email" so sign-up completes without one. Then re-run the break-test.
+
+### ISSUE-060 — Email is configured in production but delivery is unproven
+
+**Status:** Open | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-08-03
+**Correcting my own audit.** I reported that a missing `RESEND_API_KEY` would silently fall back to the console transport. The owner confirms **`RESEND_API_KEY` is set in Railway**, so that is not what is happening: `isEmailConfigured()` returns true and the Resend transport is live. The likely blocker is an **unverified sending domain** — `onboarding@resend.dev` only delivers to the address that owns the Resend account, so mail to any other recipient is accepted by the API and never arrives.
+**Why that is the worse failure mode:** the console fallback is loud in a log. This one succeeds at every layer we can see — the API returns a message id — and fails silently at the recipient. Nothing in this app can tell the difference.
+**To close:** verify a sending domain in Resend, set `RESEND_FROM_EMAIL` to an address on it, and confirm a real signup mail arrives at an address that does not own the Resend account. Related: [ISSUE-017](#issue-017).
+
+### ISSUE-059 — The whole verification suite runs against `next dev`
+
+**Status:** Open | **Severity:** **High** | **Tier:** roadmap | **Opened:** 2026-08-03
+**Problem:** every browser suite — `verify:pages`, `verify:costs`, `verify:failures`, `verify:motion`, `verify:documents:e2e` — points at `npm run dev`. A whole class of defect exists only in a production build and is therefore invisible to all of them.
+**Proven by a real outage, not by argument.** A Server Component calling a function exported from a `'use client'` module ([ISSUE-061](#issue-061)) returned 500 in production while `tsc`, `next build`, `next dev` and 34 green suites all passed simultaneously. In dev the real function is still there; in a production build it is a client reference and calling it throws.
+**What it would take:** a `verify:prod` mode that runs `next build`, starts `next start` on a spare port, and re-runs the browser suites against it. Most of the machinery exists — every suite already accepts `--base`/`BASE_URL`. The work is a build step in the runner (~2–4 minutes per run), deciding which suites are worth the wall-clock, and a fixture that has an avatar so the path that broke is actually exercised. **Estimate: 3–4 hours.**
+**Interim cover:** `verify:boundaries` catches this specific class statically, in milliseconds. It does not cover the class of "only breaks in a production build" generally.
+
+### ISSUE-061 — Production 500: a Server Component called a client function
+
+**Status:** Resolved 2026-08-03 | **Severity:** **Critical** | **Opened:** 2026-08-03 | **Resolved:** 2026-08-03
+**Problem:** `/` returned 500 for any signed-in account with an avatar. Digest `414204945`: *Attempted to call attachmentUrl() from the server but attachmentUrl is on the client.* `attachmentUrl` lived in `lib/upload/client.ts` (`'use client'`); `AvatarMark` has no directive and is rendered by the app shell on every authenticated page.
+**Why nothing caught it:** four layers passed at once — `tsc` (types are real, only the runtime value is a proxy), `next build` (a render-time failure), `next dev` (keeps the real function), and the suite ([ISSUE-059](#issue-059)). The call is guarded by `avatarKey ?`, so it fired only for accounts with an uploaded portrait, and every test account this repo creates has none.
+**Resolution:** moved to `lib/upload/urls.ts`, a module with no directive. `verify:boundaries` guards the class and was break-tested against the original defect. An audit of 93 server/shared modules against 32 client modules found no other instance. Deployed and confirmed: `/` 200 signed in with an avatar, `/login` 200 signed out.
+
+### ISSUE-062 — The provider env-key fallback is dormant here, not absent
+
+**Status:** Open — accepted risk | **Severity:** Low | **Opened:** 2026-08-03
+**Correcting my own audit.** I listed the `*_API_KEY` env fallback in `getProviderKey()` as a live silent-fallback risk in production. The owner confirms **no `ANTHROPIC_/OPENAI_/GROQ_/PERPLEXITY_API_KEY` variables are set in Railway at all**, so there is no second spend source on this deployment and admin-panel keys are already the only one.
+**The code path still exists**, and is the supported way a fresh checkout works before anyone opens the admin panel. The risk it describes — deleting a key in the admin panel while an env var quietly keeps that provider alive — is real for any deployment that does set them. Left as-is and documented rather than removed.
+
 ### ISSUE-058 — Free-tier sustainability across four services
 **Status:** Open | **Severity:** Medium | **Tier:** cross-cutting | **Opened:** 2026-08-03
 **Problem:** Railway, Supabase, R2 and Resend all have limits this app can reach, and provider API spend is not a free tier at all. No document states current usage against each limit, what happens as one is approached, or what to do having outgrown it.

@@ -5,12 +5,8 @@
 # opens the site for a week, so nothing ever pings, and the Supabase project
 # pauses. This workflow is the layer that runs when nobody is looking.
 #
-# ── NOT ENABLED. This is deliberate. ────────────────────────────────────────
-# The `schedule:` block below is commented out, so today this only runs when
-# someone presses "Run workflow" in the Actions tab. Turning it on consumes the
-# repository owner's GitHub Actions allowance on a recurring basis, which is
-# their infrastructure and their decision — uncommenting the four lines is the
-# whole change.
+# ── ENABLED, daily, at the owner's instruction (2026-08-03). ───────────────
+# It runs on a schedule and can still be triggered by hand from the Actions tab.
 #
 # Why GitHub Actions rather than the alternatives:
 #   Railway cron       needs the Railway dashboard, which this project does not touch
@@ -20,17 +16,18 @@
 # repositories, the schedule lives in a reviewed file rather than in somebody's
 # console, and it fails loudly and visibly in a tab that is already watched.
 #
-# Every 3 days is well inside the ~7-day pause window, so two consecutive
-# failures still leave a day of margin.
+# Daily, against a ~7-day pause window: six consecutive silent failures would
+# still leave a day of margin, and a failure is a red run in a tab already
+# being watched rather than a silence nobody notices.
 
 name: Keep-alive
 
 on:
   workflow_dispatch:
-  # schedule:
-  #   # 06:17 UTC every third day. Off the hour on purpose: scheduled jobs at
-  #   # :00 queue behind everybody else's.
-  #   - cron: '17 6 */3 * *'
+  schedule:
+    # 06:17 UTC daily. Off the hour on purpose: jobs scheduled at :00 queue
+    # behind everybody else's and can drift by many minutes.
+    - cron: '17 6 * * *'
 
 jobs:
   ping:
