@@ -99,6 +99,20 @@ export interface Database {
           },
         ];
       };
+      editions: {
+        Row: Timestamps & {
+          id: string;
+          user_id: string;
+          name: string;
+        };
+        Insert: Partial<Timestamps> & {
+          id?: string;
+          user_id: string;
+          name: string;
+        };
+        Update: Partial<Database['public']['Tables']['editions']['Row']>;
+        Relationships: [];
+      };
       conversations: {
         Row: Timestamps & {
           id: string;
@@ -106,6 +120,8 @@ export interface Database {
           title: string;
           model_id: string | null;
           pinned: boolean;
+          /** At most one edition. Nulled — never cascaded — when it is deleted. */
+          edition_id: string | null;
         };
         Insert: Partial<Timestamps> & {
           id?: string;
@@ -113,6 +129,7 @@ export interface Database {
           title?: string;
           model_id?: string | null;
           pinned?: boolean;
+          edition_id?: string | null;
         };
         Update: Partial<Database['public']['Tables']['conversations']['Row']>;
         /**

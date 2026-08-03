@@ -69,6 +69,7 @@ export default async function ProfilePage() {
         <ProfileForm
           initialDisplayName={profile?.display_name ?? ''}
           initialAvatarKey={profile?.avatar_url ?? null}
+          userId={user.id}
           storageEnabled={isStorageConfigured()}
         />
       </div>

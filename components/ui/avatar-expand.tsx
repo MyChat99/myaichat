@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { AvatarMark } from '@/components/ui/avatar-mark';
-import { attachmentUrl } from '@/lib/upload/urls';
+import { PressMark } from '@/components/ui/press-mark';
+import { avatarSource } from '@/lib/upload/urls';
 
 /**
  * The reader's portrait, at a size you can actually see.
@@ -21,19 +22,24 @@ import { attachmentUrl } from '@/lib/upload/urls';
  * a CLIENT module importing it is the safe direction, and `verify:boundaries`
  * pins that file so the unsafe direction cannot come back.
  *
- * ## Inert without a portrait, deliberately
+ * ## There is no longer an inert case
  *
- * With no avatar there is nothing to enlarge — the placeholder glyph at 4× is
- * not a feature. It renders the plain mark, with no button, no focus stop and
- * nothing announced, rather than offering an action that does nothing.
+ * This used to render nothing interactive when there was no avatar, because a
+ * placeholder person-glyph at 4× is not a feature. Preset marks changed that:
+ * "no stored value" now means "the mark seeded from your id", which is a real
+ * portrait and enlarges like one. Both kinds go through `avatarSource()`, so
+ * the trigger, the focus handling and the dismissal are identical either way.
  */
 export function AvatarExpand({
   avatarKey,
   label,
+  seed,
   size = 22,
 }: {
   avatarKey: string | null;
   label: string;
+  /** The user id, so an unchosen portrait is still distinct per person. */
+  seed?: string;
   size?: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -82,7 +88,14 @@ export function AvatarExpand({
     if (open) dialogRef.current?.focus();
   }, [open]);
 
-  if (!avatarKey) return <AvatarMark avatarKey={null} label={label} size={size} />;
+  /*
+   * Every reader has a portrait now — an uploaded photo or a generated mark —
+   * so there is no longer an inert case. This used to return early when
+   * `avatarKey` was null, which was right when "null" meant a placeholder glyph
+   * and wrong the moment null started meaning "the mark seeded from your id".
+   * A mark IS the portrait, and it enlarges like one.
+   */
+  const source = avatarSource(avatarKey, seed ?? label);
 
   return (
     <>
@@ -96,7 +109,7 @@ export function AvatarExpand({
         data-press="portrait-trigger"
         className="inline-flex shrink-0 align-middle"
       >
-        <AvatarMark avatarKey={avatarKey} label={label} size={size} />
+        <AvatarMark avatarKey={avatarKey} label={label} seed={seed} size={size} />
       </button>
 
       {open ? (
@@ -112,8 +125,16 @@ export function AvatarExpand({
                here would create exactly the dead zone the requirement rules
                out, so the enlarged view deliberately does NOT do that. */
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={attachmentUrl(avatarKey)} alt={`Portrait of ${label}`} draggable={false} />
+            {source.kind === 'upload' ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={source.url} alt={`Portrait of ${label}`} draggable={false} />
+            ) : (
+              /* Drawn at the plate size rather than scaled up from 22px: it is
+                 vector, so the 2px rules stay 2px instead of becoming 30. */
+              <span data-press="portrait-large-mark">
+                <PressMark index={source.index} size={320} title={`Portrait of ${label}`} />
+              </span>
+            )}
             <p id={titleId} data-press="portrait-caption">
               {label}
             </p>

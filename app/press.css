@@ -1087,6 +1087,85 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
   border-radius: 0;
 }
 
+/* ── the mark gallery ────────────────────────────────────────────────────────
+   A specimen sheet: each mark shown on its own block of stock with its name
+   set beneath in mono, the way a type specimen names what it is showing. The
+   selected one is pressed into the page — inset shadow rather than a tick
+   alone, so the state reads at a glance and not only to someone hunting for a
+   check mark. */
+[data-press='mark-gallery'] {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 10px;
+}
+[data-press='mark-option'] {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  position: relative;
+  padding: 10px 6px 8px;
+  background: var(--background);
+  border: var(--hairline) solid var(--border);
+  box-shadow: 2px 2px 0 var(--border);
+  cursor: pointer;
+  transition:
+    transform var(--press-quick, 0.16s) var(--press-ease),
+    box-shadow var(--press-quick, 0.16s) var(--press-ease);
+}
+[data-press='mark-option']:hover:not(:disabled) {
+  box-shadow: 3px 3px 0 var(--border);
+  transform: translate(-1px, -1px);
+}
+[data-press='mark-option']:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+[data-press='mark-option']:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* Chosen: pressed into the stock, and keylined at full rule weight. */
+[data-press='mark-option'][data-active='true'] {
+  border-width: var(--rule);
+  box-shadow: inset 2px 2px 0 var(--border);
+  transform: translate(1px, 1px);
+}
+[data-press='mark-name'] {
+  font-family: var(--press-mono);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+[data-press='mark-option'][data-active='true'] [data-press='mark-name'] {
+  color: var(--foreground);
+}
+[data-press='mark-check'] {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 12px;
+  height: 12px;
+  color: var(--primary);
+}
+/* The enlarged mark sits in the same plate an enlarged photo does. */
+[data-press='portrait-large-mark'] {
+  display: block;
+  border: var(--hairline) solid var(--border);
+  width: min(74vw, 340px);
+  height: min(74vw, 340px);
+}
+[data-press='portrait-large-mark'] svg {
+  width: 100%;
+  height: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-press='mark-option'] {
+    transition: none;
+  }
+}
+
 /* The small mark, when it can be enlarged. Keeps the mark's own offset shadow
    as the only visual weight — a second border around a bordered thing reads as
    a mistake — and moves on hover the way a plate lifts off the bed. */
@@ -1096,6 +1175,25 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
   padding: 0;
   border: 0;
   transition: transform 0.16s var(--press-ease);
+  /*
+   * ⚠️ 24px MINIMUM, and the mark stays 22px inside it.
+   *
+   * WCAG 2.5.8 (AA) puts the floor at 24×24 for a pointer target. The portrait
+   * was a <span> until it became a button, and a span is not a target — so
+   * making it operable silently created a 22×22 tap target and shipped it.
+   *
+   * `verify:pages` measures this at 360px and did not catch it for a run,
+   * because the button only renders for an account that HAS a portrait and every
+   * test account had none. That is the third defect this year hidden by the same
+   * blind spot: the 500 that took production down, the dead tab-rail avatar, and
+   * this. Preset marks close it for good — every account now has a portrait, so
+   * the control always renders and is always measured.
+   */
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 [data-press='portrait-trigger']:hover [data-press='portrait'] {
   box-shadow: 3px 3px 0 var(--border);

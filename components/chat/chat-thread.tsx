@@ -40,6 +40,7 @@ type Props = {
   /** The rule bar carries the navigation, so it needs these. */
   isAdmin?: boolean;
   avatarKey?: string | null;
+  avatarSeed?: string;
   email?: string | null;
   /** The dateline, as an instant — formatted in the reader's own zone. */
   lede?: { now: string; presses: number };
@@ -85,6 +86,7 @@ export function ChatThread({
   pricedModels = [],
   isAdmin = false,
   avatarKey = null,
+  avatarSeed,
   email = null,
   lede,
   spend,
@@ -423,7 +425,12 @@ export function ChatThread({
 
         {/* Sections live in this bar under Riso, so the page has one top rule
             rather than two stacked bands. See SectionTabs. */}
-        <SectionTabs isAdmin={isAdmin} avatarKey={avatarKey} email={email} />
+        <SectionTabs
+          isAdmin={isAdmin}
+          avatarKey={avatarKey}
+          avatarSeed={avatarSeed}
+          email={email}
+        />
       </div>
 
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">

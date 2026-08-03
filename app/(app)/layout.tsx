@@ -125,7 +125,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             ) : null}
 
             {/* Show the email when the display name would duplicate the nav link. */}
-            <AvatarExpand avatarKey={user.avatarUrl} label={user.email ?? 'You'} />
+            <AvatarExpand avatarKey={user.avatarUrl} seed={user.id} label={user.email ?? 'You'} />
 
             <span
               className="text-muted-foreground hidden text-sm sm:inline"
