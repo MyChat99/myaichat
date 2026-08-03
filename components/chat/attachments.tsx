@@ -1,6 +1,14 @@
 'use client';
 
-import { FileText, ImageIcon, Loader2, Paperclip, X } from 'lucide-react';
+import {
+  FileSpreadsheet,
+  FileText,
+  FileType,
+  ImageIcon,
+  Loader2,
+  Paperclip,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -12,7 +20,9 @@ import {
   MAX_ATTACHMENTS_PER_MESSAGE,
   describeAccepted,
   kindFor,
+  labelFor,
   rejectionReason,
+  resolveMime,
 } from '@/lib/upload/types';
 
 /**
@@ -33,8 +43,16 @@ type Props = {
   onRemove: (id: string) => void;
 };
 
-function iconFor(kind: PendingAttachment['kind']) {
-  return kind === 'image' ? ImageIcon : FileText;
+/**
+ * Keyed on the MIME type rather than the delivery kind, because the chip is for
+ * the person who attached the file: a spreadsheet and a PDF arrive by different
+ * routes internally and that is not what they want to be told apart by.
+ */
+function iconFor(mimeType: string) {
+  if (mimeType.startsWith('image/')) return ImageIcon;
+  if (mimeType === 'text/csv' || mimeType.includes('spreadsheetml')) return FileSpreadsheet;
+  if (mimeType.includes('wordprocessingml')) return FileType;
+  return FileText;
 }
 
 function humanSize(bytes: number): string {
@@ -50,7 +68,7 @@ export function AttachmentTray({ items, onRemove }: Props) {
   return (
     <ul className="mb-2 flex flex-wrap gap-2" aria-label="Attachments" data-press="tray">
       {items.map((item) => {
-        const Icon = iconFor(item.kind);
+        const Icon = iconFor(item.mimeType);
         const failed = Boolean(item.error);
 
         return (
@@ -86,8 +104,14 @@ export function AttachmentTray({ items, onRemove }: Props) {
               <span className="max-w-[13rem] truncate font-medium" title={item.name}>
                 {item.name}
               </span>
-              <span className={failed ? 'text-destructive' : 'text-muted-foreground'}>
-                {item.error ?? (item.key ? humanSize(item.sizeBytes) : 'Uploading…')}
+              <span
+                data-press="chip-meta"
+                className={failed ? 'text-destructive' : 'text-muted-foreground'}
+              >
+                {item.error ??
+                  (item.key
+                    ? `${labelFor(item.mimeType)} · ${humanSize(item.sizeBytes)}`
+                    : 'Uploading…')}
               </span>
             </span>
 
@@ -259,13 +283,16 @@ export function useAttachments({
             continue;
           }
 
-          const kind = kindFor(file.type) ?? 'document';
+          // The RESOLVED type, not `file.type`: a .md with an empty type would
+          // otherwise be stored and uploaded as something the server refuses.
+          const mimeType = resolveMime(file)!;
+          const kind = kindFor(mimeType) ?? 'text';
           const id = `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
           accepted.push({
             id,
             name: file.name,
-            mimeType: file.type,
+            mimeType,
             sizeBytes: file.size,
             kind,
             progress: 0,

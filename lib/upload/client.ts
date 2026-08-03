@@ -8,12 +8,14 @@
  * passes through our server, so a large upload does not occupy a Node process.
  */
 
+import { resolveMime, type AttachmentKind } from './types';
+
 export type PendingAttachment = {
   id: string;
   name: string;
   mimeType: string;
   sizeBytes: number;
-  kind: 'image' | 'document' | 'text';
+  kind: AttachmentKind;
   key?: string;
   progress: number;
   error?: string;
@@ -22,7 +24,7 @@ export type PendingAttachment = {
 };
 
 export type UploadOutcome =
-  | { ok: true; key: string; kind: 'image' | 'document' | 'text' }
+  | { ok: true; key: string; kind: AttachmentKind }
   | { ok: false; error: string; unconfigured?: boolean };
 
 export async function uploadFile(
@@ -34,7 +36,9 @@ export async function uploadFile(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       filename: file.name,
-      mimeType: file.type,
+      // Resolved, not raw: the browser reports `.md` as an empty type on some
+      // platforms, and the server validates against the table, not the browser.
+      mimeType: resolveMime(file) ?? file.type,
       sizeBytes: file.size,
       scope,
     }),

@@ -1372,3 +1372,26 @@ main h2 {
     opacity: 1;
   }
 }
+
+/* The line that stops the paperclip lying: the selected press cannot read what
+   is already clipped to the page. Set as a stamped warning on the coupon, above
+   the field, so it is read before the send rather than after it. */
+[data-press='chip-warning'] {
+  margin: 0 12px 8px;
+  padding: 6px 9px;
+  border: var(--hairline) solid var(--destructive);
+  font-family: var(--press-mono);
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: var(--destructive);
+}
+
+/* The type badge on a chip — "PDF · 240 KB". Mono, because one half of it is a
+   machine value and the other is a file size. */
+[data-press='chip-meta'] {
+  font-family: var(--press-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

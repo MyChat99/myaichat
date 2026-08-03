@@ -14,6 +14,7 @@ import { LocalTime } from '@/components/ui/local-time';
 import { formatUsd } from '@/lib/theme/money';
 import { MessageList, type UiMessage } from '@/components/chat/message-list';
 import { ModelSelector, type SelectableModel } from '@/components/chat/model-selector';
+import { capabilityRefusal } from '@/lib/upload/types';
 import { Button } from '@/components/ui/button';
 
 type Props = {
@@ -297,6 +298,21 @@ export function ChatThread({
     });
   }
 
+  /**
+   * Whether the model now selected can read what is already attached.
+   *
+   * Recomputed on every render rather than checked at attach time, because the
+   * model can be changed AFTER attaching — which is exactly the case that used
+   * to send the file anyway and fail with a 422 from the server, after the
+   * upload had already happened.
+   */
+  const selectedModel = models.find((m) => m.id === modelId) ?? null;
+  const attachmentRefusal = selectedModel
+    ? (attachments.items
+        .map((item) => capabilityRefusal(item.mimeType, selectedModel))
+        .find(Boolean) ?? null)
+    : null;
+
   const empty = messages.length === 0;
 
   return (
@@ -480,6 +496,7 @@ export function ChatThread({
         storageEnabled={storageEnabled}
         uploading={attachments.uploading}
         modelLabel={models.find((m) => m.id === modelId)?.displayName ?? null}
+        capabilityRefusal={attachmentRefusal}
       />
     </div>
   );

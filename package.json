@@ -49,7 +49,9 @@
     "verify:costs": "tsx --conditions=react-server scripts/verify-costs.ts",
     "verify:pages": "tsx scripts/verify-pages.ts",
     "verify:failures": "tsx scripts/verify-failures.ts",
-    "verify:motion": "tsx scripts/verify-motion.ts"
+    "verify:motion": "tsx scripts/verify-motion.ts",
+    "verify:documents": "tsx --conditions=react-server scripts/verify-documents.ts",
+    "verify:documents:e2e": "tsx scripts/verify-documents-e2e.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

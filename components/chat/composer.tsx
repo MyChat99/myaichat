@@ -29,6 +29,12 @@ type Props = {
   uploading?: boolean;
   /** Printed on the action rail: which press is set. */
   modelLabel?: string | null;
+  /**
+   * Set when the selected model cannot read something already attached. Shown
+   * before send, and blocks it — the alternative is uploading a file and being
+   * refused afterwards by the server.
+   */
+  capabilityRefusal?: string | null;
 };
 
 const MAX_HEIGHT_PX = 200;
@@ -48,6 +54,7 @@ export function Composer({
   storageEnabled = false,
   uploading = false,
   modelLabel = null,
+  capabilityRefusal = null,
 }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -84,7 +91,7 @@ export function Composer({
   // A message with only an attachment and no text is legitimate — "what is
   // this?" is implied by the picture.
   const ready = attachments.filter((a) => a.key && !a.error);
-  const canSend = Boolean(value.trim()) || ready.length > 0;
+  const canSend = (Boolean(value.trim()) || ready.length > 0) && !capabilityRefusal;
 
   return (
     <div className="border-border bg-background border-t p-4" data-press="coupon-wrap">
@@ -99,6 +106,15 @@ export function Composer({
 
         {onRemoveAttachment ? (
           <AttachmentTray items={attachments} onRemove={onRemoveAttachment} />
+        ) : null}
+
+        {/* Said before send, not after. `role="alert"` because it appears in
+            response to changing the model, which is not where the reader is
+            looking. */}
+        {capabilityRefusal ? (
+          <p role="alert" data-press="chip-warning">
+            {capabilityRefusal}
+          </p>
         ) : null}
 
         {/* Three zones: label rail, field, action rail. */}

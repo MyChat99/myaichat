@@ -7,6 +7,13 @@ import { defaultModel, getAdapter, resolveModel } from '@/lib/providers/registry
 import { isRetryableKind, withRetry } from '@/lib/providers/resilience';
 import { ProviderError, type ChatMessage } from '@/lib/providers/types';
 import { fetchObject, isStorageConfigured, keyBelongsToUser } from '@/lib/r2/storage';
+import {
+  ExtractionError,
+  contentMatchesType,
+  extractAttachmentText,
+  fenceExtracted,
+} from '@/lib/upload/extract';
+import { requiredCapability, type AttachmentKind } from '@/lib/upload/types';
 import { AppError, fromProviderKind, toAppError } from '@/lib/errors/app-error';
 import { logRequest, newRequestId, outcomeFor } from '@/lib/observability/log';
 import { checkChatRateLimit } from '@/lib/security/rate-limit';
@@ -44,7 +51,7 @@ const bodySchema = z.object({
         name: z.string().min(1).max(255),
         mimeType: z.string().min(1).max(128),
         sizeBytes: z.number().int().positive(),
-        kind: z.enum(['image', 'document', 'text']),
+        kind: z.enum(['image', 'document', 'text', 'office']),
       }),
     )
     .max(5)
@@ -186,18 +193,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Attachment not found.' }, { status: 404 });
     }
 
-    const wantsImage = attachments.some((a) => a.kind === 'image');
-    const wantsDocument = attachments.some((a) => a.kind === 'document');
+    /**
+     * Only the kinds delivered NATIVELY need a capability.
+     *
+     * `text` and `office` are extracted to plain text before they reach a
+     * provider, so by then they are ordinary prompt content and every model can
+     * read them. Gating those on `supportsDocuments` — as an earlier version of
+     * this check would have — would refuse a spreadsheet on a model perfectly
+     * able to read the table we hand it.
+     */
+    const needsVision = attachments.some(
+      (a) => requiredCapability(a.kind as AttachmentKind) === 'vision',
+    );
+    const needsDocuments = attachments.some(
+      (a) => requiredCapability(a.kind as AttachmentKind) === 'documents',
+    );
 
-    if (wantsImage && !model.supportsVision) {
+    if (needsVision && !model.supportsVision) {
       return NextResponse.json(
-        { error: `${model.displayName} cannot read images. Pick a vision-capable model.` },
+        {
+          error: `${model.displayName} can't read images. Choose a vision model, or attach a document instead.`,
+        },
         { status: 422 },
       );
     }
-    if (wantsDocument && !model.supportsDocuments) {
+    if (needsDocuments && !model.supportsDocuments) {
       return NextResponse.json(
-        { error: `${model.displayName} cannot read documents. Pick a document-capable model.` },
+        {
+          error: `${model.displayName} can't read PDFs. Choose a document-capable model, or paste the text.`,
+        },
         { status: 422 },
       );
     }
@@ -303,28 +327,67 @@ export async function POST(request: NextRequest) {
        * remove and re-attach it is something they can actually do.
        */
       let missing: string | null = null;
-      const hydrated = (
-        await Promise.all(
-          attachments
-            .filter((a) => a.kind !== 'text')
-            .map(async (a) => {
-              try {
-                const object = await fetchObject(a.key);
-                return {
-                  kind: a.kind as 'image' | 'document',
-                  mimeType: object.mimeType || a.mimeType,
-                  base64: object.base64,
-                  name: a.name,
-                };
-              } catch {
-                // The NAME, never the key: the key is a storage path containing
-                // the owner's user id.
-                missing = a.name;
-                return null;
-              }
-            }),
-        )
-      ).filter((a): a is NonNullable<typeof a> => a !== null);
+      let unreadable: string | null = null;
+      let wrongContent: string | null = null;
+
+      /**
+       * Every attachment is fetched once, then routed by how it reaches the
+       * model. Before this, `text` attachments were filtered out here and
+       * nowhere else — so a .txt or .md could be attached, stored, shown as a
+       * chip, and never reach the model at all. The answer came back as if the
+       * file had been read.
+       */
+      const native: {
+        kind: 'image' | 'document';
+        mimeType: string;
+        base64: string;
+        name: string;
+      }[] = [];
+      const extracted: string[] = [];
+
+      for (const a of attachments) {
+        let object: { base64: string; mimeType: string };
+        try {
+          object = await fetchObject(a.key);
+        } catch {
+          // The NAME, never the key: the key is a storage path containing the
+          // owner's user id.
+          missing = a.name;
+          break;
+        }
+
+        const bytes = Buffer.from(object.base64, 'base64');
+        const mimeType = a.mimeType;
+
+        /**
+         * The type is re-derived from the bytes here, at the only point where
+         * we actually hold them. Both the extension and the declared MIME type
+         * were chosen by whoever uploaded the file; this is the check that was
+         * not.
+         */
+        if (!contentMatchesType(mimeType, bytes)) {
+          wrongContent = a.name;
+          break;
+        }
+
+        if (a.kind === 'image' || a.kind === 'document') {
+          native.push({
+            kind: a.kind,
+            mimeType: object.mimeType || mimeType,
+            base64: object.base64,
+            name: a.name,
+          });
+          continue;
+        }
+
+        try {
+          extracted.push(fenceExtracted(a.name, mimeType, extractAttachmentText(mimeType, bytes)));
+        } catch (err) {
+          unreadable =
+            err instanceof ExtractionError ? `"${a.name}" — ${err.message}` : `"${a.name}"`;
+          break;
+        }
+      }
 
       if (missing) {
         return NextResponse.json(
@@ -336,7 +399,30 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      if (hydrated.length) last.attachments = hydrated;
+      if (wrongContent) {
+        return NextResponse.json(
+          {
+            error: `"${wrongContent}" is not the kind of file its name says it is. Remove it and attach it again.`,
+            retryable: false,
+          },
+          { status: 400 },
+        );
+      }
+
+      if (unreadable) {
+        return NextResponse.json(
+          { error: `${unreadable}. Remove it, or attach it in another format.`, retryable: false },
+          { status: 422 },
+        );
+      }
+
+      if (native.length) last.attachments = native;
+
+      // Extracted text rides in the message body, before the user's own words,
+      // so a model reading top to bottom has the document before the question.
+      if (extracted.length) {
+        last.content = `${extracted.join('\n\n')}\n\n${last.content}`;
+      }
     }
   }
 
