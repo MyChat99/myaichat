@@ -9,6 +9,7 @@ import { toAppError } from '@/lib/errors/app-error';
 import { logRequest, newRequestId, outcomeFor } from '@/lib/observability/log';
 import { checkChatRateLimit } from '@/lib/security/rate-limit';
 import { checkDailyTokenBudget } from '@/lib/security/token-budget';
+import { CEILING_MESSAGE, checkMonthlySpendCeiling } from '@/lib/security/spend-ceiling';
 
 /**
  * Ask the presses — one prompt, several models, at once.
@@ -96,10 +97,11 @@ export async function POST(request: NextRequest) {
 
   // Same pre-flight as /api/chat, issued together and evaluated in a fixed
   // order so an identical request always produces an identical status.
-  const [profileResult, rate, budget] = await Promise.all([
+  const [profileResult, rate, budget, ceiling] = await Promise.all([
     supabase.from('profiles').select('suspended').eq('id', user.id).maybeSingle(),
     checkChatRateLimit(user.id),
     checkDailyTokenBudget(user.id),
+    checkMonthlySpendCeiling(),
   ]);
 
   if (profileResult.data?.suspended) {
@@ -124,6 +126,10 @@ export async function POST(request: NextRequest) {
       },
       { status: 429 },
     );
+  }
+
+  if (!ceiling.allowed) {
+    return NextResponse.json({ error: CEILING_MESSAGE, retryable: false }, { status: 429 });
   }
 
   /**

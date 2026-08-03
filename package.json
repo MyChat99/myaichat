@@ -28,6 +28,7 @@
     "verify:routes": "tsx scripts/verify-route-loads.ts",
     "verify:attachments": "tsx scripts/verify-attachments.ts",
     "verify:security": "tsx --conditions=react-server scripts/verify-security.ts",
+    "verify:spend": "tsx --conditions=react-server scripts/verify-spend.ts",
     "verify:session": "tsx --conditions=react-server scripts/verify-session.ts",
     "verify:seed": "tsx scripts/verify-seed.ts",
     "verify:chat": "tsx scripts/verify-chat.ts",

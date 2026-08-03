@@ -16,15 +16,24 @@ type Settings = {
   daily_token_budget_per_user: number;
   session_idle_timeout_minutes: number;
   signups_enabled: boolean;
+  signup_allowed_domains: string;
+  monthly_spend_ceiling_usd: number;
   default_model_id: string | null;
 };
 
 export function SettingsForm({
   initial,
   models,
+  defaultCeilingUsd,
 }: {
   initial: Settings;
   models: { id: string; label: string }[];
+  /**
+   * Passed in rather than imported: the module that owns this number is
+   * `server-only`, and pulling it into a client component fails the build —
+   * which is the guard working, not an obstacle to route around.
+   */
+  defaultCeilingUsd: number;
 }) {
   const [form, setForm] = useState(initial);
   const [pending, startTransition] = useTransition();
@@ -138,13 +147,56 @@ export function SettingsForm({
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Switch
-          id="signups"
-          checked={form.signups_enabled}
-          onCheckedChange={(v) => setForm({ ...form, signups_enabled: v })}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Switch
+            id="signups"
+            checked={form.signups_enabled}
+            onCheckedChange={(v) => setForm({ ...form, signups_enabled: v })}
+          />
+          <Label htmlFor="signups">Allow new sign-ups</Label>
+        </div>
+        <p className="text-muted-foreground text-xs">
+          {form.signups_enabled
+            ? form.signup_allowed_domains.trim()
+              ? 'Restricted: only the domains below can create an account.'
+              : 'Open: anyone with the link can create an account.'
+            : 'Closed: only you can create accounts, from Users.'}{' '}
+          This switch existed for several phases and was read by nothing — it is enforced in the
+          sign-up action as of now.
+        </p>
+
+        <div className="space-y-2">
+          <Label htmlFor="domains">Limit sign-ups to these email domains</Label>
+          <Input
+            id="domains"
+            value={form.signup_allowed_domains}
+            placeholder="example.com, university.ac.uk"
+            disabled={!form.signups_enabled}
+            onChange={(e) => setForm({ ...form, signup_allowed_domains: e.target.value })}
+          />
+          <p className="text-muted-foreground text-xs">
+            Comma or space separated. Leave empty to allow any domain.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="ceiling">Monthly spend ceiling (USD, all users)</Label>
+        <Input
+          id="ceiling"
+          type="number"
+          min={0}
+          step="0.01"
+          value={form.monthly_spend_ceiling_usd}
+          onChange={(e) => setForm({ ...form, monthly_spend_ceiling_usd: Number(e.target.value) })}
         />
-        <Label htmlFor="signups">Allow new sign-ups</Label>
+        <p className="text-muted-foreground text-xs">
+          A hard cutoff across every user. The per-user daily budget stops one person running up a
+          bill; this stops <em>everyone</em> doing it. Unlike the other limits, leaving this unset
+          does not mean unlimited — it defaults to ${defaultCeilingUsd}, because these are your
+          provider keys. Set 0 to turn the ceiling off deliberately.
+        </p>
       </div>
 
       <Button type="button" disabled={pending} onClick={save}>
