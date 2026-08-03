@@ -739,6 +739,44 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  /* The chip is a <button> now. Reset the UA's own background and colour so it
+     still reads as a printed label rather than a form control. */
+  background: none;
+  color: inherit;
+  line-height: inherit;
+}
+
+/* When it can be pressed, it has to LOOK pressable — the chip carried the model
+   name for months while being an inert <span>, which is exactly how an
+   affordance that looks like a label gets treated as one. */
+[data-press='setting'][data-interactive='true'] {
+  cursor: pointer;
+  transition:
+    border-color 0.16s var(--press-ease),
+    box-shadow 0.16s var(--press-ease);
+}
+[data-press='setting'][data-interactive='true']:hover:not(:disabled) {
+  border-color: var(--foreground);
+  box-shadow: 2px 2px 0 var(--border);
+}
+[data-press='setting'][data-interactive='true'][aria-expanded='true'] {
+  border-color: var(--foreground);
+  box-shadow: inset 2px 2px 0 var(--border);
+}
+[data-press='setting'][data-interactive='true']:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+/* Matches the ring every other control in the press system uses, rather than
+   relying on the UA default, which several themes render at low contrast. */
+[data-press='setting'][data-interactive='true']:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-press='setting'][data-interactive='true'] {
+    transition: none;
+  }
 }
 
 [data-press='quill'] {
@@ -1047,6 +1085,101 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
 }
 [data-press='portrait'] img {
   border-radius: 0;
+}
+
+/* The small mark, when it can be enlarged. Keeps the mark's own offset shadow
+   as the only visual weight — a second border around a bordered thing reads as
+   a mistake — and moves on hover the way a plate lifts off the bed. */
+[data-press='portrait-trigger'] {
+  cursor: zoom-in;
+  background: none;
+  padding: 0;
+  border: 0;
+  transition: transform 0.16s var(--press-ease);
+}
+[data-press='portrait-trigger']:hover [data-press='portrait'] {
+  box-shadow: 3px 3px 0 var(--border);
+}
+[data-press='portrait-trigger']:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+[data-press='portrait-trigger'][aria-expanded='true'] {
+  cursor: zoom-out;
+}
+
+/* The enlarged plate. Above the masthead (z-index 60) so it is never clipped
+   by the app shell. */
+[data-press='portrait-scrim'] {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: color-mix(in oklab, var(--background) 82%, transparent);
+  animation: press-portrait-in 0.18s var(--press-ease) both;
+}
+[data-press='portrait-large'] {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 14px;
+  background: var(--background);
+  border: var(--rule) solid var(--border);
+  box-shadow: 6px 6px 0 var(--border);
+  max-width: min(92vw, 420px);
+  animation: press-portrait-plate 0.18s var(--press-ease) both;
+}
+[data-press='portrait-large']:focus-visible,
+[data-press='portrait-large']:focus {
+  outline: none;
+}
+[data-press='portrait-large'] img {
+  display: block;
+  width: min(74vw, 340px);
+  height: min(74vw, 340px);
+  object-fit: cover;
+  border: var(--hairline) solid var(--border);
+  border-radius: 0;
+  -webkit-user-select: none;
+  user-select: none;
+}
+[data-press='portrait-caption'] {
+  font-family: var(--press-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  word-break: break-all;
+}
+[data-press='portrait-hint'] {
+  font-family: var(--press-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+}
+
+@keyframes press-portrait-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes press-portrait-plate {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+/* The whole point of the interaction survives without the motion. */
+@media (prefers-reduced-motion: reduce) {
+  [data-press='portrait-trigger'],
+  [data-press='portrait-scrim'],
+  [data-press='portrait-large'] {
+    transition: none;
+    animation: none;
+  }
 }
 
 /* ── attachments ─────────────────────────────────────────────────────────────

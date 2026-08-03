@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { signOut } from '@/app/(auth)/actions';
-import { AvatarMark } from '@/components/ui/avatar-mark';
+import { AvatarExpand } from '@/components/ui/avatar-expand';
 
 /**
  * Section tabs, set in the folio rule beside the page title.
@@ -63,7 +63,14 @@ export function SectionTabs({
         between Admin and Sign out. A real uploaded avatar is a different thing
         and still belongs here; an empty frame does not.
       */}
-      {avatarKey ? <AvatarMark avatarKey={avatarKey} label={email ?? 'You'} /> : null}
+      {/*
+        The SAME expandable portrait the masthead uses. This is the copy that is
+        actually on screen while chatting — `body:has([data-press='tabs'])`
+        hides the masthead wherever these tabs render, so fixing only the
+        masthead one would have left the avatar inert on every page a reader
+        spends their time on, while passing a test that found the hidden copy.
+      */}
+      {avatarKey ? <AvatarExpand avatarKey={avatarKey} label={email ?? 'You'} /> : null}
 
       {/* A server action invoked from a client component — the form posts, so
           signing out still works with JavaScript disabled. */}

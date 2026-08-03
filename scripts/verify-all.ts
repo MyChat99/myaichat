@@ -86,6 +86,13 @@ const SUITES: Suite[] = [
   { script: 'verify:pages', needs: 'server' },
   { script: 'verify:failures', needs: 'server' },
   { script: 'verify:motion', needs: 'server' },
+  /*
+   * Runs here against the dev server for regression cover, but its AUTHORITATIVE
+   * run is against a production build — see the header of verify-controls.ts.
+   * Both controls it drives sit on the server/client boundary, and `next dev`
+   * cannot reproduce that failure class.
+   */
+  { script: 'verify:controls', needs: 'server' },
   { script: 'verify:documents', needs: 'server' },
   { script: 'verify:documents:e2e', needs: 'server' },
   { script: 'verify:providers', needs: 'server' },
@@ -109,16 +116,35 @@ type Dirt = { what: string; fix: string };
  * Checks the specific things the mutating suites touch — not "does the database
  * look fine", which is unfalsifiable.
  */
+/**
+ * Which providers were enabled when this run began.
+ *
+ * ⚠️ Captured, NOT assumed. This check used to treat any disabled provider as
+ * leftover test state and refuse to run — which is wrong, because "disabled" is
+ * a legitimate configuration an operator chooses deliberately. It blocked a
+ * whole suite run because the owner had switched a provider off in the admin
+ * panel six minutes earlier, and its suggested fix was to undo their decision.
+ *
+ * A guard that tells you to revert a deliberate change has stopped guarding and
+ * started dictating. What it is actually for is RESTORATION: did a suite leave
+ * something different from how it found it. That needs a baseline from this
+ * run, not an opinion about what the configuration ought to be.
+ */
+let enabledAtStart: Map<string, boolean> | null = null;
+
 async function findDirt(): Promise<Dirt[]> {
   const dirt: Dirt[] = [];
 
   const { data: providers } = await db.from('providers').select('name, enabled, encrypted_api_key');
 
+  enabledAtStart ??= new Map((providers ?? []).map((p) => [p.name, p.enabled]));
+
   for (const provider of providers ?? []) {
-    if (!provider.enabled) {
+    const wasEnabled = enabledAtStart.get(provider.name);
+    if (wasEnabled === true && !provider.enabled) {
       dirt.push({
-        what: `provider "${provider.name}" is DISABLED`,
-        fix: `enable it in /admin/providers — a verify:admin run probably died before restoring it`,
+        what: `provider "${provider.name}" was enabled at the start of this run and is now DISABLED`,
+        fix: `enable it in /admin/providers — a suite died before restoring it`,
       });
     }
     // verify:admin corrupts a key to prove chat fails without it. A key that no

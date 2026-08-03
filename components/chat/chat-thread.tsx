@@ -537,7 +537,20 @@ export function ChatThread({
         dropHandlers={attachments.dropHandlers}
         storageEnabled={storageEnabled}
         uploading={attachments.uploading}
-        modelLabel={models.find((m) => m.id === modelId)?.displayName ?? null}
+        modelControl={
+          /* The same component the header renders, so a mid-conversation
+             switch here goes through the identical `choose()` and the
+             identical server action. Opens upward: the composer is at the
+             bottom of the viewport. */
+          <ModelSelector
+            models={models}
+            selectedId={modelId}
+            conversationId={activeId}
+            onSelect={setModelId}
+            variant="chip"
+            menuPlacement="above"
+          />
+        }
         capabilityRefusal={attachmentRefusal}
       />
     </div>

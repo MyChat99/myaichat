@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Sidebar, type SidebarConversation } from '@/components/chat/sidebar';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/db/server';
-import { AvatarMark } from '@/components/ui/avatar-mark';
+import { AvatarExpand } from '@/components/ui/avatar-expand';
 import { dayGroup } from '@/lib/time';
 import { registeredProviderNames } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
@@ -125,7 +125,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             ) : null}
 
             {/* Show the email when the display name would duplicate the nav link. */}
-            <AvatarMark avatarKey={user.avatarUrl} label={user.email ?? 'You'} />
+            <AvatarExpand avatarKey={user.avatarUrl} label={user.email ?? 'You'} />
 
             <span
               className="text-muted-foreground hidden text-sm sm:inline"
