@@ -27,8 +27,15 @@ type Props = {
   storageEnabled?: boolean;
   /** Blocks send while a file is still going up. */
   uploading?: boolean;
-  /** Printed on the action rail: which press is set. */
-  modelLabel?: string | null;
+  /**
+   * The "which press is set" chip on the action rail.
+   *
+   * A NODE rather than a string, because the chip is now the model picker
+   * itself. Passing the rendered control in keeps this component free of model
+   * state and of the server action, and means the composer and the header
+   * share one picker rather than two that have to be kept in step.
+   */
+  modelControl?: React.ReactNode;
   /**
    * Set when the selected model cannot read something already attached. Shown
    * before send, and blocks it — the alternative is uploading a file and being
@@ -53,7 +60,7 @@ export function Composer({
   dropHandlers,
   storageEnabled = false,
   uploading = false,
-  modelLabel = null,
+  modelControl = null,
   capabilityRefusal = null,
 }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -142,12 +149,7 @@ export function Composer({
                 storageEnabled={storageEnabled}
               />
             ) : null}
-            {modelLabel ? (
-              <span data-press="setting">
-                <span data-press="square" data-filled="true" />
-                {modelLabel}
-              </span>
-            ) : null}
+            {modelControl}
           </span>
 
           {streaming ? (

@@ -58,7 +58,8 @@
     "verify:motion": "tsx scripts/verify-motion.ts",
     "verify:documents": "tsx --conditions=react-server scripts/verify-documents.ts",
     "verify:documents:e2e": "tsx scripts/verify-documents-e2e.ts",
-    "measure:perf": "tsx scripts/measure-performance.ts"
+    "measure:perf": "tsx scripts/measure-performance.ts",
+    "verify:controls": "tsx scripts/verify-controls.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

@@ -267,8 +267,17 @@ async function main() {
 
   const { getProviderHealth } = await import('../lib/admin/dashboard');
 
-  const probeName = registeredProviderNames().find((p) => !configured.has(p));
-  const disabledName = [...configured][0];
+  const { data: providerRows } = await admin.from('providers').select('name, enabled');
+  const isEnabled = new Map((providerRows ?? []).map((r) => [r.name, r.enabled]));
+
+  const probeName = registeredProviderNames().find((p) => !configured.has(p) && isEnabled.get(p));
+  /**
+   * Must be a provider that is currently ENABLED, so switching it off is a real
+   * transition. Picking the first configured name regardless would silently
+   * "disable" something already disabled and assert that it stayed hidden —
+   * true, and evidence of nothing.
+   */
+  const disabledName = [...configured].find((p) => isEnabled.get(p));
 
   if (!probeName || !disabledName) {
     console.log('        ↳ skipped: needs one keyless and one keyed provider in the table');

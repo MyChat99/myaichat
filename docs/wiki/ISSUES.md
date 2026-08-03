@@ -18,7 +18,18 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ### ISSUE-070 — `/admin` reported disabled and keyless providers as "not responding"
 
-**Status:** **Fixed 2026-08-03** | **Severity:** Medium | **Phase:** 4/7 | **Opened:** 2026-08-03 (reported by the owner)
+**Status:** **Resolved 2026-08-03 — verified in production** | **Severity:** Medium | **Phase:** 4/7 | **Opened:** 2026-08-03 (reported by the owner)
+
+Live, signed in as the owner, after the deploy:
+
+```
+/  200   /login  200   /admin  200
+"not responding" banner : absent
+anthropic  Responding 552ms · cerebras No key set · groq No key set · openai Responding 2034ms
+console errors: none
+```
+
+Confirmed to be the new build rather than a cached one: `cerebras` appears only because health is now read from the `providers` table, and "No key set" is text that exists only in the fixed version.
 
 **Problem:** the dashboard showed *"groq is not responding"* for a provider the owner had no key for and no intention of using. `getProviderHealth()` iterated `registeredProviderNames()` — **every adapter compiled into the binary** — and never read the `providers` table at all, so both `enabled` and `key_last4` were invisible to it. Each keyless provider then threw inside `getAdapter()`, was caught, and was recorded as `ok: false, "groq has no API key configured"`, which rendered as a red cross and a place in the red "not responding" banner.
 
