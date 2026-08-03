@@ -145,17 +145,62 @@ async function main() {
       },
     ]);
     const page = await context.newPage();
+    /**
+     * Kept at full length and truncated only when printed. Slicing on capture
+     * silently defeats any later `.test()` against them — a CSP violation puts
+     * the whole blocked URL first and does not reach the words "Content
+     * Security Policy" until well past 140 characters.
+     */
     const consoleErrors: string[] = [];
     page.on('console', (m) => {
-      if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 140));
+      if (m.type() === 'error') consoleErrors.push(m.text());
     });
+    const short = (s: string | undefined) => (s ? s.slice(0, 160) : '');
 
     const home = await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
     check('/ loads', home?.status() === 200, `${home?.status()}`);
     const body = await page.content();
     check('and shows no boundary violation', !/Attempted to call/.test(body));
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2500);
     await page.screenshot({ path: `${OUT}/2-signed-in.png` });
+
+    /**
+     * The avatar has to have DECODED, not merely be on the page.
+     *
+     * This is the check that would have caught ISSUE-065 from the outside. That
+     * bug shipped an `<img>` whose src was our own origin — so it was present,
+     * had a src, and laid out — pointing at a route that 302s to R2. CSP is
+     * evaluated after the redirect, the image was blocked, and every assertion
+     * about the markup still passed.
+     *
+     * `naturalWidth` is the only honest signal: it is 0 until the bytes have
+     * arrived and decoded. It is also stronger than the console-error check
+     * below, which depends on the browser choosing to log something.
+     *
+     * Strings, not closures, in `page.evaluate` — tsx/esbuild `keepNames`
+     * rewrites named functions to `__name(...)`, which does not exist in the
+     * browser.
+     */
+    const images = (await page.evaluate(
+      `Array.from(document.images).map(i => ({ src: i.currentSrc || i.src, w: i.naturalWidth }))`,
+    )) as { src: string; w: number }[];
+
+    const avatarImages = images.filter((i) => /uploads\/download|avatar/i.test(i.src));
+    check(
+      'the avatar is actually on the page',
+      avatarImages.length > 0,
+      `${images.length} image(s), none avatar-shaped`,
+    );
+    check(
+      'and it DECODED — not blocked, not broken',
+      avatarImages.length > 0 && avatarImages.every((i) => i.w > 0),
+      avatarImages.map((i) => `${i.w}px ${i.src.slice(0, 60)}`).join(' | '),
+    );
+    check(
+      'and nothing was refused by our own CSP',
+      !consoleErrors.some((e) => /Content Security Policy/i.test(e)),
+      short(consoleErrors.find((e) => /Content Security Policy/i.test(e))),
+    );
 
     // ── a message through each enabled provider ───────────────────────────
     console.log('\nA message through each configured provider\n');
@@ -263,7 +308,11 @@ async function main() {
     );
     await page.screenshot({ path: `${OUT}/3-admin.png` });
 
-    check('no console errors anywhere in the walk', consoleErrors.length === 0, consoleErrors[0]);
+    check(
+      'no console errors anywhere in the walk',
+      consoleErrors.length === 0,
+      short(consoleErrors[0]),
+    );
 
     await context.close();
   } finally {
