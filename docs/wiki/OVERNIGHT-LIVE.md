@@ -542,11 +542,15 @@ A two-minute click-path. Everything below is on the live site or `npm run dev`.
 2. **Email delivery**, still the one Phase 6 item I cannot close: one signup on
    the live site with the address that owns the Resend account (ISSUE-017).
 3. **The demo rows: still 75, still not deleted.** Say the word.
-4. **Try a real Office file of your own.** My fixtures are files I generated, so
-   they are exactly the shape my parser expects — the honest limit of this work
-   is that no file Microsoft Word actually wrote has been through it. If one
-   fails it will say "could not be read" rather than fail silently, and I would
-   want the file.
+4. ~~**Try a real Office file of your own.**~~ **DONE 2026-08-02 — verified by
+   you, and it changes the standing of this work.** A real `.docx` and `.xlsx`
+   uploaded together returned `QVX-7741`, `Marisol Okonkwo-Brandt` and
+   `PERIWINKLE-9` from the Word file, and from the workbook identified Marisol
+   Heights as highest revenue at **$49,484.50** — a *computed* column — plus all
+   three Anomalies rows from the second sheet. That proves three things my own
+   fixtures could not: multi-file in one turn, multi-sheet through the
+   relationship file, and cached formula results. Recorded as ISSUE-042,
+   resolved.
 
 ## § EVERYTHING ELSE
 

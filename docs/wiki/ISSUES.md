@@ -16,6 +16,21 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-042 — Office extraction was only ever proven against fixtures I generated
+
+**Status:** Resolved 2026-08-02 | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-08-02
+**Problem:** `.docx` and `.xlsx` extraction is a hand-written OOXML reader, and every test fed it files built by `scripts/_fixtures.ts` — files shaped exactly the way the parser expects. A parser proved correct only against its author's own fixtures is proved very little: real Word and Excel output carries style runs, `xl/` layouts, relationship ordering and shared-string shapes that a minimal generator never produces.
+**Resolved — verified by the owner against real Microsoft-authored files.** A `.docx` and an `.xlsx` uploaded **together in one message**, and the model returned, correctly:
+
+| From | Retrieved |
+| --- | --- |
+| Word document | `QVX-7741`, `Marisol Okonkwo-Brandt`, `PERIWINKLE-9` |
+| Spreadsheet, sheet 1 | Marisol Heights as highest revenue, **$49,484.50** — a computed column, read correctly |
+| Spreadsheet, sheet 2 | all three Anomalies rows |
+
+So three separate things hold on real files and not just on fixtures: **multi-file** attachment in one turn, **multi-sheet** extraction reached through the relationship file rather than by guessing filenames, and **computed cell values** — Excel stores the cached result in `<v>`, which is what the extractor reads.
+**What is still not proven:** `.doc`/`.xls` (the pre-2007 binary formats) are not accepted at all and are refused by type; password-protected and macro-enabled files are untested. Both fail as "could not be read" rather than silently.
+
 ### ISSUE-041 — `verify:persistence` failed once in a chained run and passed alone
 
 **Status:** Open — flake, cause unconfirmed | **Severity:** Low | **Phase:** 7 | **Opened:** 2026-08-02
