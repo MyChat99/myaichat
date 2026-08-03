@@ -218,10 +218,12 @@ export function MessageList({ messages, streaming, onRegenerate, onEdit }: Props
             ) : null}
 
             {isStreamingThis ? (
-              <span
-                aria-label="Generating response"
-                className="bg-foreground/60 inline-block h-4 w-1.5 animate-pulse rounded-sm align-middle"
-              />
+              // A square block caret in the type colour, not a rounded pulsing
+              // dot: `rounded-sm` was a radius in a design system whose whole
+              // premise is that nothing has one, and a soft pulse belongs to a
+              // different language. Styling lives in press.css so reduced
+              // motion can hold it steady in one place.
+              <span aria-label="Generating response" data-press="caret" />
             ) : null}
 
             {!isStreamingThis ? (

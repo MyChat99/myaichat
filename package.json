@@ -48,7 +48,8 @@
     "verify:compare": "tsx --conditions=react-server scripts/verify-compare.ts",
     "verify:costs": "tsx --conditions=react-server scripts/verify-costs.ts",
     "verify:pages": "tsx scripts/verify-pages.ts",
-    "verify:failures": "tsx scripts/verify-failures.ts"
+    "verify:failures": "tsx scripts/verify-failures.ts",
+    "verify:motion": "tsx scripts/verify-motion.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

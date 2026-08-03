@@ -126,12 +126,14 @@ export function Sidebar({
       {open ? (
         <div
           className="bg-background/70 fixed inset-0 z-30 md:hidden"
+          data-press="scrim"
           onClick={() => setOpen(false)}
           aria-hidden
         />
       ) : null}
 
       <aside
+        data-press="leaf"
         className={`border-border bg-background fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r transition-transform md:static md:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}

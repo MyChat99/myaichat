@@ -44,6 +44,24 @@
   --hairline: 1.5px;
   --press-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
   --press-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── motion, defined once ───────────────────────────────────────────────
+     The design language is print, so motion is ink, paper and press
+     mechanics: things settle, press down, and slide. Nothing bounces —
+     an overshoot curve reads as rubber, and this app is made of paper.
+
+     Three durations, and no rule below may invent a fourth:
+       --press-quick   interaction feedback. Well under the 200ms at which a
+                       press stops feeling connected to the finger.
+       --press-settle  something arriving and coming to rest.
+       --press-slide   a panel travelling a real distance across the page.
+
+     `--press-stamp` is firmer than `--press-ease` on purpose: a stamp meeting
+     paper decelerates hard, it does not glide to a stop. */
+  --press-quick: 110ms;
+  --press-settle: 190ms;
+  --press-slide: 240ms;
+  --press-stamp: cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
 /* ── paper ───────────────────────────────────────────────────────────────────
@@ -1189,4 +1207,168 @@ main h2 {
 [data-press='gate'] button[type='submit']:disabled {
   transform: translate(2px, 2px);
   box-shadow: 2px 2px 0 var(--border);
+}
+
+/* ══ motion ══════════════════════════════════════════════════════════════════
+   Every rule in this block is transform, opacity or box-shadow only. None of
+   them can move anything else on the page, which is the whole reason the list
+   is that short: a motion pass that reflows the document is a layout-shift bug
+   wearing a nice coat.
+
+   Reduced motion is handled globally in globals.css, which collapses every
+   duration to 0.01ms. The one thing that cannot do is undo an animation's
+   STARTING frame — `both` fill on an animation beginning at `opacity: 0` still
+   flashes — so every animation here is also held at its finished frame in the
+   explicit block at the end. */
+
+/* ── a line coming off the press ─────────────────────────────────────────────
+   Messages settle into place rather than appearing. 4px is deliberately small:
+   the eye should register that something arrived, not watch it travel. */
+@keyframes press-settle {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+[data-message] {
+  animation: press-settle var(--press-settle) var(--press-ease) both;
+}
+
+/* The streamed line re-settles when its impression is finished — the element
+   is remounted at that moment, so the animation runs again. Kept rather than
+   suppressed: a line coming to rest as it completes is the correct metaphor,
+   and at 190ms and 4px it reads as settling rather than as a flicker. */
+
+/* ── the sidebar slip, pressed ───────────────────────────────────────────────
+   The offset shadow SHIFTS; it never glows. Hovering lifts the card a
+   millimetre off its shadow, pressing puts it all the way down into it. */
+[data-press='slip'] > a,
+[data-press='slip'] {
+  transition:
+    transform var(--press-quick) var(--press-stamp),
+    box-shadow var(--press-quick) var(--press-stamp);
+}
+[data-press='slip']:hover {
+  transform: translate(-1px, -1px);
+}
+[data-press='slip'][data-active='true']:hover {
+  box-shadow: 5px 5px 0 var(--border);
+}
+[data-press='slip']:active {
+  transform: translate(2px, 2px);
+}
+[data-press='slip'][data-active='true']:active {
+  box-shadow: 2px 2px 0 var(--border);
+}
+
+/* ── the send button as a stamp ──────────────────────────────────────────────
+   Pressed all the way into its own shadow and held there, the way a rubber
+   stamp meets paper. Disabled keeps a flattened offset so a button that is
+   working reads as held down rather than as unresponsive. */
+[data-press='quill'] {
+  box-shadow: 3px 3px 0 var(--border);
+  transition:
+    transform var(--press-quick) var(--press-stamp),
+    box-shadow var(--press-quick) var(--press-stamp);
+}
+[data-press='quill']:hover:not(:disabled) {
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0 var(--border);
+}
+[data-press='quill']:active:not(:disabled) {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 var(--border);
+}
+[data-press='quill']:disabled {
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0 var(--border);
+}
+
+/* The paperclip takes the same gesture at a smaller amplitude, so the two
+   controls either side of the composer behave like one mechanism. */
+[data-press='clip'] {
+  transition: transform var(--press-quick) var(--press-stamp);
+}
+[data-press='clip']:active:not(:disabled) {
+  transform: translate(1px, 1px);
+}
+
+/* ── paper, sliding ──────────────────────────────────────────────────────────
+   The sidebar already travelled on a transform; it did so on Tailwind's default
+   150ms linear-ish timing, which is nobody's decision. Given the tokens, it
+   moves like a sheet pushed across a desk — a real distance, decelerating.
+
+   Deliberately NOT given a second entrance animation: it is already animated,
+   and stacking a keyframe on top of a transition is how you get a panel that
+   jumps and then slides. */
+[data-press='leaf'] {
+  transition-duration: var(--press-slide);
+  transition-timing-function: var(--press-ease);
+}
+
+/* The scrim behind it fades rather than appearing, so the page dims instead of
+   being replaced. Opacity only — it covers the viewport, and anything else
+   here would be compositing the whole page every frame. */
+@keyframes press-scrim {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+[data-press='scrim'] {
+  animation: press-scrim var(--press-slide) var(--press-ease) both;
+}
+
+/* ── the impression in progress ──────────────────────────────────────────────
+   A block caret in the type colour, square like everything else here, holding
+   steady and then cutting out — `steps(1)` rather than a soft pulse, because a
+   fading dot belongs to a different design language. */
+@keyframes press-caret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  95% {
+    opacity: 0.15;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+[data-press='caret'] {
+  display: inline-block;
+  width: 7px;
+  height: 15px;
+  vertical-align: text-bottom;
+  background: var(--foreground);
+  border-radius: 0;
+  animation: press-caret 1s steps(1, end) infinite;
+}
+
+/* ── held at the finished frame ──────────────────────────────────────────────
+   globals.css collapses durations; it cannot undo a `both` fill that starts at
+   `opacity: 0`. Without this, a reader who asked for no motion gets every
+   message and every panel flashing in from invisible. Learned once already,
+   from the masthead. */
+@media (prefers-reduced-motion: reduce) {
+  [data-message],
+  [data-press='scrim'] {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  [data-press='caret'] {
+    animation: none;
+    opacity: 1;
+  }
 }
