@@ -16,6 +16,80 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-058 — Free-tier sustainability across four services
+**Status:** Open | **Severity:** Medium | **Tier:** cross-cutting | **Opened:** 2026-08-03
+**Problem:** Railway, Supabase, R2 and Resend all have limits this app can reach, and provider API spend is not a free tier at all. No document states current usage against each limit, what happens as one is approached, or what to do having outgrown it.
+**Deliverable:** `docs/wiki/FREE-TIER-OPERATIONS.md`. Specific risks: Supabase inactivity pause ([ISSUE-047](#issue-047)), R2 growth from attachments and any future audio/video, Railway memory/CPU for processing, Resend send ceilings, and provider spend ([ISSUE-048](#issue-048)).
+
+### ISSUE-057 — Scheduled messages and tasks
+**Status:** Open | **Severity:** Low | **Tier:** 4 | **Opened:** 2026-08-03
+**Problem:** No way to run a prompt on a schedule. Wants one-off and recurring, results into a conversation and optionally emailed, a Scheduled page with upcoming/past runs and cost, per-user limits so a runaway schedule cannot drain spend, and an admin toggle. Shares its mechanism with [ISSUE-047](#issue-047).
+
+### ISSUE-056 — Audio and video input
+**Status:** Open — **needs infrastructure confirmation before any code** | **Severity:** Low | **Tier:** 4 | **Opened:** 2026-08-03
+**Problem:** No speech or video input. Audio would need server-side transcription; video needs audio extraction plus sampled keyframes, and the UI must be honest that the model sees frames rather than video.
+**Blocked on a question only the owner can answer:** video requires `ffmpeg` on Railway. Memory footprint, cost and feasibility on the current plan must be confirmed before writing code.
+
+### ISSUE-055 — Moderation and three-strike enforcement
+**Status:** Open | **Severity:** Medium | **Tier:** 4 | **Opened:** 2026-08-03
+**Problem:** Nothing checks message content before a provider call. Wants warning → final warning → suspension requiring admin reinstatement, an admin queue with context and reversible actions, all audit-logged.
+**Design constraint already decided:** use a moderation API as the primary signal — OpenAI's is free and already in-stack — not a wordlist, and it must distinguish abuse aimed at a person from ordinary profanity, quoted text, or clinical discussion. Every strike visible to the user with its reason, and reversible.
+
+### ISSUE-054 — Sidebar is a flat chat list, not a navigation column
+**Status:** Open | **Severity:** Low | **Tier:** 3 | **Opened:** 2026-08-03
+**Problem:** The sidebar holds only conversations. Wants an action group (Start a page, Temporary chat, Search), a navigation group (Presses, Scheduled, Folders, Usage), conversations grouped as now, and a bottom account row — collapsible, state persisted, tidy at 360px, keyboard navigable, in the press language rather than a copy of another product.
+
+### ISSUE-053 — Admin panel cannot control the product without code
+**Status:** Open | **Severity:** Medium | **Tier:** 3 | **Opened:** 2026-08-03
+**Problem:** Feature flags, per-model parameters and system prompts, per-role limits, signup controls, branding, email preview and test send, storage overview and orphan purge, announcements, bulk user actions and richer analytics all require a code change or a SQL console.
+**Privacy line, decided:** admin access to conversation CONTENT is excluded by default. Any support-oriented view must be consent-gated and audit-logged, never silent.
+
+### ISSUE-052 — No account menu, and no response-language control
+**Status:** Open | **Severity:** Low | **Tier:** 3 | **Opened:** 2026-08-03
+**Problem:** Navigation is loose links. Wants a grouped account menu (Profile, Appearance, Usage, Language, Admin, Help, Sign out) and a language submenu of 50+ languages, each in its own script, with a search filter.
+**Decided:** implement RESPONSE language now — the model replies in the chosen language — plus i18n plumbing and RTL layout support so interface translation can follow later. **Do not claim 50 translated interfaces the app cannot deliver.**
+
+### ISSUE-051 — Avatars are a placeholder glyph or nothing
+**Status:** Open | **Severity:** Low | **Tier:** 2 | **Opened:** 2026-08-03
+**Problem:** No avatar library. Wants preset avatars drawn in the press language (two-colour ink, hard edges, halftone), a custom builder, SVG so it costs no storage, and a deterministic default from the user id so nobody sees an empty frame. Photo upload still wins. Correct in all 14 palette-and-mode combinations.
+
+### ISSUE-050 — No tone control over how the model answers
+**Status:** Open | **Severity:** Medium | **Tier:** 2 | **Opened:** 2026-08-03
+**Problem:** Every conversation gets one system prompt. Wants seven presets producing genuinely different output — Neutral, Direct, Warm, Socratic, Beginner, Expert, Critical — stored per conversation, shown on the sidebar card, switchable mid-conversation with the change visible in the transcript, applied to Presses too so comparisons stay fair, with custom named modes and admin control of the preset prompts.
+
+### ISSUE-049 — No temporary / off-the-record conversation
+**Status:** Open | **Severity:** Medium | **Tier:** 2 | **Opened:** 2026-08-03
+**Problem:** Every message is persisted. Wants a mode that is not stored, not in the sidebar, not searchable or exportable, gone on refresh, with an unmistakable visual state and a warning before navigating away.
+**Decisions still to make:** whether attachments in this mode are deleted from R2 after the request or blocked outright. Usage rows must still record for billing integrity but **without message content**, and the UI must state plainly what is and is not kept.
+
+### ISSUE-048 — Provider keys pay for every stranger's message
+**Status:** Open | **Severity:** **High** | **Tier:** 1 | **Opened:** 2026-08-03
+**Problem:** The owner's API keys fund every message anyone sends. Before this is shared publicly it needs a global monthly spend ceiling with a hard cutoff, tight default per-user daily budgets, real-time admin visibility of spend, and signup control (invite-only / domain allowlist / open).
+**Why it is the highest-severity item in this list:** every other issue costs time. This one costs money, to a stranger's schedule.
+
+### ISSUE-047 — Supabase pauses on inactivity and nothing prevents it
+**Status:** Open | **Severity:** High | **Tier:** 1 | **Opened:** 2026-08-03
+**Problem:** A free Supabase project pauses after a period without activity, taking the whole app down. Wants three layers: a cheap rate-limited ping on any arrival including the signed-out page; a manual admin PING showing result, timestamp and latency; and a scheduled ping independent of traffic, because if nobody visits for a week the first two never run.
+**Flag before implementing:** the scheduled layer touches infrastructure the owner owns.
+
+### ISSUE-046 — The error page lies and its button does nothing
+**Status:** Open | **Severity:** Medium | **Tier:** 1 | **Opened:** 2026-08-03
+**Problem:** Two defects. (a) The copy promises "the digest below will help track it down" and no digest is shown — only "Reference: <number>" — and it is unverified whether that reference can find the server-side log entry at all. (b) "Try again" is clickable and does nothing.
+**Root cause worth naming:** nobody ever opened these pages. A visibly dead button shipped because the error boundaries were never triggered in a browser.
+
+### ISSUE-045 — Destructive confirmations use the browser's native dialog
+**Status:** Open | **Severity:** Low | **Tier:** 1 | **Opened:** 2026-08-03
+**Problem:** Deleting a conversation uses `confirm()` — a white system dialog, completely off-design, with no press treatment and no control over focus or motion. Wants a press-styled dialog (paper stock, 2px ink, offset shadow, mono caps, zero radius, ink-wash backdrop), stamp-in motion, Esc cancels, Enter confirms, focus trapped and returned, 360px, motion collapsing under reduced-motion — then every other native `confirm`/`alert`/`prompt` in the app replaced with it.
+
+### ISSUE-044 — The sent message is a box with one action
+**Status:** Open | **Severity:** Low | **Tier:** 1 | **Opened:** 2026-08-03
+**Problem:** User messages render inside an outlined box, and offer only Copy. Wants the box gone entirely, an Edit action (edit and resubmit, already implemented elsewhere), and a third action no other chat app can offer.
+**Note:** re-running a prompt on another model already exists on the cost comparison rows, so the third action must either surface that same capability consistently from the user message with the same guards, or be something else — and the choice must be stated.
+
+### ISSUE-043 — The composer has a redundant inner box
+**Status:** Open | **Severity:** Low | **Tier:** 1 | **Opened:** 2026-08-03
+**Problem:** The "Write here…" textarea sits inside its own outlined rectangle, nested within the COMPOSE panel's hard border. Two borders around one field reads as unfinished. Keyboard focus must stay clearly visible by other means.
+
 ### ISSUE-042 — Office extraction was only ever proven against fixtures I generated
 
 **Status:** Resolved 2026-08-02 | **Severity:** Medium | **Phase:** 6 | **Opened:** 2026-08-02
