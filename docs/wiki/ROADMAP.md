@@ -97,3 +97,27 @@ Chrome is already installed.
 **Worth building:** a `verify:render` that loads the main routes signed in,
 fails on any console error or hydration warning, and asserts the document does
 not scroll. That is the cheap 80% and it would have caught all three.
+
+## Shortlist from the 2026-08-02 competitive review
+
+Full reasoning, feature matrix and the rejected list are in
+[COMPETITIVE-ANALYSIS.md](COMPETITIVE-ANALYSIS.md). Ranked by *(demo value ×
+confidence it can be finished completely)* ÷ *risk*. Every item has already been
+through the project's value gate; the rejected ones are recorded there so the
+decision does not get re-litigated.
+
+| # | Item | Why | Size |
+|---|---|---|---|
+| 1 | **Document attachments** — PDF, txt, md, csv, docx, xlsx | Worst-felt gap against every competitor. The paperclip exists and takes images only, so it currently lies about what it accepts. Native pass-through where the provider supports documents, server-side extraction where it does not — a decision the provider abstraction is the right place to own | L |
+| 2 | **"What this answer would have cost elsewhere"** | Pure arithmetic over data already stored: per-message token counts × the per-1K prices already on every model row. No second API call, no tokens spent. **Structurally impossible for a single-vendor product**, and it extends the one feature we have that none of them do | S |
+| 3 | **Folders for conversations** | Second-worst gap; a flat list stops being navigable around twenty conversations. Take the grouping half of ChatGPT/Claude Projects and leave the shared-instructions half until asked | M |
+| 4 | **Visible budget meter** | The daily token budget is already enforced and completely invisible until it refuses you. "You have used 40% of today" turns a punitive limit into a useful one. Self-hosted only — no hosted product will show you a spend meter | S |
+| 5 | **Share a conversation by link** | Expected everywhere. Only worth building as expiring, revocable, explicitly opt-in, and a redacted snapshot rather than a live view — a public link is a new unauthenticated surface on a self-hosted app. If it cannot be built that way, do not build it | M |
+| 6 | Admin-set model routing by task | A policy a self-hosted deployment can set and a hosted product cannot offer without undermining its own pricing. Real value; a settings surface plus a routing layer, and easy to get subtly wrong | L |
+
+**Rejected, with reasons, in COMPETITIVE-ANALYSIS.md §4:** image generation, code
+execution sandbox, third-party connectors, cross-chat memory harvesting, agent
+modes, canvas, usage tiers. Web search with citations is also rejected for now —
+Perplexity is already one of our four registered providers and does cited search
+natively, so "choose the Sonar model" is a real answer that costs nothing to
+build.
