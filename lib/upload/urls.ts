@@ -49,9 +49,7 @@ const PRESET_PREFIX = 'preset:';
 /** How many marks exist. Must equal the number of cases in `PressMark`. */
 export const PRESET_COUNT = 8;
 
-export type AvatarSource =
-  | { kind: 'upload'; url: string }
-  | { kind: 'preset'; index: number };
+export type AvatarSource = { kind: 'upload'; url: string } | { kind: 'preset'; index: number };
 
 /** The stored value for a chosen mark. */
 export function presetRef(index: number): string {
