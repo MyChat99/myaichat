@@ -21,6 +21,25 @@ export type AuthState = { error: string | null };
  */
 const GENERIC_CREDENTIALS_ERROR = 'Invalid email or password.';
 
+/**
+ * What a failed sign-up says.
+ *
+ * Never the upstream message. Two reasons, and the second is the important one:
+ *
+ *  - It is frequently unusable. Sign-ups are disabled at the Supabase project
+ *    level on this deployment, and that surfaces as a 500 whose body is an
+ *    empty object — so the user was shown the literal string `{}`.
+ *  - It leaks. "User already registered" tells whoever asked that an address
+ *    has an account here. The sign-IN path has always been careful about
+ *    exactly that (see `GENERIC_CREDENTIALS_ERROR` above); sign-up was not, and
+ *    it is the same disclosure by a different door.
+ *
+ * One message for every upstream failure. The reason a person can act on has
+ * already been returned by then — the policy gate, the disposable-domain check
+ * and the password rules all speak for themselves before this point.
+ */
+const GENERIC_SIGNUP_ERROR = 'This account could not be created. Ask an administrator for access.';
+
 function firstIssue(error: { issues: { message: string }[] }) {
   return error.issues[0]?.message ?? 'Check your details and try again.';
 }
@@ -142,7 +161,12 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     },
   });
 
-  if (error) return { error: error.message };
+  if (error) {
+    // Logged with the upstream detail so an operator can diagnose it; the
+    // caller gets the generic message.
+    console.error('[signup] rejected by the auth service:', error.status, error.message);
+    return { error: GENERIC_SIGNUP_ERROR };
+  }
 
   // With email confirmation enabled Supabase returns a user but no session.
   if (!data.session) {

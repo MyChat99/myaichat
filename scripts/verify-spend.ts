@@ -247,6 +247,19 @@ async function main() {
         /closed/i.test(message),
         message.trim() || 'the page said nothing',
       );
+      /**
+       * And whatever the reason, the reader never sees the upstream text.
+       * Sign-ups are disabled at the Supabase project level on the deployed
+       * site, which surfaces as a 500 with an empty body — the user was shown
+       * the literal string `{}`. An upstream message is also a disclosure
+       * channel: "User already registered" answers a question nobody should be
+       * able to ask, which is the same care the sign-IN path has always taken.
+       */
+      check(
+        'and never shows a raw upstream error',
+        !/\{\}|AuthRetryableFetchError|already registered/i.test(message),
+        message.trim(),
+      );
       check('and the browser was not signed in', !page.url().endsWith('/'), page.url());
     } finally {
       await browser.close();

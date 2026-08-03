@@ -239,12 +239,49 @@ async function main() {
       `${exportedFns.length} actions, ${gateCount} gates`,
     );
 
-    const auditCount = (actionsSrc.match(/auditLog\(\{/g) ?? []).length;
-    // testProviderConnection and fetchProviderModels are reads, so they audit nothing.
+    /**
+     * Checked per function, against a NAMED exemption list.
+     *
+     * This compared two totals — `auditCount >= exportedFns.length - 2` — where
+     * the 2 stood for the read-only actions. That is brittle in the worst way:
+     * it says nothing about WHICH functions audit, so a new mutating action
+     * plus a new read-only one would cancel out and pass. It also broke the
+     * moment a third read-only action was added, which is how this was found.
+     *
+     * Exempt actions are read-only or operational. `pingDatabase` writes a
+     * timestamp, but it is telemetry rather than an administrative decision,
+     * and auditing every press of a health-check button would bury the entries
+     * that matter under ones that do not.
+     */
+    const READ_ONLY_ACTIONS = new Set([
+      'testProviderConnection',
+      'fetchProviderModels',
+      'pingDatabase',
+    ]);
+
+    const unaudited: string[] = [];
+    for (const chunk of actionsSrc.split(/\nexport async function /).slice(1)) {
+      const name = chunk.split('(')[0];
+      if (READ_ONLY_ACTIONS.has(name)) continue;
+      if (!/auditLog\(\{/.test(chunk)) unaudited.push(name);
+    }
+
     check(
       'every mutating admin action writes an audit row',
-      auditCount >= exportedFns.length - 2,
-      `${exportedFns.length} actions, ${auditCount} audit writes`,
+      unaudited.length === 0,
+      unaudited.join(', '),
+    );
+    // `exportedFns` holds whole match strings ("export async function setUserRole"),
+    // so the names are taken from the same split the audit check uses.
+    const actionNames = actionsSrc
+      .split(/\nexport async function /)
+      .slice(1)
+      .map((chunk) => chunk.split('(')[0]);
+
+    check(
+      'and every exempted action still exists — no stale exemptions',
+      [...READ_ONLY_ACTIONS].every((name) => actionNames.includes(name)),
+      `missing: ${[...READ_ONLY_ACTIONS].filter((n) => !actionNames.includes(n)).join(', ')}`,
     );
 
     // --- audit_logs confidentiality ---------------------------------------

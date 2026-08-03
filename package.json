@@ -45,6 +45,7 @@
     "security:audit": "tsx scripts/security-audit.ts",
     "audit:report": "tsx scripts/audit-report.ts",
     "smoke": "tsx scripts/smoke.ts",
+    "smoke:signed-in": "tsx scripts/smoke-signed-in.ts",
     "shoot": "tsx scripts/shoot.ts",
     "verify:persistence": "tsx scripts/verify-persistence.ts",
     "verify:structure": "tsx scripts/verify-structure.ts",
