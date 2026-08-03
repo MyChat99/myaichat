@@ -93,6 +93,7 @@ const SUITES: Suite[] = [
    * cannot reproduce that failure class.
    */
   { script: 'verify:controls', needs: 'server' },
+  { script: 'verify:editions', needs: 'database' },
   { script: 'verify:documents', needs: 'server' },
   { script: 'verify:documents:e2e', needs: 'server' },
   { script: 'verify:providers', needs: 'server' },

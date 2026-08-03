@@ -624,6 +624,19 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
 .dark [data-press='headline'] {
   color: var(--foreground);
 }
+/* The empty state's standfirst is gone, so its headline has to carry the space
+   that used to sit under it — otherwise the headline butts against the starter
+   prompts.
+   
+   Scoped with `:has` to the headline that has NO standfirst after it. A blanket
+   rule would also loosen /compare, which still sets one, and would have made a
+   copy change quietly reflow an unrelated page. The file already leans on
+   `:has` for `body:has([data-press='tabs'])`. */
+[data-press='headline']:not(:has(+ [data-press='standfirst'])) {
+  margin-bottom: 26px;
+}
+
+/* Retained: other pages still set a standfirst under their headline. */
 [data-press='standfirst'] {
   font-size: 16.5px;
   line-height: 1.55;
@@ -1160,6 +1173,83 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
 }
 [data-press='portrait'] img {
   border-radius: 0;
+}
+
+/* ── editions ────────────────────────────────────────────────────────────────
+   An edition heading is a section of the sidebar, so it takes the divider's
+   form and adds weight — the reader has to be able to tell "a place I filed
+   this" from "the day I wrote it" at a glance, and those are the only two
+   kinds of heading in this column. */
+[data-press='divider'][data-edition='true'],
+[data-press='divider'][data-loose='true'] {
+  color: var(--foreground);
+  font-weight: 700;
+}
+[data-press='divider'][data-edition='true']::before {
+  content: '¶ ';
+  color: var(--display, var(--foreground));
+}
+
+/* The filing menu. Opens upward-neutral and is bounded, because a reader with
+   thirty editions should scroll the menu and not the page. */
+[data-press='edition-menu'] {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 40;
+  min-width: 170px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--background);
+  border: var(--rule) solid var(--border);
+  box-shadow: 4px 4px 0 var(--border);
+  text-align: left;
+}
+[data-press='edition-menu-label'] {
+  font-family: var(--press-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  padding: 4px 6px 5px;
+}
+[data-press='edition-menu'] button {
+  display: block;
+  width: 100%;
+  padding: 5px 6px;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+[data-press='edition-menu'] button:hover,
+[data-press='edition-menu'] button:focus-visible {
+  background: var(--accent);
+  outline: none;
+}
+[data-press='edition-menu'] button[data-on='true'] {
+  font-weight: 700;
+}
+[data-press='edition-menu'] button[data-on='true']::after {
+  content: ' ·';
+  color: var(--display, var(--foreground));
+}
+[data-press='edition-new'] {
+  border-top: var(--hairline) solid var(--border);
+  margin-top: 4px;
+  color: var(--muted-foreground);
+}
+[data-press='edition-new-input'] {
+  width: 100%;
+  margin-top: 4px;
+  padding: 5px 6px;
+  font-size: 12px;
+  background: var(--background);
+  border: var(--hairline) solid var(--border);
+}
+[data-press='edition-new-input']:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -1px;
 }
 
 /* ── the mark gallery ────────────────────────────────────────────────────────
