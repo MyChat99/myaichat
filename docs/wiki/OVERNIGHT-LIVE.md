@@ -485,3 +485,121 @@ flourish, now exempt by name; and one assertion was a tautology
 - **One flake carried over** from this morning: ISSUE-041, `verify:persistence`
   failing once in a chained run and passing since. It did not recur in either
   full-suite run this session.
+
+---
+
+# Session — 2026-08-02, documents and cost comparison
+
+Started from `main` @ `caf131b`, 30 suites green. Two features, both complete
+and merged: PRs #72 and #73. Suite now **32 suites**.
+
+## § WHAT YOU CAN NOW DO
+
+A two-minute click-path. Everything below is on the live site or `npm run dev`.
+
+### 1. Attach a spreadsheet and ask about it — 40 seconds
+
+1. Open the chat page (`/`).
+2. Click the **paperclip** at the bottom-left of the compose panel.
+3. Pick any `.xlsx` — or a `.docx`, `.csv`, `.md`, `.txt` or `.pdf`. All of them
+   are accepted now; before today only images, PDFs and plain text were, and
+   plain text was *silently thrown away* before it reached the model.
+4. **Expect:** a chip above the field showing the filename, a per-type icon, and
+   a mono badge reading e.g. `SHEET · 12 KB`. → `docs/screenshots/documents/1-sheet-attached.png`
+5. Type *"What is in this file?"* and press **Set it**.
+6. **Expect:** the answer quotes actual values out of the sheet. Spreadsheets go
+   in sheet by sheet, by name, with the header row above its data.
+
+### 2. Watch the paperclip refuse to lie — 30 seconds
+
+1. In a conversation, open the **model pill** in the top bar and pick a model
+   that cannot read images (any text-only model).
+2. Attach a **PNG**.
+3. **Expect:** a pink-keylined line above the field —
+   *"… can't read images. Choose a vision model, or attach a document instead."*
+   — and the **Set it** button goes disabled. Before today the file uploaded and
+   the server refused it afterwards.
+   → `docs/screenshots/documents/4-capability-warning.png`
+4. Now attach a **spreadsheet** to that same text-only model. **Expect:** no
+   warning. Extraction turns it into text, so it works on a model with no
+   document capability at all.
+
+### 3. See what the answer would have cost elsewhere — 30 seconds
+
+1. Open any conversation with a reply in it.
+2. Under the answer, next to the price, click **Elsewhere**.
+3. **Expect:** a table of every model this deployment could have used, cheapest
+   first, each with a price and a multiple (`13× less`, `2.6× less`). The model
+   that actually answered is in bold, marked *this answer*.
+4. **Expect** the last line to say the numbers are an estimate, because models
+   tokenise differently. Nothing was sent to produce any of it.
+   → `docs/screenshots/cost-elsewhere/expanded.png`
+
+## § WHAT I NEED FROM YOU
+
+1. **Nothing is blocking.** Production was re-verified at the start of this
+   session — 9/9 upload, 19/19 smoke, both R2 hosts in the CSP, health ok.
+2. **Email delivery**, still the one Phase 6 item I cannot close: one signup on
+   the live site with the address that owns the Resend account (ISSUE-017).
+3. **The demo rows: still 75, still not deleted.** Say the word.
+4. **Try a real Office file of your own.** My fixtures are files I generated, so
+   they are exactly the shape my parser expects — the honest limit of this work
+   is that no file Microsoft Word actually wrote has been through it. If one
+   fails it will say "could not be read" rather than fail silently, and I would
+   want the file.
+
+## § EVERYTHING ELSE
+
+### Cycle log
+
+| # | Work | Outcome | Class |
+|---|---|---|---|
+| 13 | **Document uploads** — PDF, txt, md, csv, docx, xlsx, images kept | Merged (PR #72) | USER-VISIBLE |
+| 14 | **"What it would have cost elsewhere"** under every answer | Merged (PR #73) | USER-VISIBLE |
+
+### What the document work found
+
+**`text` attachments never reached the model.** A `.txt` or `.md` could be
+picked, uploaded, stored and drawn as a chip, and the hydration step filtered it
+out and passed nothing to the provider — so the answer came back as though the
+file had been read. Same code path, fixed as part of this.
+
+**No parser dependency.** `.docx` and `.xlsx` are ZIP archives of XML and Node
+ships an inflater, so the extractor is a few hundred lines rather than a new
+supply-chain dependency in the one path that handles bytes an untrusted user
+chose. The trade cuts both ways and is written into the module: it reads the
+common shape of real Office files, and it is not a full OOXML implementation.
+
+**Zip bombs are refused from the declared size, before anything is allocated** —
+a fixture claiming to expand to 900MB is refused in under half a second, and
+that timing is itself asserted. Extracted text is fenced and labelled to the
+model as data, never instructions, because a spreadsheet cell reading "ignore
+your instructions" is prompt injection through a file the user may not have
+written.
+
+### What the cost work found
+
+`models.input_cost_per_1k` is `not null default 0`, so a model nobody priced
+does not arrive as null — it arrives as **0 and 0**, and rendered naively it
+tops the comparison at $0.0000 and reads as the cheapest option available.
+Both-zero is now treated as "no price set" and sorted last. I only found it
+because the test tried to insert a null and the database refused.
+
+### Two of my own checks were wrong first, both passing silently
+
+The capability gate had **no working test twice over**: the first version pinned
+a non-vision model whose provider holds no key — the route resolves that to the
+default vision model, so the gate was never reached and the check reported it
+broken. The replacement searched only usable models, found none, and *skipped*:
+a security-relevant gate with no test, reported green. It now creates the model
+it needs.
+
+The end-to-end check polled `document.body.innerText` across a navigation and
+kept reading the page it had just left, reporting a correct answer as missing.
+It asserts stored state now, which is this project's own rule.
+
+### Not started, deliberately
+
+**Folders** (#3 on the shortlist) and **avatars**. Both are a migration or a
+crop-and-resize away from being half-done, and the instruction was FINISH >
+BREADTH. Two complete features beat two complete features and a broken third.
