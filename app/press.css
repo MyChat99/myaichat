@@ -58,6 +58,13 @@
 
      `--press-stamp` is firmer than `--press-ease` on purpose: a stamp meeting
      paper decelerates hard, it does not glide to a stop. */
+  /* The height of the top band, shared by the masthead over the sidebar and
+     the rule beside it. They are one horizontal band across the top of the
+     page and were two different heights — 83px against 55px — so the wordmark
+     sat 6px below the centre line of Presses / Profile / Appearance. One token
+     means they cannot drift apart again. */
+  --press-band: 55px;
+
   --press-quick: 110ms;
   --press-settle: 190ms;
   --press-slide: 240ms;
@@ -99,9 +106,28 @@ aside {
   width: 236px;
 }
 
+/* One line, not two.
+   Stacked, the wordmark and the issue line centred as a BLOCK, which put the
+   wordmark 7px above the centre of Presses / Profile / Appearance beside it.
+   Set as a row, the wordmark centres on the band itself and the issue line
+   sits on the same baseline — which is how a masthead is set anyway. */
 [data-press='masthead'] {
-  padding: 18px 16px 14px;
+  min-height: var(--press-band);
+  display: flex;
+  flex-direction: row;
+  /* `center`, not `baseline`: baseline pins the row to the top of the band and
+     left the wordmark's optical centre 7px above the tabs it sits beside. */
+  align-items: center;
+  gap: 9px;
+  padding: 6px 16px;
   border-bottom: var(--rule) solid var(--border);
+}
+[data-press='masthead'] [data-press='issue'] {
+  margin-top: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* The registration moment: a second plate that slides into alignment, the way
@@ -318,6 +344,7 @@ aside > div:has(input) {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   padding: 5px 11px 10px;
   font-family: var(--press-mono);
   font-size: 9.5px;
@@ -393,13 +420,17 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
 }
 
 [data-press='rule'] {
+  min-height: var(--press-band);
   border-bottom-width: var(--rule);
   border-bottom-color: var(--border);
   background: var(--background);
   /* Folio and ticket left, sections right. */
   justify-content: flex-start;
+  align-items: center;
   gap: 12px;
-  padding: 13px 26px;
+  /* Vertical space comes from the band height, not from padding, so the two
+     halves of the band centre their contents on the same line. */
+  padding: 6px 26px;
 }
 
 [data-press='tabs'] {
@@ -1423,6 +1454,8 @@ main h2 {
 }
 [data-press='cost-row'] {
   display: grid;
+  width: 100%;
+  text-align: left;
   grid-template-columns: 1fr auto auto;
   align-items: center;
   gap: 10px;
@@ -1464,4 +1497,190 @@ main h2 {
   line-height: 1.6;
   letter-spacing: 0.03em;
   color: var(--muted-foreground);
+}
+
+/* ── export ──────────────────────────────────────────────────────────────────
+   One labelled control where two bare file extensions used to sit. Set as a
+   mono caps label like every other machine-facing word in this design. */
+[data-press='export'] {
+  position: relative;
+}
+[data-press='export'] > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 3px 7px;
+  border: var(--hairline) solid transparent;
+  font-family: var(--press-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  transition: color var(--press-quick) var(--press-ease);
+}
+[data-press='export'] > summary::-webkit-details-marker {
+  display: none;
+}
+[data-press='export'] > summary:hover,
+[data-press='export'][open] > summary {
+  color: var(--foreground);
+  border-color: var(--border);
+}
+[data-press='export-menu'] {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 40;
+  min-width: 160px;
+  border: var(--hairline) solid var(--border);
+  background: var(--background);
+  box-shadow: 4px 4px 0 var(--secondary);
+}
+[data-press='export-menu'] a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 7px 10px;
+  font-size: 12px;
+  text-decoration: none;
+  color: var(--foreground);
+}
+[data-press='export-menu'] a + a {
+  border-top: var(--hairline) dashed var(--secondary);
+}
+[data-press='export-menu'] a:hover {
+  background: var(--secondary);
+}
+[data-press='export-menu'] a span {
+  font-family: var(--press-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: var(--muted-foreground);
+}
+
+/* ── the slip's own controls ─────────────────────────────────────────────────
+   Pin and delete, at the end of the meta line rather than floating over the
+   title. Two things were wrong before: they were absolutely positioned across
+   the card, so a long title ran underneath them; and they were ghost buttons
+   whose icon took `--muted-foreground` against the card's own fill, which on
+   several palettes is very nearly the same colour — the delete control was
+   effectively invisible and read as an unfinished edge.
+
+   Now they are stamped: the paper colour behind, the ink colour in front, and
+   a hard keyline. That pairing is legible on every palette because it is the
+   same pairing the page itself uses for body text. */
+[data-press='stamp-text'] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-press='slip-actions'] {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding-left: 6px;
+  /* Hidden until wanted on a pointer device, so the resting card stays quiet. */
+  opacity: 0;
+  transition: opacity var(--press-quick) var(--press-ease);
+}
+[data-press='slip']:hover [data-press='slip-actions'],
+[data-press='slip']:focus-within [data-press='slip-actions'] {
+  opacity: 1;
+}
+
+/* A touch device has no hover, so "reveal on hover" means "never". Anything
+   that cannot hover gets them permanently. */
+@media (hover: none) {
+  [data-press='slip-actions'] {
+    opacity: 1;
+  }
+}
+
+[data-press='slip-action'] {
+  display: grid;
+  place-items: center;
+  /* 26px, above the 24px WCAG 2.2 minimum, and the whole row is 44px tall so
+     the practical target at 360px is larger than the button. */
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border: var(--hairline) solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  cursor: pointer;
+  transition:
+    transform var(--press-quick) var(--press-stamp),
+    background var(--press-quick) var(--press-ease);
+}
+[data-press='slip-action'] svg {
+  width: 13px;
+  height: 13px;
+}
+[data-press='slip-action']:hover {
+  background: var(--secondary);
+}
+[data-press='slip-action']:active {
+  transform: translate(1px, 1px);
+}
+/* Pinned reads as set: the accent fills rather than outlines. */
+[data-press='slip-action'][data-on='true'] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+[data-press='slip-action'][data-danger='true']:hover {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+  border-color: var(--destructive);
+}
+
+/* On the selected slip the card is overprinted, so the controls take that
+   pairing instead — `--background` on `--overprint` is the wrong contrast. */
+[data-press='slip'][data-active='true'] [data-press='slip-action'] {
+  background: var(--overprint);
+  color: var(--overprint-foreground);
+  border-color: var(--overprint-foreground);
+}
+
+/* A comparison row that can actually do something looks like it can, and one
+   that cannot looks like a table. The reader tried clicking a model expecting
+   to switch to it; a surface that invites a press and does nothing is worse
+   than a plain list, because it teaches the reader to stop trying. */
+button[data-press='cost-row'] {
+  border: 0;
+  border-bottom: var(--hairline) dashed var(--secondary);
+  background: none;
+  cursor: pointer;
+  grid-template-columns: 1fr auto auto auto;
+  transition: background var(--press-quick) var(--press-ease);
+}
+button[data-press='cost-row']:hover,
+button[data-press='cost-row']:focus-visible {
+  background: var(--secondary);
+  color: var(--foreground);
+}
+[data-press='cost-run'] {
+  min-width: 6ch;
+  text-align: right;
+  color: var(--primary);
+  opacity: 0;
+  transition: opacity var(--press-quick) var(--press-ease);
+}
+button[data-press='cost-row']:hover [data-press='cost-run'],
+button[data-press='cost-row']:focus-visible [data-press='cost-run'] {
+  opacity: 1;
+}
+/* Touch has no hover: the affordance is permanent there. */
+@media (hover: none) {
+  [data-press='cost-run'] {
+    opacity: 1;
+  }
+}
+/* The row that produced the answer is not re-runnable and is never a button,
+   so it keeps the plain treatment and the default cursor. */
+div[data-press='cost-row'] {
+  cursor: default;
 }

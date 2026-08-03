@@ -56,9 +56,14 @@ export function SectionTabs({
           {tab.label}
         </Link>
       ))}
-      {/* The chat pages hide the shell's bar, so the portrait belongs here or
-          it appears nowhere the reader actually is. */}
-      <AvatarMark avatarKey={avatarKey} label={email ?? 'You'} />
+      {/*
+        Only when there is an actual portrait to show.
+        A generic person glyph in the navigation is a placeholder for something
+        that may never arrive — it reads as an unfinished control sitting
+        between Admin and Sign out. A real uploaded avatar is a different thing
+        and still belongs here; an empty frame does not.
+      */}
+      {avatarKey ? <AvatarMark avatarKey={avatarKey} label={email ?? 'You'} /> : null}
 
       {/* A server action invoked from a client component — the form posts, so
           signing out still works with JavaScript disabled. */}

@@ -123,13 +123,11 @@ async function measureRoute(
   path: string,
 ): Promise<RouteResult> {
   let transfer = 0;
-  let script = 0;
   const onResponse = async (r: import('playwright').Response) => {
     try {
       const headers = await r.allHeaders();
       const size = Number(headers['content-length'] ?? 0);
       transfer += size;
-      if (/javascript/.test(headers['content-type'] ?? '')) script += size;
     } catch {
       /* a response that went away mid-flight is not worth failing over */
     }

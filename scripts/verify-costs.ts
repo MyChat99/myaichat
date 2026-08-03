@@ -347,6 +347,9 @@ async function main() {
         .select('id')
         .single();
       await turn(owner.cookie, shown!.id, 'Reply with exactly: OK');
+      // A second turn, so the "older answer" half of the check below has an
+      // older answer to be about.
+      await turn(owner.cookie, shown!.id, 'Reply with exactly: AGAIN');
 
       await page.goto(`${BASE_URL}/c/${shown!.id}`, { waitUntil: 'networkidle' });
 
@@ -370,6 +373,46 @@ async function main() {
         /this month/i.test((await ledger.textContent()) ?? ''),
         (await ledger.textContent())?.trim(),
       );
+
+      /**
+       * Only the newest answer's rows are pressable.
+       *
+       * Reported from real use: someone clicked a model in the comparison
+       * expecting to switch to it, and nothing happened. A surface that invites
+       * a press and does nothing is worse than a plain table. Re-running an
+       * OLDER answer would have to discard every turn after it, so those rows
+       * stay inert — and this asserts both halves, because "make it all
+       * buttons" would be the easy wrong fix.
+       */
+      const toggles = page.locator('[data-press="cost-toggle"]');
+      check(
+        'two priced answers are on screen to compare',
+        (await toggles.count()) >= 2,
+        `${await toggles.count()} toggle(s) — the checks below cannot run without two`,
+      );
+      if ((await toggles.count()) >= 2) {
+        await toggles.first().click();
+        await page.waitForTimeout(250);
+        check(
+          'an older answer offers comparison only, with nothing to press',
+          (await page.locator('button[data-press="cost-row"]').count()) === 0,
+        );
+        await toggles.first().click();
+
+        await toggles.last().click();
+        await page.waitForTimeout(250);
+        check(
+          'the newest answer offers a re-run on each other model',
+          (await page.locator('button[data-press="cost-row"]').count()) > 0,
+        );
+        check(
+          'and says so, rather than leaving it to be discovered by clicking',
+          /Choose a row/.test(
+            (await page.locator('[data-press="cost-caveat"]').last().textContent()) ?? '',
+          ),
+        );
+        await toggles.last().click();
+      }
 
       /**
        * An answer written before this feature existed has no usage row. It must

@@ -38,6 +38,8 @@ type Props = {
   pricedModels?: PricedModel[];
   /** The model that actually produced these answers. */
   modelId?: string | null;
+  /** Re-run the LATEST answer on another model. Absent = comparison only. */
+  onRerunOn?: (modelId: string) => void;
   onRegenerate: () => void;
   onEdit: (messageId: string, content: string) => void;
 };
@@ -172,6 +174,7 @@ export function MessageList({
   onEdit,
   pricedModels = [],
   modelId = null,
+  onRerunOn,
 }: Props) {
   const lastAssistantId = [...messages].reverse().find((m) => m.role === 'assistant')?.id;
   const [expanded, setExpanded] = useState(false);
@@ -234,6 +237,9 @@ export function MessageList({
                 outputTokens={message.outputTokens ?? 0}
                 pricedModels={pricedModels}
                 modelId={modelId ?? null}
+                // Only the newest answer can be re-run: re-running an older one
+                // would have to discard every turn after it.
+                onRerunOn={message.id === lastAssistantId && !streaming ? onRerunOn : undefined}
               />
             ) : null}
 
@@ -284,12 +290,14 @@ function AnswerCost({
   outputTokens,
   pricedModels,
   modelId,
+  onRerunOn,
 }: {
   cost: number;
   inputTokens: number;
   outputTokens: number;
   pricedModels: PricedModel[];
   modelId: string | null;
+  onRerunOn?: (modelId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -321,28 +329,76 @@ function AnswerCost({
           role="region"
           aria-label="What this answer would have cost on other models"
         >
-          {rows.map((row) => (
-            <div
-              key={row.modelId}
-              data-press="cost-row"
-              data-actual={row.actual ? 'true' : 'false'}
-            >
-              <span data-press="cost-model">
-                <ProviderLogo provider={row.providerName} />
-                {row.displayName}
-              </span>
-              <span data-press="cost-figure">
-                {/* Never $0.00 for an unpriced model: a missing price is a gap
-                    in the admin's setup, and rendering it as free would be the
-                    most expensive kind of wrong. */}
-                {row.usd === null ? 'no price set' : formatUsd(row.usd)}
-              </span>
-              <span data-press="cost-delta">
-                {row.actual ? 'this answer' : (describeRatio(row.ratio) ?? '—')}
-              </span>
-            </div>
-          ))}
-          <p data-press="cost-caveat">{ESTIMATE_CAVEAT}</p>
+          {rows.map((row) => {
+            const body = (
+              <>
+                <span data-press="cost-model">
+                  <ProviderLogo provider={row.providerName} />
+                  {row.displayName}
+                </span>
+                <span data-press="cost-figure">
+                  {/* Never $0.00 for an unpriced model: a missing price is a gap
+                      in the admin's setup, and rendering it as free would be the
+                      most expensive kind of wrong. */}
+                  {row.usd === null ? 'no price set' : formatUsd(row.usd)}
+                </span>
+                <span data-press="cost-delta">
+                  {row.actual ? 'this answer' : (describeRatio(row.ratio) ?? '—')}
+                </span>
+              </>
+            );
+
+            /**
+             * A row is a button only when clicking it can actually do
+             * something. A surface that invites a press and does nothing is
+             * worse than a plain table: the reader tries it, nothing happens,
+             * and they stop trusting the rest of the page. This was reported
+             * from real use — someone clicked a model expecting to switch.
+             */
+            const canRerun = Boolean(onRerunOn) && !row.actual;
+
+            if (!canRerun) {
+              return (
+                <div
+                  key={row.modelId}
+                  data-press="cost-row"
+                  data-actual={row.actual ? 'true' : 'false'}
+                >
+                  {body}
+                </div>
+              );
+            }
+
+            return (
+              <button
+                key={row.modelId}
+                type="button"
+                data-press="cost-row"
+                data-action="true"
+                onClick={() => {
+                  // The price is already on the row being clicked, so the
+                  // confirmation repeats it rather than asking for a blind yes.
+                  const price = row.usd === null ? 'an unknown amount' : formatUsd(row.usd);
+                  if (
+                    confirm(
+                      `Ask ${row.displayName} the same thing?\n\nThis replaces the answer above and spends about ${price}. Your daily budget and hourly limit still apply.`,
+                    )
+                  ) {
+                    onRerunOn?.(row.modelId);
+                  }
+                }}
+              >
+                {body}
+                <span data-press="cost-run" aria-hidden>
+                  Re-run
+                </span>
+              </button>
+            );
+          })}
+          <p data-press="cost-caveat">
+            {ESTIMATE_CAVEAT}
+            {onRerunOn ? ' Choose a row to ask that model the same question.' : ''}
+          </p>
         </div>
       ) : null}
     </div>
