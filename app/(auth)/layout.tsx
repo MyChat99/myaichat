@@ -14,9 +14,14 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div data-press="gate-masthead">
           {/* Two plates, as in the sidebar: the second slides into register on
               load. `aria-hidden`, so the name is announced once. */}
-          <div data-press="wordmark">
-            myaichat
-            <span aria-hidden="true">myaichat</span>
+          <div data-press="lockup">
+            <span data-press="mark" aria-hidden="true">
+              ¶
+            </span>
+            <div data-press="wordmark">
+              Pilcrow
+              <span aria-hidden="true">Pilcrow</span>
+            </div>
           </div>
           <div data-press="issue">Multi-provider AI chat</div>
         </div>

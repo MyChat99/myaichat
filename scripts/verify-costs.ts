@@ -351,6 +351,48 @@ async function main() {
       // older answer to be about.
       await turn(owner.cookie, shown!.id, 'Reply with exactly: AGAIN');
 
+      /**
+       * Wait for the PRICES, not for the streams.
+       *
+       * `turn()` returns when the response body ends, but the cost is written
+       * after that — the assistant message is inserted, then its `usage_logs`
+       * row. Loading the page in between shows an answer with no price and so
+       * no comparison toggle, and the check below reports "1 toggle(s)" as
+       * though the feature were broken.
+       *
+       * It passed on a quiet machine and failed inside the full suite, which is
+       * the signature of a race rather than a defect. Polling stored state is
+       * the fix; a longer sleep would only move the failure.
+       */
+      /*
+       * Two queries rather than a `usage_logs(id)` embed: that relationship is
+       * not declared in types.ts, and declaring one purely to let a test phrase
+       * a join more tersely is the wrong direction — the types file describes
+       * the embeds the app uses.
+       */
+      const priced = async () => {
+        const { data: answers } = await admin
+          .from('messages')
+          .select('id')
+          .eq('conversation_id', shown!.id)
+          .eq('role', 'assistant');
+        const ids = (answers ?? []).map((m) => m.id);
+        if (ids.length === 0) return 0;
+        const { data: rows } = await admin
+          .from('usage_logs')
+          .select('message_id')
+          .in('message_id', ids);
+        return new Set((rows ?? []).map((r) => r.message_id)).size;
+      };
+      for (let i = 0; i < 40 && (await priced()) < 2; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      check(
+        'both answers were priced before the page was read',
+        (await priced()) >= 2,
+        `${await priced()} priced`,
+      );
+
       await page.goto(`${BASE_URL}/c/${shown!.id}`, { waitUntil: 'networkidle' });
 
       const stamp = page.locator('[data-press="answer-cost"]').first();

@@ -79,7 +79,7 @@ function Shell({ preview, heading, children }: ShellProps) {
             className="email-text"
             style={{ color: TEXT, fontSize: '18px', fontWeight: 700, margin: '0 0 24px' }}
           >
-            myaichat
+            Pilcrow
           </Text>
 
           <Heading
@@ -138,9 +138,9 @@ function FallbackLink({ href }: { href: string }) {
 
 export function WelcomeEmail({ confirmUrl }: { confirmUrl: string }) {
   return (
-    <Shell preview="Confirm your myaichat account" heading="Confirm your email">
+    <Shell preview="Confirm your Pilcrow account" heading="Confirm your email">
       <Text className="email-text" style={{ color: TEXT, fontSize: '14px', margin: 0 }}>
-        Welcome to myaichat. Confirm your address and you can start chatting.
+        Welcome to Pilcrow. Confirm your address and you can start chatting.
       </Text>
       <ActionButton href={confirmUrl} label="Confirm email" />
       <FallbackLink href={confirmUrl} />
@@ -150,7 +150,7 @@ export function WelcomeEmail({ confirmUrl }: { confirmUrl: string }) {
 
 export function PasswordResetEmail({ resetUrl }: { resetUrl: string }) {
   return (
-    <Shell preview="Reset your myaichat password" heading="Reset your password">
+    <Shell preview="Reset your Pilcrow password" heading="Reset your password">
       <Text className="email-text" style={{ color: TEXT, fontSize: '14px', margin: 0 }}>
         Use the button below to choose a new password. The link expires in one hour.
       </Text>
@@ -162,7 +162,7 @@ export function PasswordResetEmail({ resetUrl }: { resetUrl: string }) {
 
 export function MagicLinkEmail({ magicUrl }: { magicUrl: string }) {
   return (
-    <Shell preview="Your myaichat sign-in link" heading="Sign in to myaichat">
+    <Shell preview="Your Pilcrow sign-in link" heading="Sign in to Pilcrow">
       <Text className="email-text" style={{ color: TEXT, fontSize: '14px', margin: 0 }}>
         Click below to sign in. The link works once and expires shortly.
       </Text>
@@ -223,7 +223,7 @@ export function NewLoginEmail({
   userAgent: string;
 }) {
   return (
-    <Shell preview="New sign-in to your myaichat admin account" heading="New sign-in">
+    <Shell preview="New sign-in to your Pilcrow admin account" heading="New sign-in">
       <Text className="email-text" style={{ color: TEXT, fontSize: '14px', margin: '0 0 12px' }}>
         Your <strong>administrator</strong> account was used to sign in from a device we have not
         seen before.

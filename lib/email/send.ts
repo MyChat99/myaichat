@@ -67,17 +67,17 @@ async function deliver(to: string, subject: string, html: string): Promise<Email
 
 export async function sendWelcomeEmail(to: string, confirmUrl: string): Promise<EmailResult> {
   const html = await render(WelcomeEmail({ confirmUrl }));
-  return deliver(to, 'Confirm your myaichat account', html);
+  return deliver(to, 'Confirm your Pilcrow account', html);
 }
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string): Promise<EmailResult> {
   const html = await render(PasswordResetEmail({ resetUrl }));
-  return deliver(to, 'Reset your myaichat password', html);
+  return deliver(to, 'Reset your Pilcrow password', html);
 }
 
 export async function sendMagicLinkEmail(to: string, magicUrl: string): Promise<EmailResult> {
   const html = await render(MagicLinkEmail({ magicUrl }));
-  return deliver(to, 'Your myaichat sign-in link', html);
+  return deliver(to, 'Your Pilcrow sign-in link', html);
 }
 
 export async function sendNewLoginEmail(
@@ -85,7 +85,7 @@ export async function sendNewLoginEmail(
   context: { when: string; ip: string; userAgent: string },
 ): Promise<EmailResult> {
   const html = await render(NewLoginEmail(context));
-  return deliver(to, 'New sign-in to your myaichat admin account', html);
+  return deliver(to, 'New sign-in to your Pilcrow admin account', html);
 }
 
 export async function sendAdminAlertEmail(
@@ -96,5 +96,5 @@ export async function sendAdminAlertEmail(
   const html = await render(
     AdminAlertEmail({ title, detail, occurredAt: new Date().toISOString() }),
   );
-  return deliver(to, `[myaichat] ${title}`, html);
+  return deliver(to, `[Pilcrow] ${title}`, html);
 }

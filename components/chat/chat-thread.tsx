@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowDown } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -375,6 +376,21 @@ export function ChatThread({
         {/* The mockup's rule bar leads with the folio — the page you are on —
             and sets the model ticket beside it. Without it the band is an
             empty rule with one control pushed to the far edge. */}
+        {/*
+          The MARK, alone, as the logo in this rail.
+
+          Chat pages carry no wordmark: `body:has([data-press='tabs'])` hides
+          the masthead, so before this the rail led straight into the page
+          title and the product had no presence on the screen readers spend
+          their time on. The glyph alone is the right thing here — the wordmark
+          is set in the sidebar two inches away, and repeating it would be the
+          name twice on one line. It links home for the same reason a masthead
+          does, and it is labelled rather than aria-hidden BECAUSE it is a link:
+          a bare "¶" announced to a screen reader is not a destination.
+        */}
+        <Link href="/" data-press="rail-mark" aria-label="Pilcrow — home">
+          ¶
+        </Link>
         <span data-press="folio">
           {conversations.find((c) => c.id === activeId)?.title ?? 'New page'}
         </span>

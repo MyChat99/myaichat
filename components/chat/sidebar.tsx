@@ -141,9 +141,19 @@ export function Sidebar({
             first — it reads as a duplicate only if the stylesheet that
             positions it is missing. */}
         <div data-press="masthead">
-          <div data-press="wordmark">
-            myaichat
-            <span aria-hidden="true">myaichat</span>
+          {/* "¶ Pilcrow" is one unit: the mark is the logo, the word is the
+              wordmark, and they are set tight so the pair reads as a lockup
+              rather than as a bullet in front of a heading. The glyph is
+              aria-hidden — it is the same name said twice to a screen reader
+              otherwise. */}
+          <div data-press="lockup">
+            <span data-press="mark" aria-hidden="true">
+              ¶
+            </span>
+            <div data-press="wordmark">
+              Pilcrow
+              <span aria-hidden="true">Pilcrow</span>
+            </div>
           </div>
           {issue ? (
             /**
