@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createAdminClient } from '@/lib/db/admin';
+import type { PricedModel } from '@/lib/theme/compare-cost';
 
 /**
  * What a conversation and each of its answers actually cost.
@@ -104,3 +105,35 @@ export async function loadMonthToDateSpend(userId: string): Promise<number> {
 }
 
 export { formatUsd } from '@/lib/theme/money';
+
+/**
+ * Every model a user could have picked, with its prices — nulls preserved.
+ *
+ * Deliberately NOT read through the registry, which coerces prices with
+ * `Number(...)`: `Number(null)` is 0, and a model with no price set would show
+ * as free, which is the one number in this feature that must never be invented.
+ *
+ * Scoped to providers that hold a key and are enabled, so the comparison lists
+ * models the deployment could actually have used rather than every row in the
+ * catalogue.
+ */
+export async function loadPricedModels(): Promise<PricedModel[]> {
+  const db = createAdminClient();
+  const { data } = await db
+    .from('models')
+    .select(
+      'id, display_name, input_cost_per_1k, output_cost_per_1k, providers!inner(name, enabled, key_last4)',
+    )
+    .eq('enabled', true)
+    .eq('providers.enabled', true)
+    .not('providers.key_last4', 'is', null)
+    .order('display_name');
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    displayName: row.display_name,
+    providerName: row.providers.name,
+    inputCostPer1k: row.input_cost_per_1k === null ? null : Number(row.input_cost_per_1k),
+    outputCostPer1k: row.output_cost_per_1k === null ? null : Number(row.output_cost_per_1k),
+  }));
+}

@@ -4,8 +4,15 @@ import { Check, Copy, Pencil, RefreshCw, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { Markdown } from '@/components/chat/markdown';
+import { ProviderLogo } from '@/components/chat/provider-logo';
 import { MessageEntrance, useHydrated } from '@/components/motion/motion';
-import { formatUsd } from '@/lib/theme/money';
+import {
+  ESTIMATE_CAVEAT,
+  compareCost,
+  describeRatio,
+  formatUsd,
+  type PricedModel,
+} from '@/lib/theme/compare-cost';
 import { Button } from '@/components/ui/button';
 
 export type UiMessage = {
@@ -27,6 +34,10 @@ export type UiMessage = {
 type Props = {
   messages: UiMessage[];
   streaming: boolean;
+  /** Every model the deployment could have used, for the cost comparison. */
+  pricedModels?: PricedModel[];
+  /** The model that actually produced these answers. */
+  modelId?: string | null;
   onRegenerate: () => void;
   onEdit: (messageId: string, content: string) => void;
 };
@@ -154,7 +165,14 @@ const WINDOW_SIZE = 60;
 /** Rows this far from the bottom get `content-visibility: auto`. */
 const ACTIVE_TAIL = 6;
 
-export function MessageList({ messages, streaming, onRegenerate, onEdit }: Props) {
+export function MessageList({
+  messages,
+  streaming,
+  onRegenerate,
+  onEdit,
+  pricedModels = [],
+  modelId = null,
+}: Props) {
   const lastAssistantId = [...messages].reverse().find((m) => m.role === 'assistant')?.id;
   const [expanded, setExpanded] = useState(false);
   // Messages in the server-rendered HTML must not animate in — see
@@ -210,11 +228,13 @@ export function MessageList({ messages, streaming, onRegenerate, onEdit }: Props
                 price, and $0.00 would be a lie in the one place the number has
                 to be trustworthy. */}
             {message.cost !== undefined ? (
-              <p data-press="answer-cost">
-                <span>{formatUsd(message.cost)}</span>
-                <span>{message.inputTokens ?? 0} in</span>
-                <span>{message.outputTokens ?? 0} out</span>
-              </p>
+              <AnswerCost
+                cost={message.cost}
+                inputTokens={message.inputTokens ?? 0}
+                outputTokens={message.outputTokens ?? 0}
+                pricedModels={pricedModels}
+                modelId={modelId ?? null}
+              />
             ) : null}
 
             {isStreamingThis ? (
@@ -245,6 +265,86 @@ export function MessageList({ messages, streaming, onRegenerate, onEdit }: Props
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * The price under an answer, and — one click away — what it would have cost on
+ * every other model this deployment could have used.
+ *
+ * Compact by default on purpose. The number under an answer is glanceable; a
+ * table of six models under every answer is noise. Nothing here costs anything
+ * to produce: it is the answer's own token counts multiplied by prices already
+ * on the model rows, so opening it sends no request and spends no tokens.
+ */
+function AnswerCost({
+  cost,
+  inputTokens,
+  outputTokens,
+  pricedModels,
+  modelId,
+}: {
+  cost: number;
+  inputTokens: number;
+  outputTokens: number;
+  pricedModels: PricedModel[];
+  modelId: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+
+  // Only worth offering when there is something to compare against.
+  const comparable = pricedModels.length > 1 && (inputTokens > 0 || outputTokens > 0);
+  const rows = open ? compareCost(inputTokens, outputTokens, pricedModels, modelId) : [];
+
+  return (
+    <div data-press="answer-cost-wrap">
+      <p data-press="answer-cost">
+        <span>{formatUsd(cost)}</span>
+        <span>{inputTokens} in</span>
+        <span>{outputTokens} out</span>
+        {comparable ? (
+          <button
+            type="button"
+            data-press="cost-toggle"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? 'Hide comparison' : 'Elsewhere'}
+          </button>
+        ) : null}
+      </p>
+
+      {open ? (
+        <div
+          data-press="cost-table"
+          role="region"
+          aria-label="What this answer would have cost on other models"
+        >
+          {rows.map((row) => (
+            <div
+              key={row.modelId}
+              data-press="cost-row"
+              data-actual={row.actual ? 'true' : 'false'}
+            >
+              <span data-press="cost-model">
+                <ProviderLogo provider={row.providerName} />
+                {row.displayName}
+              </span>
+              <span data-press="cost-figure">
+                {/* Never $0.00 for an unpriced model: a missing price is a gap
+                    in the admin's setup, and rendering it as free would be the
+                    most expensive kind of wrong. */}
+                {row.usd === null ? 'no price set' : formatUsd(row.usd)}
+              </span>
+              <span data-press="cost-delta">
+                {row.actual ? 'this answer' : (describeRatio(row.ratio) ?? '—')}
+              </span>
+            </div>
+          ))}
+          <p data-press="cost-caveat">{ESTIMATE_CAVEAT}</p>
+        </div>
+      ) : null}
     </div>
   );
 }
