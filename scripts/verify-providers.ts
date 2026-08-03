@@ -247,6 +247,70 @@ async function main() {
     check(`${provider}: listModels() returns models`, list.length > 0, `${list.length} model(s)`);
   }
 
+  // --- the dashboard health panel ------------------------------------------
+  /**
+   * The panel must report on providers that are SUPPOSED to be serving, and
+   * nothing else.
+   *
+   * It used to iterate every adapter compiled into the binary, so it probed
+   * providers the operator had switched off and providers that had never been
+   * given a key, and reported both as "not responding". The owner saw
+   * "groq is not responding" for a provider they had no key for and no
+   * intention of using. Same defect class as the sign-up switch that was
+   * stored, displayed, and never read where it decided anything.
+   *
+   * Driven against real rows rather than a mocked table: the bug was precisely
+   * that the function never consulted the table, and a test that hands it a
+   * table cannot detect that.
+   */
+  console.log('\nThe health panel respects the provider table\n');
+
+  const { getProviderHealth } = await import('../lib/admin/dashboard');
+
+  const probeName = registeredProviderNames().find((p) => !configured.has(p));
+  const disabledName = [...configured][0];
+
+  if (!probeName || !disabledName) {
+    console.log('        ↳ skipped: needs one keyless and one keyed provider in the table');
+  } else {
+    const keyless = (await getProviderHealth(true)).find((h) => h.name === probeName);
+    check(
+      `an enabled provider with no key is NOT reported as failing (${probeName})`,
+      keyless?.ok === null,
+      `ok=${String(keyless?.ok)} message=${keyless?.message}`,
+    );
+    check(
+      'and says so in words an operator can act on',
+      /no key/i.test(keyless?.message ?? ''),
+      keyless?.message,
+    );
+
+    const before = await admin
+      .from('providers')
+      .select('enabled')
+      .eq('name', disabledName)
+      .single();
+    await admin.from('providers').update({ enabled: false }).eq('name', disabledName);
+    try {
+      const health = await getProviderHealth(true);
+      check(
+        `a DISABLED provider is excluded from the panel entirely (${disabledName})`,
+        !health.some((h) => h.name === disabledName),
+        health.map((h) => h.name).join(', ') || 'panel is empty',
+      );
+      check(
+        'and disabling one does not remove the others',
+        health.length > 0,
+        `${health.length} provider(s) still reported`,
+      );
+    } finally {
+      await admin
+        .from('providers')
+        .update({ enabled: before.data?.enabled ?? true })
+        .eq('name', disabledName);
+    }
+  }
+
   // --- same UX on both providers -------------------------------------------
   console.log('\nEnd-to-end per provider\n');
 

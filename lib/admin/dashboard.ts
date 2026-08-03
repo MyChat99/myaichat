@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { createAdminClient } from '@/lib/db/admin';
-import { getAdapter, registeredProviderNames } from '@/lib/providers/registry';
+import { getAdapter, hasUsableKey, isRegisteredProvider } from '@/lib/providers/registry';
 import { HEALTH_TIMEOUT_MS, withDeadline } from '@/lib/providers/resilience';
 import { ProviderError } from '@/lib/providers/types';
 
@@ -55,7 +55,27 @@ function isFresh(entry: ProviderHealth | undefined): entry is ProviderHealth {
 }
 
 /**
- * Health for every registered provider.
+ * Health for every provider that is actually meant to be serving traffic.
+ *
+ * ⚠️ This reads the `providers` TABLE, not the adapter registry. It used to
+ * iterate `registeredProviderNames()` — every adapter compiled into the binary —
+ * which meant the dashboard probed providers the operator had switched off and
+ * providers that had never been given a key, then reported both as "not
+ * responding". A provider deliberately turned off being announced as broken is
+ * worse than useless: it trains the operator to ignore the one banner whose job
+ * is to be believed.
+ *
+ * Same defect class as the sign-up switch that was never read: a flag stored,
+ * shown in the UI, and not consulted where it decides something.
+ *
+ * Three states, and the distinction between the last two is the point:
+ *
+ *  - **disabled** — not returned at all. Off means off; it is not a health
+ *    question, and there is nothing for an operator to act on.
+ *  - **enabled, no key** — returned with `ok: null`. This is a real thing to
+ *    tell someone, but it is a configuration gap, not an outage, so it must not
+ *    read as "not responding" or trip the alert banner.
+ *  - **enabled, with a key** — probed for real.
  *
  * Checks run concurrently — three providers checked in series would make an
  * admin wait for the sum of three network round trips to see a page that is
@@ -66,10 +86,38 @@ function isFresh(entry: ProviderHealth | undefined): entry is ProviderHealth {
  * provider is down reports nothing.
  */
 export async function getProviderHealth(force = false): Promise<ProviderHealth[]> {
-  const names = registeredProviderNames();
+  const db = createAdminClient();
+  const { data: rows } = await db.from('providers').select('name, enabled, key_last4');
+
+  const candidates = (rows ?? [])
+    // A row naming an adapter this build does not have cannot be checked, and
+    // is not the operator's problem to see on a health panel.
+    .filter((row) => isRegisteredProvider(row.name))
+    .filter((row) => row.enabled);
 
   return Promise.all(
-    names.map(async (name): Promise<ProviderHealth> => {
+    candidates.map(async (row): Promise<ProviderHealth> => {
+      const name = row.name;
+
+      /**
+       * No key: say so plainly and spend nothing.
+       *
+       * Probing would throw inside `getAdapter` and land in the catch below as
+       * `ok: false, "Not configured"` — a red cross and a place in the "not
+       * responding" count for a provider that was simply never set up. Not
+       * cached either: a key arriving should show up on the next render, not in
+       * five minutes.
+       */
+      if (!hasUsableKey(name, row.key_last4)) {
+        return {
+          name,
+          ok: null,
+          message: 'No key set',
+          latencyMs: null,
+          checkedAt: new Date().toISOString(),
+        };
+      }
+
       const cached = healthCache.get(name);
       if (!force && isFresh(cached)) return cached;
 
