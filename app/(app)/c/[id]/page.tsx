@@ -70,6 +70,8 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         id: m.id,
         displayName: m.displayName,
         providerName: m.providerName,
+        supportsVision: m.supportsVision,
+        supportsDocuments: m.supportsDocuments,
       }))}
       selectedModelId={conversation.model_id}
       conversations={await listConversationTitles()}

@@ -12,6 +12,13 @@ export type SelectableModel = {
   id: string;
   displayName: string;
   providerName: string;
+  /**
+   * Carried to the client so the composer can refuse a pairing BEFORE the
+   * upload and the send. Without these the paperclip cannot know that the
+   * selected model will reject the file it just accepted.
+   */
+  supportsVision: boolean;
+  supportsDocuments: boolean;
 };
 
 type Props = {

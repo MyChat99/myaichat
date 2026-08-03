@@ -28,6 +28,8 @@ export default async function NewChatPage() {
         id: m.id,
         displayName: m.displayName,
         providerName: m.providerName,
+        supportsVision: m.supportsVision,
+        supportsDocuments: m.supportsDocuments,
       }))}
       selectedModelId={models[0]?.id ?? null}
       conversations={await listConversationTitles()}
