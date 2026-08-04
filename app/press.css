@@ -1175,6 +1175,66 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
   border-radius: 0;
 }
 
+/* ── create user ─────────────────────────────────────────────────────────────
+   A form set on its own stock, so it reads as a separate act from the table of
+   accounts beneath it. The revealed password is set in mono at a size meant to
+   be read aloud. */
+[data-press='create-user'] {
+  padding: 14px;
+  background: var(--background);
+  border: var(--rule) solid var(--border);
+  box-shadow: 4px 4px 0 var(--border);
+}
+[data-press='create-user-title'],
+[data-press='create-user-made'] {
+  font-family: var(--press-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+[data-press='create-user-note'],
+[data-press='create-user-once'] {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+[data-press='create-user-once'] {
+  color: var(--destructive);
+  margin-bottom: 8px;
+}
+[data-press='create-user-secret'] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: var(--hairline) solid var(--border);
+  background: var(--muted);
+}
+[data-press='create-user-secret'] code {
+  font-family: var(--press-mono);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  flex: 1;
+  word-break: break-all;
+}
+[data-press='create-user-secret'] button {
+  display: inline-flex;
+  padding: 5px;
+  border: var(--hairline) solid var(--border);
+  background: var(--background);
+  cursor: pointer;
+}
+[data-press='create-user-secret'] button svg {
+  width: 14px;
+  height: 14px;
+}
+[data-press='create-user-secret'] button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
 /* ── confirmation ────────────────────────────────────────────────────────────
    A letterpress card, not an OS panel. The destructive action is inked as the
    danger colour rather than merely placed on the right, because "which button

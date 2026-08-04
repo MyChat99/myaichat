@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/db/admin';
 import { requireAdmin } from '@/lib/security/auth';
 
+import { CreateUser } from './create-user';
 import { UsersTable, type AdminUser } from './users-client';
 
 export default async function UsersPage() {
@@ -37,6 +38,8 @@ export default async function UsersPage() {
           enforced by row-level security, not just the UI.
         </p>
       </header>
+
+      <CreateUser />
 
       <UsersTable users={users} currentUserId={admin.id} />
     </div>
