@@ -23,6 +23,7 @@ export type AuditAction =
   | 'model.created'
   | 'model.updated'
   | 'model.deleted'
+  | 'user.created'
   | 'user.role_changed'
   | 'user.suspension_changed'
   | 'settings.updated'

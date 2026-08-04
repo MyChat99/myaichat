@@ -11,6 +11,7 @@ import { ProviderError } from '@/lib/providers/types';
 import { auditLog, redactMetadata } from '@/lib/security/audit';
 import { requireAdmin } from '@/lib/security/auth';
 import { encryptSecret, keyLast4 } from '@/lib/security/crypto';
+import { strongPasswordSchema } from '@/lib/security/password';
 import { ReauthError, requireAdminWithPassword } from '@/lib/security/reauth';
 import { ping } from '@/lib/security/keepalive';
 
@@ -426,4 +427,91 @@ export async function pingDatabase(): Promise<{
     lastActivityAt: result.lastActivityAt,
     error: result.error,
   };
+}
+
+/**
+ * Create an account from the admin panel.
+ *
+ * Goes through the ADMIN API, so it bypasses both sign-up gates exactly as
+ * `npm run accounts:create` does — the application's `signups_enabled` switch
+ * and the Supabase project-level one. That is the point: closing sign-ups stops
+ * strangers making accounts, not the operator.
+ *
+ * ## What it deliberately cannot do
+ *
+ * Mint an admin. The role comes from `handle_new_user()`, which writes `'user'`
+ * unconditionally; nothing here passes a role at all. Promotion is a separate,
+ * re-authenticated, audit-logged action, and a creation form that could also
+ * grant admin would quietly become the least-guarded path to it.
+ *
+ * ## The profile row
+ *
+ * Not written here. `handle_new_user()` fires on the `auth.users` insert and
+ * creates the `profiles` and `user_preferences` rows, taking the display name
+ * from user metadata. Writing them here as well would be a second source of
+ * truth that can disagree with the trigger — which is what "match whatever
+ * accounts:create does" actually means, since that script relies on the same
+ * trigger rather than duplicating it.
+ */
+const createUserSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Enter a valid email address.'),
+  password: strongPasswordSchema,
+  displayName: z.string().trim().max(60).optional(),
+});
+
+export async function createUserAccount(input: {
+  email: string;
+  password: string;
+  displayName?: string;
+}): Promise<{ ok: true; email: string } | { ok: false; error: string }> {
+  const admin = await requireAdmin();
+
+  const parsed = createUserSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Check the details and retry.' };
+  }
+
+  const db = createAdminClient();
+  const { data, error } = await db.auth.admin.createUser({
+    email: parsed.data.email,
+    password: parsed.data.password,
+    // Confirmed on creation: these accounts are handed out directly, and an
+    // unconfirmed account cannot sign in.
+    email_confirm: true,
+    user_metadata: parsed.data.displayName ? { display_name: parsed.data.displayName } : undefined,
+  });
+
+  if (error || !data?.user) {
+    /**
+     * Never the upstream text.
+     *
+     * Supabase says "A user with this email address has already been
+     * registered", and passing that through is the same disclosure the sign-up
+     * form was fixed for — except here the reader is an admin who is entitled
+     * to know, so the duplicate case is named plainly and everything else is
+     * generic. The distinction is made on the STATUS, not on matching the
+     * message, because vendor wording changes without notice.
+     */
+    const duplicate = error?.status === 422 || /already/i.test(error?.message ?? '');
+    console.error('[admin] createUser rejected:', error?.status, error?.message);
+    return {
+      ok: false,
+      error: duplicate
+        ? 'An account with that email already exists.'
+        : 'That account could not be created.',
+    };
+  }
+
+  await auditLog({
+    actorId: admin.id,
+    action: 'user.created',
+    targetType: 'user',
+    targetId: data.user.id,
+    // The password is never written here, and `redactMetadata` would strip it
+    // anyway. The email is the whole record worth keeping.
+    metadata: { email: parsed.data.email },
+  });
+
+  revalidatePath('/admin/users');
+  return { ok: true, email: parsed.data.email };
 }
