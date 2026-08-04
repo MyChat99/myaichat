@@ -470,9 +470,21 @@ export const DEFAULT_APPEARANCE = {
   // Annotated so it stays the literal union member rather than widening to
   // `string` — this object has to satisfy `Appearance`, and a widened `theme`
   // would not.
-  theme: 'system' as const,
-  // Riso is the product's visual identity, not the shadcn default.
-  presetTheme: 'riso',
+  /**
+   * Newsprint light, deliberately, and for the FRONT DOOR as much as anything.
+   *
+   * This is the default for a signed-out visitor and for a new account alike —
+   * one default, not two. It was `system`/`riso`, which meant anyone arriving
+   * with a dark OS met a dark pink login page: a striking screen, but not the
+   * letterpress the product is. Newsprint light is the brand at its plainest,
+   * which is what a front door should be.
+   *
+   * `light` rather than `system` for the same reason: the first impression
+   * should not depend on the visitor's OS setting. Anyone who wants Riso dark
+   * chooses it in Appearance, and that choice is respected everywhere after.
+   */
+  theme: 'light' as const,
+  presetTheme: 'newsprint',
   // Follow the theme rather than override it. See THEME_ACCENT.
   accentColor: THEME_ACCENT,
   fontSize: 'md',

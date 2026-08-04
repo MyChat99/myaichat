@@ -3,6 +3,7 @@
 import { Menu, MessageSquarePlus, Pin, PinOff, Search, Trash2, X } from 'lucide-react';
 
 import { EditionPicker } from '@/components/chat/edition-picker';
+import { useConfirm } from '@/components/ui/press-confirm';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Fragment, useMemo, useState, useTransition } from 'react';
@@ -67,6 +68,7 @@ export function Sidebar({
 }) {
   const params = useParams<{ id?: string }>();
   const [query, setQuery] = useState('');
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -176,6 +178,7 @@ export function Sidebar({
 
   return (
     <>
+      {confirmDialog}
       {/* Mobile toggle */}
       <Button
         type="button"
@@ -292,7 +295,14 @@ export function Sidebar({
                      read as part of the first conversation. */
                   <Fragment key={c.id}>
                     {edition ? (
-                      <li data-press="divider" data-edition="true" role="presentation">
+                      <li
+                        data-press="divider"
+                        data-edition="true"
+                        role="presentation"
+                        /* The heading truncates in a 220px column, so the full
+                           name has to be readable somehow. */
+                        title={edition.name}
+                      >
                         {edition.name}
                       </li>
                     ) : null}
@@ -398,9 +408,15 @@ export function Sidebar({
                                 data-danger="true"
                                 aria-label="Delete conversation"
                                 onClick={() => {
-                                  if (confirm(`Delete "${c.title}"? This cannot be undone.`)) {
-                                    startTransition(() => void deleteConversation(c.id));
-                                  }
+                                  void (async () => {
+                                    const ok = await confirm({
+                                      title: `Delete "${c.title}"?`,
+                                      body: 'This cannot be undone.',
+                                      confirmLabel: 'Delete',
+                                      destructive: true,
+                                    });
+                                    if (ok) startTransition(() => void deleteConversation(c.id));
+                                  })();
                                 }}
                               >
                                 <Trash2 aria-hidden />

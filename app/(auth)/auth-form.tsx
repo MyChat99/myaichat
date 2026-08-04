@@ -26,9 +26,15 @@ const COPY = {
     description: 'Welcome back.',
     submit: 'Sign in',
     pending: 'Signing in…',
-    footer: 'No account?',
-    footerHref: '/signup',
-    footerLink: 'Create one',
+    /**
+     * Sign-ups are closed on this deployment, so "Create one" sent people to a
+     * form that refuses them. Stating the policy is kinder than offering a door
+     * that does not open. /signup stays functional for when it reopens — this
+     * is copy, not a route change.
+     */
+    footer: 'Accounts are by invitation.',
+    footerHref: undefined,
+    footerLink: undefined,
   },
   signup: {
     title: 'Create account',
@@ -116,11 +122,19 @@ export function AuthForm({ mode, action, next, notice }: Props) {
           <SubmitButton mode={mode} />
         </form>
 
+        {/* A footer with no link is a statement, not an invitation to click.
+            Sign-in says "Accounts are by invitation."; sign-up still links back
+            to sign-in, so the pair is not a dead end. */}
         <p className="text-muted-foreground mt-6 text-center text-sm">
-          {copy.footer}{' '}
-          <Link href={copy.footerHref} className="text-foreground underline underline-offset-4">
-            {copy.footerLink}
-          </Link>
+          {copy.footer}
+          {copy.footerHref && copy.footerLink ? (
+            <>
+              {' '}
+              <Link href={copy.footerHref} className="text-foreground underline underline-offset-4">
+                {copy.footerLink}
+              </Link>
+            </>
+          ) : null}
         </p>
       </CardContent>
     </Card>

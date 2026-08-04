@@ -16,6 +16,34 @@ Known bugs, blockers, and technical debt. **Newest entries at the top.**
 
 ---
 
+### ISSUE-071 — GitHub dormancy can silently disable the Supabase keep-alive
+
+**Status:** Open — **cut from the 2026-08-03 batch, design attached** | **Severity:** Medium | **Phase:** 8 | **Opened:** 2026-08-03
+
+**The risk.** GitHub disables scheduled workflows in a repository with no activity for 60 days. `keepalive.yml` is what stops the free Supabase project pausing, so the failure chain is: repo goes quiet → GitHub disables the workflow → nothing pings Supabase → the project pauses → **the whole site is down**, with no alert anywhere in this application, because every layer it can see is healthy.
+
+**Cut deliberately, not forgotten.** Sized at 4–6 hours against ~2–3 for the rest of that batch, and the owner is covering the dormancy clock with a calendar reminder. Written down so it is ready to pick up.
+
+**Design as decided (Actions-only variant).** A "Ping" section in the admin sidebar, with two cards:
+
+- **Supabase** — as the Overview card is today: last-touched, a manual Ping, measured latency. Move it here and leave a one-line summary on Overview linking across.
+- **GitHub workflow** — read-only status plus one action:
+  - `keepalive.yml` **enabled or disabled** (Actions API), last run time and conclusion
+  - a visible warning when the workflow reports disabled
+  - a **"Re-enable workflow"** button — `PUT /repos/{owner}/{repo}/actions/workflows/{id}/enable`
+
+**Credential:** `GITHUB_KEEPALIVE_TOKEN` — **not** `GITHUB_TOKEN`, which collides with the one Actions injects. Fine-grained PAT scoped to this one repository:
+
+| Permission | Level |
+| --- | --- |
+| Metadata | Read |
+| Actions | Read and Write |
+| Contents | **none** |
+
+**No `Contents` grant and no push-a-commit button, deliberately.** That was the original sketch and it means the web app holds push access to the repo. Re-enabling a disabled workflow addresses the actual failure without it. Resetting the 60-day clock needs real repo activity, which the calendar reminder covers.
+
+**Must fail visibly when the token is absent** — a clear "not configured" state, distinguishable from "configured and broken". That distinction is the R2 lesson: partial configuration that looks like none is how [ISSUE-065](#issue-065) hid for days.
+
 ### ISSUE-070 — `/admin` reported disabled and keyless providers as "not responding"
 
 **Status:** **Resolved 2026-08-03 — verified in production** | **Severity:** Medium | **Phase:** 4/7 | **Opened:** 2026-08-03 (reported by the owner)
