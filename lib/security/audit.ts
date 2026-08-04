@@ -24,6 +24,7 @@ export type AuditAction =
   | 'model.updated'
   | 'model.deleted'
   | 'user.created'
+  | 'user.password_reset'
   | 'user.role_changed'
   | 'user.suspension_changed'
   | 'settings.updated'

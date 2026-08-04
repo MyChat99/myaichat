@@ -33,9 +33,18 @@ export default async function UsersPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-xl font-semibold">Users</h1>
+        {/*
+          Rewritten because it described the OLD behaviour and had become
+          false. Suspension was a read-only state — history readable, sending
+          refused — and is now a full revocation. Copy that describes a
+          superseded model is worse than no copy: it is the page an operator
+          reads to decide whether suspending someone is enough.
+        */}
         <p className="text-muted-foreground mt-1 text-sm">
-          Suspended users keep their history and can still sign in, but cannot send messages —
-          enforced by row-level security, not just the UI.
+          Suspending revokes access immediately: any answer still being written is cut off and not
+          billed, the session ends on the next request, and sign-in is blocked until it is lifted. A
+          suspended administrator loses the panel too. Nothing is deleted — reactivating restores
+          the account and its history exactly as it was.
         </p>
       </header>
 

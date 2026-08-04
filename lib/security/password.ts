@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import { z } from 'zod';
 
 /**
@@ -148,3 +150,41 @@ export const signUpPasswordSchema = z
     message: 'Password must not contain your email address',
     path: ['password'],
   });
+
+/**
+ * A passphrase for an account an administrator is handing over in person.
+ *
+ * Four words and four digits: long enough to pass `strongPasswordSchema`, short
+ * enough to read down a phone line, which is how one of these actually gets
+ * delivered. `randomBytes`, never `Math.random` — the latter is seeded
+ * predictably and has no business near a credential.
+ *
+ * Server-side and shared by account creation and password reset, so there is
+ * one definition of what a handed-over password looks like rather than one per
+ * call site drifting apart.
+ */
+export function generatePassphrase(): string {
+  const bytes = randomBytes(5);
+  const pick = (i: number) => PASSPHRASE_WORDS[bytes[i] % PASSPHRASE_WORDS.length];
+  const digits = String(((bytes[3] << 8) | bytes[4]) % 10_000).padStart(4, '0');
+  return `${pick(0)}-${pick(1)}-${pick(2)}-${digits}`;
+}
+
+const PASSPHRASE_WORDS = [
+  'press',
+  'ink',
+  'paper',
+  'plate',
+  'folio',
+  'quire',
+  'signature',
+  'proof',
+  'galley',
+  'stone',
+  'roller',
+  'type',
+  'margin',
+  'gutter',
+  'rule',
+  'stock',
+];

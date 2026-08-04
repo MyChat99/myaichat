@@ -11,7 +11,7 @@ import { ProviderError } from '@/lib/providers/types';
 import { auditLog, redactMetadata } from '@/lib/security/audit';
 import { requireAdmin } from '@/lib/security/auth';
 import { encryptSecret, keyLast4 } from '@/lib/security/crypto';
-import { strongPasswordSchema } from '@/lib/security/password';
+import { generatePassphrase, strongPasswordSchema } from '@/lib/security/password';
 import { ReauthError, requireAdminWithPassword } from '@/lib/security/reauth';
 import { ping } from '@/lib/security/keepalive';
 
@@ -514,4 +514,65 @@ export async function createUserAccount(input: {
 
   revalidatePath('/admin/users');
   return { ok: true, email: parsed.data.email };
+}
+
+/**
+ * Issue a new password for someone who cannot sign in.
+ *
+ * Handed over directly rather than emailed, because email delivery is not
+ * proven on this deployment ([ISSUE-060]): a reset that silently fails to
+ * arrive is worse than no reset, since the admin believes it worked and the
+ * user waits for a message that never comes.
+ *
+ * ## Why the server generates it
+ *
+ * The admin does not choose it, and cannot. A human-chosen "temporary" password
+ * is reused, is guessable, and tends to be the same one every time — and the
+ * whole point of this action is that the account was already unreachable. The
+ * generator is the same shape the account-creation form uses.
+ *
+ * ## Re-authenticated
+ *
+ * Behind `requireAdminWithPassword`, like role changes and key deletion. Taking
+ * over an account is what this does — anyone who walks up to an unlocked
+ * session should not be able to do it, and the password prompt is the check
+ * that an unattended browser cannot satisfy.
+ */
+export async function resetUserPassword(
+  userId: string,
+  password: string,
+): Promise<{ ok: true; email: string; password: string } | { ok: false; error: string }> {
+  let admin;
+  try {
+    admin = await requireAdminWithPassword(password, await headers());
+  } catch (err) {
+    if (err instanceof ReauthError) return { ok: false, error: err.message };
+    throw err;
+  }
+
+  const parsedId = uuid.parse(userId);
+
+  const db = createAdminClient();
+  const { data: target } = await db.auth.admin.getUserById(parsedId);
+  if (!target?.user?.email) return { ok: false, error: 'That account no longer exists.' };
+
+  const issued = generatePassphrase();
+  const { error } = await db.auth.admin.updateUserById(parsedId, { password: issued });
+  if (error) {
+    console.error('[admin] password reset rejected:', error.status, error.message);
+    return { ok: false, error: 'That password could not be reset.' };
+  }
+
+  await auditLog({
+    actorId: admin.id,
+    action: 'user.password_reset',
+    targetType: 'user',
+    targetId: parsedId,
+    // The email, never the password. `redactMetadata` would strip it anyway,
+    // but it must not be assembled here in the first place.
+    metadata: { email: target.user.email },
+  });
+
+  revalidatePath('/admin/users');
+  return { ok: true, email: target.user.email, password: issued };
 }
