@@ -1,11 +1,12 @@
 import Link from 'next/link';
 
+import { CommandPalette } from '@/components/command/command-palette';
 import { Sidebar, type SidebarConversation } from '@/components/chat/sidebar';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/db/server';
 import { AvatarExpand } from '@/components/ui/avatar-expand';
 import { dayGroup } from '@/lib/time';
-import { registeredProviderNames } from '@/lib/providers/registry';
+import { listAvailableModels, registeredProviderNames } from '@/lib/providers/registry';
 import { requireUser } from '@/lib/security/auth';
 
 import { signOut } from '../(auth)/actions';
@@ -60,6 +61,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // one is renamed.
   const editions = editionRows ?? [];
 
+  // Offered by the palette on every page. Empty on a deployment with no keys,
+  // which the palette renders as simply having no model section.
+  const paletteModels = (await listAvailableModels()).map((m) => ({
+    id: m.id,
+    displayName: m.displayName,
+    providerName: m.providerName,
+  }));
+
   const conversations: SidebarConversation[] = (data ?? []).map((c) => ({
     id: c.id,
     title: c.title,
@@ -96,6 +105,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
      * `h-dvh` and the shell went back to sizing itself from its content.
      */
     <div className="flex h-dvh overflow-hidden">
+      {/*
+        Mounted HERE, not in the chat thread.
+
+        Cmd+K and `?` were bound inside ChatThread, so they worked on chat pages
+        and nowhere else — Appearance, Profile and Admin had no palette and no
+        shortcuts help at all. A global shortcut that is only global on one
+        route is worse than none: it teaches a habit that then fails.
+
+        Model selection is bridged by an event rather than a prop, because this
+        shell has no chat state to change. On a chat page ChatThread listens; on
+        any other page the model list simply is not offered.
+      */}
+      <CommandPalette
+        conversations={conversations.map((c) => ({ id: c.id, title: c.title }))}
+        models={paletteModels}
+      />
+
       <Sidebar
         conversations={conversations}
         editions={editions}

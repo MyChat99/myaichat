@@ -23,7 +23,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               <span aria-hidden="true">Pilcrow</span>
             </div>
           </div>
-          <div data-press="issue">Multi-provider AI chat</div>
         </div>
 
         {children}

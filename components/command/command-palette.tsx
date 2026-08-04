@@ -133,7 +133,13 @@ export function CommandPalette({ conversations, models, onSelectModel }: Props) 
       label: `Switch to ${m.displayName}`,
       hint: m.providerName,
       icon: Sparkles,
-      run: () => onSelectModel?.(m.id),
+      run: () =>
+        // Prop when one is given, event otherwise: the shell mounts this with
+        // no handler, and the chat thread — the only thing that owns a model —
+        // listens for it.
+        onSelectModel
+          ? onSelectModel(m.id)
+          : window.dispatchEvent(new CustomEvent('pilcrow:select-model', { detail: m.id })),
     }));
 
     const conversationItems: Item[] = conversations.slice(0, 50).map((c) => ({

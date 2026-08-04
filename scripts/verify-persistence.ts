@@ -145,8 +145,21 @@ async function main() {
     //
     // Settings has no rule bar, so it has no section tabs — the way back to the
     // chat from there is the wordmark. Worth noticing in its own right.
+    /**
+     * The VISIBLE link, not the first one in the DOM.
+     *
+     * Several navigation links exist twice — once in the masthead, once in the
+     * tab rail — and `body:has([data-press='tabs'])` hides the masthead on every
+     * chat page. `.first()` therefore resolves to a perfectly good element that
+     * cannot be clicked, and the run dies on a 30s timeout that names a link
+     * plainly present in the markup.
+     *
+     * This is the third time that exact trap has cost time here: a dead avatar
+     * shipped behind it, and the portrait test "passed" against the hidden copy
+     * before being corrected. `:visible` is the fix each time.
+     */
     const clickLink = async (name: string) => {
-      const link = page.getByRole('link', { name, exact: true }).first();
+      const link = page.getByRole('link', { name, exact: true }).locator('visible=true').first();
       await link.waitFor({ state: 'visible', timeout: 15_000 });
       await link.click();
       await page.waitForLoadState('networkidle');

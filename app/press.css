@@ -1175,6 +1175,78 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
   border-radius: 0;
 }
 
+/* ── confirmation ────────────────────────────────────────────────────────────
+   A letterpress card, not an OS panel. The destructive action is inked as the
+   danger colour rather than merely placed on the right, because "which button
+   deletes" should not depend on knowing the platform's convention. */
+[data-press='confirm-scrim'] {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: color-mix(in oklab, var(--background) 80%, transparent);
+  animation: press-portrait-in 0.16s var(--press-ease) both;
+}
+[data-press='confirm'] {
+  max-width: min(92vw, 420px);
+  padding: 18px 18px 14px;
+  background: var(--background);
+  border: var(--rule) solid var(--border);
+  box-shadow: 6px 6px 0 var(--border);
+  animation: press-portrait-plate 0.16s var(--press-ease) both;
+}
+[data-press='confirm']:focus-visible {
+  outline: none;
+}
+[data-press='confirm-title'] {
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.3;
+}
+[data-press='confirm-body'] {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+  white-space: pre-line;
+}
+[data-press='confirm-actions'] {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+[data-press='confirm-actions'] button {
+  padding: 6px 12px;
+  font-family: var(--press-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: var(--hairline) solid var(--border);
+  background: var(--background);
+  cursor: pointer;
+}
+[data-press='confirm-actions'] button:hover {
+  box-shadow: 2px 2px 0 var(--border);
+}
+[data-press='confirm-actions'] button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+[data-press='confirm-go'][data-danger='true'] {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+  border-color: var(--destructive);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-press='confirm-scrim'],
+  [data-press='confirm'] {
+    animation: none;
+  }
+}
+
 /* ── editions ────────────────────────────────────────────────────────────────
    An edition heading is a section of the sidebar, so it takes the divider's
    form and adds weight — the reader has to be able to tell "a place I filed
@@ -1193,10 +1265,13 @@ body:has([data-press='tabs']) [data-press='masthead-bar'] {
 /* The filing menu. Opens upward-neutral and is bounded, because a reader with
    thirty editions should scroll the menu and not the page. */
 [data-press='edition-menu'] {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 40;
+  /* FIXED, and rendered into <body> via a portal. The sidebar list is
+     `overflow-y: auto`, and an absolutely-positioned menu inside a scroll
+     container is clipped by it — z-index cannot help, because overflow clipping
+     happens before stacking is considered. Coordinates come from the trigger's
+     own rect, in the component. */
+  position: fixed;
+  z-index: 80;
   min-width: 170px;
   max-height: 260px;
   overflow-y: auto;

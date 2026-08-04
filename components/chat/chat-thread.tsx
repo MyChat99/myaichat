@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 
 import { createConversationForMessage } from '@/app/(app)/conversations/actions';
 import { useAttachments } from '@/components/chat/attachments';
-import { CommandPalette } from '@/components/command/command-palette';
 import { Composer } from '@/components/chat/composer';
 import { SectionTabs } from '@/components/chat/section-tabs';
 import { LocalTime } from '@/components/ui/local-time';
@@ -95,6 +94,17 @@ export function ChatThread({
   const router = useRouter();
 
   const [messages, setMessages] = useState<UiMessage[]>(initialMessages);
+  /*
+   * The palette lives in the app shell now, so it can be reached from every
+   * page. It announces a model choice; this is the only place that can act on
+   * one, so this is where it is heard.
+   */
+  useEffect(() => {
+    const onPick = (e: Event) => setModelId((e as CustomEvent<string>).detail);
+    window.addEventListener('pilcrow:select-model', onPick);
+    return () => window.removeEventListener('pilcrow:select-model', onPick);
+  }, []);
+
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [atBottom, setAtBottom] = useState(true);
@@ -359,16 +369,6 @@ export function ChatThread({
 
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
-      <CommandPalette
-        conversations={conversations}
-        models={models.map((m) => ({
-          id: m.id,
-          displayName: m.displayName,
-          providerName: m.providerName,
-        }))}
-        onSelectModel={setModelId}
-      />
-
       <div
         className="border-border flex items-center justify-end gap-1 border-b px-4 py-1.5"
         data-press="rule"

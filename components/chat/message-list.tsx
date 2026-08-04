@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Markdown } from '@/components/chat/markdown';
 import { ProviderLogo } from '@/components/chat/provider-logo';
 import { MessageEntrance, useHydrated } from '@/components/motion/motion';
+import { useConfirm } from '@/components/ui/press-confirm';
 import {
   ESTIMATE_CAVEAT,
   compareCost,
@@ -299,6 +300,7 @@ function AnswerCost({
   modelId: string | null;
   onRerunOn?: (modelId: string) => void;
 }) {
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [open, setOpen] = useState(false);
 
   // Only worth offering when there is something to compare against.
@@ -306,101 +308,106 @@ function AnswerCost({
   const rows = open ? compareCost(inputTokens, outputTokens, pricedModels, modelId) : [];
 
   return (
-    <div data-press="answer-cost-wrap">
-      <p data-press="answer-cost">
-        <span>{formatUsd(cost)}</span>
-        <span>{inputTokens} in</span>
-        <span>{outputTokens} out</span>
-        {comparable ? (
-          <button
-            type="button"
-            data-press="cost-toggle"
-            aria-expanded={open}
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? 'Hide comparison' : 'Elsewhere'}
-          </button>
-        ) : null}
-      </p>
+    <>
+      {confirmDialog}
 
-      {open ? (
-        <div
-          data-press="cost-table"
-          role="region"
-          aria-label="What this answer would have cost on other models"
-        >
-          {rows.map((row) => {
-            const body = (
-              <>
-                <span data-press="cost-model">
-                  <ProviderLogo provider={row.providerName} />
-                  {row.displayName}
-                </span>
-                <span data-press="cost-figure">
-                  {/* Never $0.00 for an unpriced model: a missing price is a gap
+      <div data-press="answer-cost-wrap">
+        <p data-press="answer-cost">
+          <span>{formatUsd(cost)}</span>
+          <span>{inputTokens} in</span>
+          <span>{outputTokens} out</span>
+          {comparable ? (
+            <button
+              type="button"
+              data-press="cost-toggle"
+              aria-expanded={open}
+              onClick={() => setOpen((v) => !v)}
+            >
+              {open ? 'Hide comparison' : 'Elsewhere'}
+            </button>
+          ) : null}
+        </p>
+
+        {open ? (
+          <div
+            data-press="cost-table"
+            role="region"
+            aria-label="What this answer would have cost on other models"
+          >
+            {rows.map((row) => {
+              const body = (
+                <>
+                  <span data-press="cost-model">
+                    <ProviderLogo provider={row.providerName} />
+                    {row.displayName}
+                  </span>
+                  <span data-press="cost-figure">
+                    {/* Never $0.00 for an unpriced model: a missing price is a gap
                       in the admin's setup, and rendering it as free would be the
                       most expensive kind of wrong. */}
-                  {row.usd === null ? 'no price set' : formatUsd(row.usd)}
-                </span>
-                <span data-press="cost-delta">
-                  {row.actual ? 'this answer' : (describeRatio(row.ratio) ?? '—')}
-                </span>
-              </>
-            );
+                    {row.usd === null ? 'no price set' : formatUsd(row.usd)}
+                  </span>
+                  <span data-press="cost-delta">
+                    {row.actual ? 'this answer' : (describeRatio(row.ratio) ?? '—')}
+                  </span>
+                </>
+              );
 
-            /**
-             * A row is a button only when clicking it can actually do
-             * something. A surface that invites a press and does nothing is
-             * worse than a plain table: the reader tries it, nothing happens,
-             * and they stop trusting the rest of the page. This was reported
-             * from real use — someone clicked a model expecting to switch.
-             */
-            const canRerun = Boolean(onRerunOn) && !row.actual;
+              /**
+               * A row is a button only when clicking it can actually do
+               * something. A surface that invites a press and does nothing is
+               * worse than a plain table: the reader tries it, nothing happens,
+               * and they stop trusting the rest of the page. This was reported
+               * from real use — someone clicked a model expecting to switch.
+               */
+              const canRerun = Boolean(onRerunOn) && !row.actual;
 
-            if (!canRerun) {
+              if (!canRerun) {
+                return (
+                  <div
+                    key={row.modelId}
+                    data-press="cost-row"
+                    data-actual={row.actual ? 'true' : 'false'}
+                  >
+                    {body}
+                  </div>
+                );
+              }
+
               return (
-                <div
+                <button
                   key={row.modelId}
+                  type="button"
                   data-press="cost-row"
-                  data-actual={row.actual ? 'true' : 'false'}
+                  data-action="true"
+                  onClick={() => {
+                    // The price is already on the row being clicked, so the
+                    // confirmation repeats it rather than asking for a blind yes.
+                    const price = row.usd === null ? 'an unknown amount' : formatUsd(row.usd);
+                    void (async () => {
+                      const ok = await confirm({
+                        title: `Ask ${row.displayName} the same thing?`,
+                        body: `This replaces the answer above and spends about ${price}.\n\nYour daily budget and hourly limit still apply.`,
+                        confirmLabel: 'Re-run',
+                      });
+                      if (ok) onRerunOn?.(row.modelId);
+                    })();
+                  }}
                 >
                   {body}
-                </div>
+                  <span data-press="cost-run" aria-hidden>
+                    Re-run
+                  </span>
+                </button>
               );
-            }
-
-            return (
-              <button
-                key={row.modelId}
-                type="button"
-                data-press="cost-row"
-                data-action="true"
-                onClick={() => {
-                  // The price is already on the row being clicked, so the
-                  // confirmation repeats it rather than asking for a blind yes.
-                  const price = row.usd === null ? 'an unknown amount' : formatUsd(row.usd);
-                  if (
-                    confirm(
-                      `Ask ${row.displayName} the same thing?\n\nThis replaces the answer above and spends about ${price}. Your daily budget and hourly limit still apply.`,
-                    )
-                  ) {
-                    onRerunOn?.(row.modelId);
-                  }
-                }}
-              >
-                {body}
-                <span data-press="cost-run" aria-hidden>
-                  Re-run
-                </span>
-              </button>
-            );
-          })}
-          <p data-press="cost-caveat">
-            {ESTIMATE_CAVEAT}
-            {onRerunOn ? ' Choose a row to ask that model the same question.' : ''}
-          </p>
-        </div>
-      ) : null}
-    </div>
+            })}
+            <p data-press="cost-caveat">
+              {ESTIMATE_CAVEAT}
+              {onRerunOn ? ' Choose a row to ask that model the same question.' : ''}
+            </p>
+          </div>
+        ) : null}
+      </div>
+    </>
   );
 }

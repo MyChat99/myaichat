@@ -263,9 +263,15 @@ async function main() {
      * every light-mode visitor gets a dark first paint — the same flash,
      * pointed the other way.
      */
+    /*
+     * Widened from `!== 'system'` to "not dark", because the default is now
+     * `light` and TypeScript correctly pointed out that the old comparison
+     * could never be true. The property being guarded is unchanged: a first
+     * paint must not be dark unless the stored preference actually is.
+     */
     check(
-      'no dark class is hardcoded while the mode is system',
-      DEFAULT_APPEARANCE.theme !== 'system' || !/<html[^>]*class="[^"]*\bdark\b/.test(anon),
+      'no dark class is hardcoded unless the default mode is dark',
+      String(DEFAULT_APPEARANCE.theme) === 'dark' || !/<html[^>]*class="[^"]*\bdark\b/.test(anon),
     );
 
     // Invalid stored values must degrade, not blank the page. The DB constraint
