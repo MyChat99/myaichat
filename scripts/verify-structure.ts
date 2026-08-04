@@ -21,6 +21,8 @@
 import { readFileSync } from 'node:fs';
 
 import { createClient } from '@supabase/supabase-js';
+import { readFile, readdir } from 'node:fs/promises';
+
 import { chromium, type Page } from 'playwright';
 
 import type { Database } from '../lib/db/types';
@@ -110,6 +112,44 @@ async function main() {
     .filter((hex) => !withoutComments.includes(`%23${hex.slice(1)}`));
   check('press.css names no colour', literals.length === 0, literals.slice(0, 5).join(', '));
   check('press.css draws its rules in the ink role', withoutComments.includes('var(--border)'));
+
+  /**
+   * Every SVG in the repo must be well-formed XML.
+   *
+   * `app/icon.svg` shipped broken because a comment in it named a CSS custom
+   * property directly — and XML forbids two hyphens in a row inside a comment,
+   * so the leading `--` of the token ended it early and the parser aborted.
+   *
+   * The failure is silent from every angle this project usually looks from:
+   * the route returned 200, the content-type was `image/svg+xml`, the file was
+   * the right size, and the markup read correctly to a human. It simply did not
+   * render, in any browser. Only opening it directly, or parsing it, says so.
+   *
+   * Parsed rather than pattern-matched: a regex for `--` inside comments finds
+   * the bug we already had, and this finds the next one too.
+   */
+  console.log('\nEvery SVG is well-formed XML\n');
+  const svgFiles = [
+    ...(await readdir('app')).filter((f) => f.endsWith('.svg')).map((f) => `app/${f}`),
+    ...(await readdir('public')).filter((f) => f.endsWith('.svg')).map((f) => `public/${f}`),
+  ];
+  for (const file of svgFiles) {
+    const body = await readFile(file, 'utf8');
+    /*
+     * The exact rule that shipped a broken icon: XML forbids two hyphens in a
+     * row inside a comment, and the note in `app/icon.svg` named a CSS custom
+     * property directly, so the token's leading `--` ended the comment early
+     * and the parser aborted.
+     *
+     * Silent from every angle this project usually checks: the route returned
+     * 200, the content-type was right, the size was right, and the markup read
+     * correctly to a human. It simply did not render, in any browser.
+     */
+    const badComment = (body.match(/<!--[\s\S]*?-->/g) ?? []).some((c) =>
+      c.slice(4, -3).includes('--'),
+    );
+    check(`${file}: no double hyphen inside a comment`, !badComment, 'XML forbids "--" there');
+  }
 
   console.log('\nRendered structure, every palette, both modes\n');
 

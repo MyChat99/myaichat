@@ -1,20 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Pilcrow">
   <!--
-    The mark is the pilcrow itself — the standalone logo, as distinct from the
+    The mark is the pilcrow itself: the standalone logo, as distinct from the
     wordmark, which stays the clean word "Pilcrow".
 
-    Square with no corner radius, because `--radius: 0` is the one structural
-    invariant of this design and a rounded app icon would be the only soft
-    corner the product owns.
+    Square, with the radius token held at zero, because that is the one
+    structural invariant of this design and a rounded app icon would be the
+    only soft corner the product owns.
 
-    Colours are literal here and cannot be otherwise: this file is served as a
-    static asset to browser chrome, outside the document, so no CSS custom
-    property is in scope. Ink on paper, at a contrast that survives both a light
-    and a dark tab strip.
+    NOTE ON WORDING: this comment must never contain two hyphens in a row. XML
+    forbids the sequence inside a comment, and an SVG that is not well-formed
+    does not degrade — the parser aborts and the icon fails to render in every
+    browser. That is exactly what happened here: the note used to name the CSS
+    custom property directly, and its leading hyphens silently broke the file
+    while the route still returned 200 with the right content-type. Naming the
+    token in prose is the price of keeping the note.
 
-    Drawn as geometry rather than set as text: a <text> favicon depends on a
-    font the rendering context may not have and silently falls back to whatever
-    it does have — which, for a mark that IS one glyph, means the logo is wrong.
+    Colours are literal and cannot be otherwise: this is served as a static
+    asset to browser chrome, outside the document, so no CSS custom property is
+    in scope. Ink on paper, at a contrast that survives a light or dark tab.
+
+    Drawn as geometry rather than set as text: a text favicon depends on a font
+    the rendering context may not have and falls back silently, which for a mark
+    that IS one glyph means the logo is wrong.
   -->
   <rect width="512" height="512" fill="#121212" />
   <g fill="#f5f2e9">
