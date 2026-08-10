@@ -72,7 +72,7 @@
     "@supabase/supabase-js": "^2.111.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "framer-motion": "^12.43.0",
+    "framer-motion": "^13.0.0",
     "highlight.js": "^11.11.1",
     "lucide-react": "^1.28.0",
     "next": "16.2.12",
